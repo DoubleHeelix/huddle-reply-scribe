@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useScreenshot } from 'use-react-screenshot';
 import { useToast } from "@/hooks/use-toast";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
-import { LandingPage } from "@/components/LandingPage";
+import LandingPage from "@/components/LandingPage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +29,7 @@ const Index = () => {
   const [autoCropMargin, setAutoCropMargin] = useState(10);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isTestingOCR, setIsTestingOCR] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
   const { toast } = useToast();
   const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
 
@@ -187,236 +188,238 @@ const Index = () => {
     }
   };
 
-return (
-  <div className="min-h-screen bg-gray-900 text-white">
-    <LandingPage />
-    
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-6xl mx-auto">
-        <Tabs defaultValue="upload" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-gray-800 border-gray-700">
-            <TabsTrigger value="upload" className="text-white data-[state=active]:bg-gray-700">
-              Upload Image
-            </TabsTrigger>
-            <TabsTrigger value="past-huddles" className="text-white data-[state=active]:bg-gray-700">
-              Past Huddles
-            </TabsTrigger>
-            <TabsTrigger value="interruptions" className="text-white data-[state=active]:bg-gray-700">
-              Interruptions
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="text-white data-[state=active]:bg-gray-700">
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="pdf-upload" className="text-white data-[state=active]:bg-gray-700">
-              Upload PDF
-            </TabsTrigger>
-          </TabsList>
+  if (showLanding) {
+    return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+  }
 
-          <TabsContent value="upload" className="mt-6">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <div className="grid gap-4">
-                  <h2 className="text-xl font-semibold">1. Capture Context</h2>
-                  <p className="text-gray-400">Take a screenshot or upload an image to provide context for the AI.</p>
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-5 bg-gray-800 border-gray-700">
+              <TabsTrigger value="upload" className="text-white data-[state=active]:bg-gray-700">
+                Upload Image
+              </TabsTrigger>
+              <TabsTrigger value="past-huddles" className="text-white data-[state=active]:bg-gray-700">
+                Past Huddles
+              </TabsTrigger>
+              <TabsTrigger value="interruptions" className="text-white data-[state=active]:bg-gray-700">
+                Interruptions
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="text-white data-[state=active]:bg-gray-700">
+                Documents
+              </TabsTrigger>
+              <TabsTrigger value="pdf-upload" className="text-white data-[state=active]:bg-gray-700">
+                Upload PDF
+              </TabsTrigger>
+            </TabsList>
 
-                  <div className="flex space-x-4">
-                    <Button onClick={handleScreenshot} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                      Take Screenshot
-                    </Button>
-                    <Input
-                      type="file"
-                      id="upload"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleUpload}
-                    />
-                    <Label htmlFor="upload" className="cursor-pointer bg-gray-700 border-gray-600 text-white hover:bg-gray-600 rounded-md px-4 py-2">
-                      Upload Image
-                    </Label>
-                  </div>
+            <TabsContent value="upload" className="mt-6">
+              <Card className="bg-gray-800 border-gray-700">
+                <CardContent className="p-6">
+                  <div className="grid gap-4">
+                    <h2 className="text-xl font-semibold">1. Capture Context</h2>
+                    <p className="text-gray-400">Take a screenshot or upload an image to provide context for the AI.</p>
 
-                  {screenshot && (
-                    <div className="mt-4">
-                      <h3 className="text-lg font-medium">Captured Image</h3>
-                      <div ref={ref} className="mt-2">
-                        <img src={screenshot} alt="Captured" style={{ maxWidth: '100%', height: 'auto' }} />
-                      </div>
+                    <div className="flex space-x-4">
+                      <Button onClick={handleScreenshot} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                        Take Screenshot
+                      </Button>
+                      <Input
+                        type="file"
+                        id="upload"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleUpload}
+                      />
+                      <Label htmlFor="upload" className="cursor-pointer bg-gray-700 border-gray-600 text-white hover:bg-gray-600 rounded-md px-4 py-2">
+                        Upload Image
+                      </Label>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="bg-gray-800 border-gray-700 mt-6">
-              <CardContent className="p-6">
-                <div className="grid gap-4">
-                  <h2 className="text-xl font-semibold">2. Enter Your Draft</h2>
-                  <p className="text-gray-400">Write your initial message or draft to be improved by the AI.</p>
-                  <Textarea
-                    placeholder="Enter your draft message here..."
-                    value={userDraft}
-                    onChange={(e) => setUserDraft(e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800 border-gray-700 mt-6">
-              <CardContent className="p-6">
-                <div className="grid gap-4">
-                  <h2 className="text-xl font-semibold">3. Generate Reply</h2>
-                  <p className="text-gray-400">Generate an improved reply using the AI assistant.</p>
-
-                  <div className="flex items-center space-x-4">
-                    <Button onClick={handleGenerate} disabled={isGenerating} className="bg-purple-600 text-white hover:bg-purple-500">
-                      {isGenerating ? (
-                        <>
-                          Generating...
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                        </>
-                      ) : (
-                        "Generate Reply"
-                      )}
-                    </Button>
-
-                    <Button onClick={handleRegenerate} disabled={isGenerating} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                      {isGenerating ? (
-                        <>
-                          Regenerating...
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCcw className="w-4 h-4 mr-2" />
-                          Regenerate
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {error && (
-                    <div className="rounded-md bg-red-100 px-4 py-3 mt-2">
-                      <div className="flex">
-                        <div className="flex-shrink-0">
-                          <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                    {screenshot && (
+                      <div className="mt-4">
+                        <h3 className="text-lg font-medium">Captured Image</h3>
+                        <div ref={ref} className="mt-2">
+                          <img src={screenshot} alt="Captured" style={{ maxWidth: '100%', height: 'auto' }} />
                         </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-red-800">
-                            Error
-                          </h3>
-                          <div className="mt-2 text-sm text-red-700">
-                            <p>{error}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800 border-gray-700 mt-6">
+                <CardContent className="p-6">
+                  <div className="grid gap-4">
+                    <h2 className="text-xl font-semibold">2. Enter Your Draft</h2>
+                    <p className="text-gray-400">Write your initial message or draft to be improved by the AI.</p>
+                    <Textarea
+                      placeholder="Enter your draft message here..."
+                      value={userDraft}
+                      onChange={(e) => setUserDraft(e.target.value)}
+                      className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800 border-gray-700 mt-6">
+                <CardContent className="p-6">
+                  <div className="grid gap-4">
+                    <h2 className="text-xl font-semibold">3. Generate Reply</h2>
+                    <p className="text-gray-400">Generate an improved reply using the AI assistant.</p>
+
+                    <div className="flex items-center space-x-4">
+                      <Button onClick={handleGenerate} disabled={isGenerating} className="bg-purple-600 text-white hover:bg-purple-500">
+                        {isGenerating ? (
+                          <>
+                            Generating...
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                          </>
+                        ) : (
+                          "Generate Reply"
+                        )}
+                      </Button>
+
+                      <Button onClick={handleRegenerate} disabled={isGenerating} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                        {isGenerating ? (
+                          <>
+                            Regenerating...
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCcw className="w-4 h-4 mr-2" />
+                            Regenerate
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {error && (
+                      <div className="rounded-md bg-red-100 px-4 py-3 mt-2">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-red-800">
+                              Error
+                            </h3>
+                            <div className="mt-2 text-sm text-red-700">
+                              <p>{error}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {generatedReply && (
-                    <div className="mt-4">
-                      <h3 className="text-lg font-medium">Generated Reply</h3>
-                      <Textarea
-                        readOnly
-                        value={generatedReply}
-                        className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
-                      />
-                      <div className="flex justify-end mt-2">
-                        <Button onClick={handleCopy} disabled={isCopied} variant="secondary" className="bg-green-600 text-white hover:bg-green-500">
-                          {isCopied ? (
+                    {generatedReply && (
+                      <div className="mt-4">
+                        <h3 className="text-lg font-medium">Generated Reply</h3>
+                        <Textarea
+                          readOnly
+                          value={generatedReply}
+                          className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                        />
+                        <div className="flex justify-end mt-2">
+                          <Button onClick={handleCopy} disabled={isCopied} variant="secondary" className="bg-green-600 text-white hover:bg-green-500">
+                            {isCopied ? (
+                              <>
+                                <Check className="w-4 h-4 mr-2" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Copy to Clipboard
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {generatedReply && (
+                <Card className="bg-gray-800 border-gray-700 mt-6">
+                  <CardContent className="p-6">
+                    <div className="grid gap-4">
+                      <h2 className="text-xl font-semibold">4. Adjust Tone</h2>
+                      <p className="text-gray-400">Fine-tune the tone of the generated reply.</p>
+
+                      <div className="flex items-center space-x-4">
+                        <Select value={selectedTone} onValueChange={setSelectedTone}>
+                          <SelectTrigger className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 w-[180px]">
+                            <SelectValue placeholder="Select Tone" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="casual">Casual</SelectItem>
+                            <SelectItem value="professional">Professional</SelectItem>
+                            <SelectItem value="friendly">Friendly</SelectItem>
+                            <SelectItem value="direct">Direct</SelectItem>
+                            <SelectItem value="warm">Warm</SelectItem>
+                            <SelectItem value="confident">Confident</SelectItem>
+                            <SelectItem value="curious">Curious</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Button onClick={handleAdjustTone} disabled={isAdjustingTone} className="bg-blue-600 text-white hover:bg-blue-500">
+                          {isAdjustingTone ? (
                             <>
-                              <Check className="w-4 h-4 mr-2" />
-                              Copied!
+                              Adjusting...
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
                             </>
                           ) : (
-                            <>
-                              <Copy className="w-4 h-4 mr-2" />
-                              Copy to Clipboard
-                            </>
+                            "Adjust Tone"
                           )}
                         </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-            {generatedReply && (
-              <Card className="bg-gray-800 border-gray-700 mt-6">
-                <CardContent className="p-6">
-                  <div className="grid gap-4">
-                    <h2 className="text-xl font-semibold">4. Adjust Tone</h2>
-                    <p className="text-gray-400">Fine-tune the tone of the generated reply.</p>
+            <TabsContent value="past-huddles" className="mt-6">
+              <PastHuddlesTab />
+            </TabsContent>
 
-                    <div className="flex items-center space-x-4">
-                      <Select value={selectedTone} onValueChange={setSelectedTone}>
-                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 w-[180px]">
-                          <SelectValue placeholder="Select Tone" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="casual">Casual</SelectItem>
-                          <SelectItem value="professional">Professional</SelectItem>
-                          <SelectItem value="friendly">Friendly</SelectItem>
-                          <SelectItem value="direct">Direct</SelectItem>
-                          <SelectItem value="warm">Warm</SelectItem>
-                          <SelectItem value="confident">Confident</SelectItem>
-                          <SelectItem value="curious">Curious</SelectItem>
-                        </SelectContent>
-                      </Select>
+            <TabsContent value="interruptions" className="mt-6">
+              <InterruptionsTab />
+            </TabsContent>
 
-                      <Button onClick={handleAdjustTone} disabled={isAdjustingTone} className="bg-blue-600 text-white hover:bg-blue-500">
-                        {isAdjustingTone ? (
-                          <>
-                            Adjusting...
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                          </>
-                        ) : (
-                          "Adjust Tone"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
+            <TabsContent value="documents" className="mt-6">
+              <DocumentsTab />
+            </TabsContent>
 
-          <TabsContent value="past-huddles" className="mt-6">
-            <PastHuddlesTab />
-          </TabsContent>
-
-          <TabsContent value="interruptions" className="mt-6">
-            <InterruptionsTab />
-          </TabsContent>
-
-          <TabsContent value="documents" className="mt-6">
-            <DocumentsTab />
-          </TabsContent>
-
-          <TabsContent value="pdf-upload" className="mt-6">
-            <PDFUploader />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="pdf-upload" className="mt-6">
+              <PDFUploader />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
 
-    <SettingsSidebar
-      googleCloudApiKey={googleCloudApiKey}
-      onGoogleCloudApiKeyChange={setGoogleCloudApiKey}
-      enableAutoCropping={enableAutoCropping}
-      onAutoCroppingChange={setEnableAutoCropping}
-      autoCropMargin={autoCropMargin}
-      onAutoCropMarginChange={setAutoCropMargin}
-      onTestOCR={handleTestOCR}
-      isTestingOCR={isTestingOCR}
-      principles={principles}
-      setPrinciples={setPrinciples}
-      uploadedImage={uploadedImage}
-    />
-  </div>
-);
+      <SettingsSidebar
+        googleCloudApiKey={googleCloudApiKey}
+        onGoogleCloudApiKeyChange={setGoogleCloudApiKey}
+        enableAutoCropping={enableAutoCropping}
+        onAutoCroppingChange={setEnableAutoCropping}
+        autoCropMargin={autoCropMargin}
+        onAutoCropMarginChange={setAutoCropMargin}
+        onTestOCR={handleTestOCR}
+        isTestingOCR={isTestingOCR}
+        principles={principles}
+        setPrinciples={setPrinciples}
+        uploadedImage={uploadedImage}
+      />
+    </div>
+  );
 };
 
 export default Index;
