@@ -48,9 +48,17 @@ serve(async (req) => {
       documentKnowledge 
     }: RequestBody = await req.json();
 
-    console.log('Enhanced AI Suggestions - Action:', action);
+    console.log('🤖 DEBUG: Enhanced AI Suggestions - Action:', action);
 
     if (action === 'generateReply') {
+      console.log('📊 DEBUG: Generate reply request details:', {
+        screenshotTextLength: screenshotText?.length || 0,
+        userDraftLength: userDraft?.length || 0,
+        principlesLength: principles?.length || 0,
+        documentsProvided: documentKnowledge?.length || 0,
+        isRegeneration
+      });
+
       // Get user from auth header
       const authHeader = req.headers.get('Authorization');
       const token = authHeader?.replace('Bearer ', '');
@@ -59,13 +67,14 @@ serve(async (req) => {
       if (token) {
         const { data: { user } } = await supabase.auth.getUser(token);
         userId = user?.id;
+        console.log('👤 DEBUG: User ID from token:', userId);
       }
 
       // Fetch similar past huddles from Qdrant if available
       let similarHuddles = [];
       if (qdrantApiKey && qdrantUrl && userId && !isRegeneration) {
         try {
-          console.log('Fetching similar huddles from Qdrant...');
+          console.log('🔍 DEBUG: Fetching similar huddles from Qdrant...');
           
           const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
             method: 'POST',
@@ -106,32 +115,44 @@ serve(async (req) => {
           if (qdrantResponse.ok) {
             const qdrantData = await qdrantResponse.json();
             similarHuddles = qdrantData.result || [];
-            console.log(`Found ${similarHuddles.length} similar huddles`);
+            console.log(`✅ DEBUG: Found ${similarHuddles.length} similar huddles from Qdrant`);
           }
         } catch (error) {
-          console.error('Error fetching from Qdrant:', error);
+          console.error('❌ DEBUG: Error fetching from Qdrant:', error);
         }
       }
 
       // Build context from similar huddles
       let contextFromPastHuddles = '';
       if (similarHuddles.length > 0) {
+        console.log('🧠 DEBUG: Building context from past huddles...');
         contextFromPastHuddles = '\n\nHere are some similar past conversations and responses that worked well:\n';
         similarHuddles.forEach((huddle: any, index: number) => {
           const payload = huddle.payload;
           contextFromPastHuddles += `\nExample ${index + 1}:\nContext: ${payload.screenshot_text}\nDraft: ${payload.user_draft}\nSuccessful Reply: ${payload.final_reply || payload.generated_reply}\n`;
         });
         contextFromPastHuddles += '\nUse these examples to inform your response style and approach.\n';
+        console.log('✅ DEBUG: Past huddles context built, length:', contextFromPastHuddles.length);
       }
 
       // Build context from document knowledge
       let contextFromDocuments = '';
       if (documentKnowledge && documentKnowledge.length > 0) {
+        console.log('📚 DEBUG: Building context from document knowledge...');
+        console.log('📚 DEBUG: Documents to use:', documentKnowledge.map(doc => ({
+          name: doc.document_name,
+          similarity: (doc.similarity * 100).toFixed(1) + '%',
+          contentLength: doc.content_chunk.length
+        })));
+        
         contextFromDocuments = '\n\nRelevant information from your knowledge documents:\n';
         documentKnowledge.forEach((doc, index) => {
           contextFromDocuments += `\nFrom ${doc.document_name} (relevance: ${(doc.similarity * 100).toFixed(1)}%):\n${doc.content_chunk}\n`;
         });
         contextFromDocuments += '\nUse this information to inform your response when relevant.\n';
+        console.log('✅ DEBUG: Document context built, length:', contextFromDocuments.length);
+      } else {
+        console.log('⚠️ DEBUG: No document knowledge provided to AI function');
       }
 
       // Generate AI response with enhanced context
@@ -159,6 +180,13 @@ User's draft message: ${userDraft}
 
 Please provide an improved version of this message:`;
 
+      console.log('🤖 DEBUG: Sending request to OpenAI with context lengths:', {
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length,
+        hasDocumentContext: contextFromDocuments.length > 0,
+        hasPastHuddlesContext: contextFromPastHuddles.length > 0
+      });
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -179,6 +207,8 @@ Please provide an improved version of this message:`;
       const data = await response.json();
       const reply = data.choices[0].message.content.trim();
 
+      console.log('✅ DEBUG: OpenAI response received, reply length:', reply.length);
+
       // Format past huddles for frontend display
       const pastHuddlesForDisplay = similarHuddles.map((huddle: any) => ({
         id: huddle.id,
@@ -193,7 +223,7 @@ Please provide an improved version of this message:`;
       if (qdrantApiKey && qdrantUrl && userId) {
         const storeInQdrant = async () => {
           try {
-            console.log('Storing huddle in Qdrant for future learning...');
+            console.log('💾 DEBUG: Storing huddle in Qdrant for future learning...');
             
             const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
               method: 'POST',
@@ -233,14 +263,19 @@ Please provide an improved version of this message:`;
               }),
             });
 
-            console.log('Successfully stored in Qdrant');
+            console.log('✅ DEBUG: Successfully stored in Qdrant');
           } catch (error) {
-            console.error('Error storing in Qdrant:', error);
+            console.error('❌ DEBUG: Error storing in Qdrant:', error);
           }
         };
 
         storeInQdrant();
       }
+
+      console.log('🎯 DEBUG: Returning response with:', {
+        replyLength: reply.length,
+        pastHuddlesCount: pastHuddlesForDisplay.length
+      });
 
       return new Response(
         JSON.stringify({ 
@@ -311,7 +346,7 @@ Please provide an improved version of this message:`;
     throw new Error('Invalid action');
 
   } catch (error) {
-    console.error('Error in enhanced-ai-suggestions function:', error);
+    console.error('❌ DEBUG: Error in enhanced-ai-suggestions function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

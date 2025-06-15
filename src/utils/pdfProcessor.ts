@@ -12,6 +12,8 @@ export interface DocumentChunk {
 
 export class PDFProcessor {
   private async extractTextFromPDF(file: File): Promise<string> {
+    console.log('📄 DEBUG: Starting PDF text extraction for:', file.name);
+    
     // Use PDF.js to extract text from PDF
     const pdfjsLib = await import('pdfjs-dist');
     
@@ -19,7 +21,10 @@ export class PDFProcessor {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
     
     const arrayBuffer = await file.arrayBuffer();
+    console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
+    
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    console.log('📄 DEBUG: PDF loaded, total pages:', pdf.numPages);
     
     let fullText = '';
     
@@ -29,28 +34,37 @@ export class PDFProcessor {
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
+      
+      console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
       fullText += `\n\nPage ${pageNum}:\n${pageText}`;
     }
     
+    console.log('📄 DEBUG: Total text extracted:', fullText.length, 'characters');
     return fullText;
   }
 
   private chunkText(text: string, chunkSize: number = 1000): DocumentChunk[] {
+    console.log('✂️ DEBUG: Starting text chunking, target size:', chunkSize);
+    
     const chunks: DocumentChunk[] = [];
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    
+    console.log('✂️ DEBUG: Split into', sentences.length, 'sentences');
     
     let currentChunk = '';
     let chunkIndex = 0;
     
     for (const sentence of sentences) {
       if (currentChunk.length + sentence.length > chunkSize && currentChunk.length > 0) {
+        const keywords = this.extractKeywords(currentChunk);
         chunks.push({
           content: currentChunk.trim(),
           chunkIndex,
           metadata: {
-            keywords: this.extractKeywords(currentChunk)
+            keywords
           }
         });
+        console.log(`✂️ DEBUG: Created chunk ${chunkIndex}, size: ${currentChunk.length} chars, keywords: ${keywords.length}`);
         currentChunk = sentence;
         chunkIndex++;
       } else {
@@ -59,15 +73,18 @@ export class PDFProcessor {
     }
     
     if (currentChunk.trim().length > 0) {
+      const keywords = this.extractKeywords(currentChunk);
       chunks.push({
         content: currentChunk.trim(),
         chunkIndex,
         metadata: {
-          keywords: this.extractKeywords(currentChunk)
+          keywords
         }
       });
+      console.log(`✂️ DEBUG: Created final chunk ${chunkIndex}, size: ${currentChunk.length} chars`);
     }
     
+    console.log('✂️ DEBUG: Total chunks created:', chunks.length);
     return chunks;
   }
 
@@ -95,47 +112,55 @@ export class PDFProcessor {
 
   private async createEmbedding(text: string): Promise<number[]> {
     try {
+      console.log('🧠 DEBUG: Creating embedding for text chunk, length:', text.length);
+      
       const { data, error } = await supabase.functions.invoke('create-embedding', {
         body: { text }
       });
 
       if (error) {
-        console.error('Error creating embedding:', error);
+        console.error('❌ DEBUG: Error creating embedding:', error);
         return [];
       }
 
+      console.log('✅ DEBUG: Embedding created successfully, dimensions:', data.embedding?.length);
       return data.embedding;
     } catch (error) {
-      console.error('Error calling embedding function:', error);
+      console.error('❌ DEBUG: Error calling embedding function:', error);
       return [];
     }
   }
 
   async processDocument(file: File, documentName: string): Promise<boolean> {
     try {
-      console.log(`Processing document: ${documentName}`);
+      console.log(`🔄 DEBUG: Starting to process document: ${documentName}`);
       
       // Extract text from PDF
       const fullText = await this.extractTextFromPDF(file);
       
       if (!fullText.trim()) {
-        console.error('No text extracted from PDF');
+        console.error('❌ DEBUG: No text extracted from PDF');
         return false;
       }
 
       // Chunk the text
       const chunks = this.chunkText(fullText);
-      console.log(`Created ${chunks.length} chunks for ${documentName}`);
+      console.log(`✂️ DEBUG: Document chunked into ${chunks.length} pieces`);
 
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('User not authenticated');
+        console.error('❌ DEBUG: User not authenticated');
         return false;
       }
 
+      console.log('👤 DEBUG: Processing chunks for user:', user.id);
+
       // Process each chunk
+      let successfulChunks = 0;
       for (const chunk of chunks) {
+        console.log(`🔄 DEBUG: Processing chunk ${chunk.chunkIndex + 1}/${chunks.length}`);
+        
         const embedding = await this.createEmbedding(chunk.content);
         
         const { error } = await supabase
@@ -151,31 +176,36 @@ export class PDFProcessor {
           });
 
         if (error) {
-          console.error('Error storing chunk:', error);
-          return false;
+          console.error(`❌ DEBUG: Error storing chunk ${chunk.chunkIndex}:`, error);
+        } else {
+          successfulChunks++;
+          console.log(`✅ DEBUG: Successfully stored chunk ${chunk.chunkIndex + 1}`);
         }
       }
 
-      console.log(`Successfully processed ${documentName}`);
-      return true;
+      console.log(`✅ DEBUG: Document processing complete: ${successfulChunks}/${chunks.length} chunks stored successfully`);
+      return successfulChunks > 0;
     } catch (error) {
-      console.error('Error processing document:', error);
+      console.error('❌ DEBUG: Error processing document:', error);
       return false;
     }
   }
 
   async processStorageDocuments(bucketName: string = 'documents'): Promise<void> {
     try {
-      console.log('Fetching documents from Supabase Storage...');
+      console.log('📁 DEBUG: Starting to process documents from Supabase Storage bucket:', bucketName);
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('User not authenticated');
+        console.error('❌ DEBUG: User not authenticated');
         return;
       }
 
+      console.log('👤 DEBUG: User authenticated:', user.id);
+
       // List files in the storage bucket
+      console.log('📁 DEBUG: Listing files in storage bucket...');
       const { data: files, error: listError } = await supabase.storage
         .from(bucketName)
         .list('', {
@@ -184,16 +214,16 @@ export class PDFProcessor {
         });
 
       if (listError) {
-        console.error('Error listing files:', listError);
+        console.error('❌ DEBUG: Error listing files:', listError);
         return;
       }
 
       if (!files || files.length === 0) {
-        console.log('No files found in storage bucket');
+        console.log('⚠️ DEBUG: No files found in storage bucket');
         return;
       }
 
-      console.log(`Found ${files.length} files in storage:`, files.map(f => f.name));
+      console.log(`📁 DEBUG: Found ${files.length} files in storage:`, files.map(f => f.name));
 
       // Filter for PDF files
       const pdfFiles = files.filter(file => 
@@ -201,10 +231,12 @@ export class PDFProcessor {
         !file.name.startsWith('.') // Exclude hidden files
       );
 
-      console.log(`Processing ${pdfFiles.length} PDF files...`);
+      console.log(`📄 DEBUG: Found ${pdfFiles.length} PDF files to process`);
 
       for (const fileInfo of pdfFiles) {
         try {
+          console.log(`🔍 DEBUG: Checking if ${fileInfo.name} already processed...`);
+          
           // Check if this document has already been processed
           const { data: existingDocs } = await supabase
             .from('document_knowledge')
@@ -214,42 +246,52 @@ export class PDFProcessor {
             .limit(1);
 
           if (existingDocs && existingDocs.length > 0) {
-            console.log(`Document ${fileInfo.name} already processed, skipping...`);
+            console.log(`⏭️ DEBUG: Document ${fileInfo.name} already processed, skipping...`);
             continue;
           }
 
+          console.log(`⬇️ DEBUG: Downloading ${fileInfo.name} from storage...`);
+          
           // Download the file from storage
           const { data: fileData, error: downloadError } = await supabase.storage
             .from(bucketName)
             .download(fileInfo.name);
 
           if (downloadError) {
-            console.error(`Error downloading ${fileInfo.name}:`, downloadError);
+            console.error(`❌ DEBUG: Error downloading ${fileInfo.name}:`, downloadError);
             continue;
           }
+
+          console.log(`✅ DEBUG: Successfully downloaded ${fileInfo.name}, size: ${fileData.size} bytes`);
 
           // Convert blob to File object
           const file = new File([fileData], fileInfo.name, { type: 'application/pdf' });
           
           // Process the document
           const documentName = fileInfo.name.replace('.pdf', '');
-          await this.processDocument(file, documentName);
+          console.log(`🔄 DEBUG: Starting processing of ${documentName}...`);
           
-          console.log(`Successfully processed ${fileInfo.name} from storage`);
+          const success = await this.processDocument(file, documentName);
+          
+          if (success) {
+            console.log(`✅ DEBUG: Successfully processed ${fileInfo.name} from storage`);
+          } else {
+            console.log(`❌ DEBUG: Failed to process ${fileInfo.name}`);
+          }
         } catch (error) {
-          console.error(`Error processing ${fileInfo.name}:`, error);
+          console.error(`❌ DEBUG: Error processing ${fileInfo.name}:`, error);
         }
       }
 
-      console.log('Finished processing all documents from storage');
+      console.log('🎉 DEBUG: Finished processing all documents from storage');
     } catch (error) {
-      console.error('Error in processStorageDocuments:', error);
+      console.error('❌ DEBUG: Error in processStorageDocuments:', error);
     }
   }
 
   // Keep the old method for backwards compatibility
   async processExistingDocuments(): Promise<void> {
-    console.log('processExistingDocuments called - redirecting to storage...');
+    console.log('🔄 DEBUG: processExistingDocuments called - redirecting to storage...');
     await this.processStorageDocuments();
   }
 }
