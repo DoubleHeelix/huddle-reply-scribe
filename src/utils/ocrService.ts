@@ -3,7 +3,7 @@
 // Note: In a production environment, this should be handled server-side
 // For demo purposes, we'll create the structure and use a placeholder
 
-interface OCRResult {
+export interface OCRResult {
   text: string;
   processingTime: number;
   success: boolean;
