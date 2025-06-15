@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -151,7 +150,7 @@ Looking forward to reconnecting properly! 😊`);
                       <img 
                         src={uploadedImage} 
                         alt="Uploaded screenshot" 
-                        className="max-w-full h-48 object-contain mx-auto rounded-lg"
+                        className="w-full max-w-md mx-auto rounded-lg border border-gray-600 shadow-lg"
                       />
                       <Badge variant="secondary" className="mt-2">Screenshot uploaded</Badge>
                     </div>
