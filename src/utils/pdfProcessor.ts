@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -61,8 +62,7 @@ export class PDFProcessor {
           pdf = await pdfjsLib.getDocument({ 
             data: arrayBuffer,
             verbosity: 0,
-            disableFontFace: true,
-            nativeImageDecoderSupport: 'none'
+            disableFontFace: true
           }).promise;
           console.log('📄 DEBUG: PDF loaded with basic config');
         } catch (basicError) {
