@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -21,8 +22,8 @@ export class PDFProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Properly disable worker by setting to false
-      pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+      // Properly disable worker by setting to empty string
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
       console.log('📄 DEBUG: Worker properly disabled for browser compatibility');
       
       const arrayBuffer = await file.arrayBuffer();
