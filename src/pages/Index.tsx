@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -406,8 +405,8 @@ const Index = () => {
             {/* Generated Reply Section */}
             {generatedReply && (
               <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
+                <CardContent className="p-4 md:p-6 space-y-4">
+                  <div className="flex flex-col space-y-3 md:flex-row md:items-center md:justify-between md:space-y-0">
                     <h3 className="text-white text-lg font-medium">Generated Reply</h3>
                     <ToneSelector
                       selectedTone={selectedTone}
@@ -419,7 +418,7 @@ const Index = () => {
                   </div>
                   
                   <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                    <pre className="whitespace-pre-wrap text-white text-sm font-normal">
+                    <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed">
                       {generatedReply}
                     </pre>
                   </div>
@@ -434,11 +433,11 @@ const Index = () => {
                     </div>
                   )}
                   
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 md:flex-row">
                     <Button 
                       onClick={handleRegenerate}
                       variant="outline" 
-                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12"
                       disabled={isGenerating}
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
@@ -447,7 +446,7 @@ const Index = () => {
                     <Button 
                       onClick={resetHuddle}
                       variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 md:w-auto"
                     >
                       New Huddle
                     </Button>
