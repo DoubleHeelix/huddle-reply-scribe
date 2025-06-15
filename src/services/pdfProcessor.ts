@@ -1,8 +1,9 @@
 
+
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure PDF.js to use CDN worker (most reliable approach)
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js';
+// Configure PDF.js worker - using jsdelivr CDN which is more reliable
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 export interface PDFProcessingResult {
   text: string;
@@ -23,7 +24,11 @@ export const pdfProcessor = {
         data: arrayBuffer,
         useWorkerFetch: false,
         isEvalSupported: false,
-        useSystemFonts: true
+        useSystemFonts: true,
+        // Add timeout to prevent hanging
+        maxImageSize: 1024 * 1024,
+        disableFontFace: true,
+        verbosity: 0 // Reduce console noise
       });
       
       const pdf = await loadingTask.promise;
@@ -79,3 +84,4 @@ export const pdfProcessor = {
     }
   }
 };
+
