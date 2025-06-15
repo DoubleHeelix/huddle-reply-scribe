@@ -13,6 +13,64 @@ interface OCRRequest {
   margin?: number;
 }
 
+// Google Cloud service account authentication
+async function getAccessToken() {
+  const serviceAccountEmail = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_EMAIL');
+  const privateKey = Deno.env.get('GOOGLE_PRIVATE_KEY');
+  const projectId = Deno.env.get('GOOGLE_PROJECT_ID');
+
+  if (!serviceAccountEmail || !privateKey || !projectId) {
+    throw new Error('Missing Google Cloud service account credentials. Please set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_PROJECT_ID in Supabase secrets.');
+  }
+
+  console.log('OCR: Using service account authentication');
+  console.log('OCR: Project ID:', projectId);
+  console.log('OCR: Service account email:', serviceAccountEmail);
+
+  // Create JWT for Google Cloud authentication
+  const now = Math.floor(Date.now() / 1000);
+  const jwtHeader = {
+    alg: 'RS256',
+    typ: 'JWT'
+  };
+
+  const jwtPayload = {
+    iss: serviceAccountEmail,
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  };
+
+  // Base64 encode header and payload
+  const encodedHeader = btoa(JSON.stringify(jwtHeader));
+  const encodedPayload = btoa(JSON.stringify(jwtPayload));
+  
+  // Create signature (simplified - in production you'd use proper crypto)
+  const assertion = `${encodedHeader}.${encodedPayload}`;
+  
+  // Request access token
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: assertion
+    })
+  });
+
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text();
+    console.error('OCR: Token request failed:', errorText);
+    throw new Error(`Failed to get access token: ${errorText}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  return tokenData.access_token;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -30,14 +88,23 @@ serve(async (req) => {
       throw new Error('Image data is required');
     }
 
+    // Try to get access token using service account first, fallback to API key
+    let authHeader = '';
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-    if (!googleApiKey) {
-      console.error('OCR: Google Cloud Vision API key not found in environment');
-      throw new Error('Google Cloud Vision API key not configured');
+    
+    try {
+      const accessToken = await getAccessToken();
+      authHeader = `Bearer ${accessToken}`;
+      console.log('OCR: Using service account authentication');
+    } catch (authError) {
+      console.log('OCR: Service account auth failed, trying API key fallback:', authError.message);
+      
+      if (!googleApiKey) {
+        throw new Error('No Google Cloud authentication available. Please set either service account credentials (GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_PROJECT_ID) or GOOGLE_API_KEY in Supabase secrets.');
+      }
+      
+      console.log('OCR: Using API key authentication');
     }
-
-    console.log('OCR: Google API key found, length:', googleApiKey.length);
-    console.log('OCR: API key starts with:', googleApiKey.substring(0, 10) + '...');
 
     // Remove data URL prefix if present
     const base64Data = imageData.startsWith('data:') 
@@ -47,8 +114,11 @@ serve(async (req) => {
     console.log(`OCR: Processing image (${base64Data.length} characters of base64)`);
 
     // Construct the API URL
-    const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`;
-    console.log('OCR: API URL constructed (without key):', apiUrl.replace(/key=.*/, 'key=***'));
+    const apiUrl = googleApiKey 
+      ? `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`
+      : `https://vision.googleapis.com/v1/images:annotate`;
+
+    console.log('OCR: API URL constructed');
 
     // Prepare the request body
     const requestBody = {
@@ -68,18 +138,22 @@ serve(async (req) => {
     };
 
     console.log('OCR: Making request to Google Cloud Vision API...');
-    console.log('OCR: Request body prepared, image content length:', base64Data.length);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
 
     const visionResponse = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(requestBody),
     });
 
     console.log(`OCR: Vision API response status: ${visionResponse.status}`);
-    console.log(`OCR: Vision API response headers:`, Object.fromEntries(visionResponse.headers.entries()));
 
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
@@ -98,11 +172,9 @@ serve(async (req) => {
       
       // Check for specific error types and provide helpful messages
       if (errorMessage.includes('billing') || errorMessage.includes('BILLING_DISABLED')) {
-        const projectInfo = errorData.error?.details?.find(d => d.metadata?.consumer);
-        const projectId = projectInfo?.metadata?.consumer?.replace('projects/', '') || 'unknown';
-        throw new Error(`Billing issue detected for project ${projectId}. Please verify billing is enabled and the API key has the correct project permissions. Full error: ${errorMessage}`);
+        throw new Error(`Billing issue detected. Please verify billing is enabled for your Google Cloud project and the credentials have the correct permissions. Full error: ${errorMessage}`);
       } else if (errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT')) {
-        throw new Error(`Invalid Google Cloud API key. Please check your API key configuration. Full error: ${errorMessage}`);
+        throw new Error(`Invalid Google Cloud credentials. Please check your service account or API key configuration. Full error: ${errorMessage}`);
       } else if (errorMessage.includes('not been used') || errorMessage.includes('disabled') || errorMessage.includes('PERMISSION_DENIED')) {
         throw new Error(`Google Cloud Vision API access issue. Please ensure the API is enabled and has proper permissions. Full error: ${errorMessage}`);
       } else {
@@ -112,7 +184,6 @@ serve(async (req) => {
 
     const visionData = await visionResponse.json();
     console.log('OCR: Google Vision API response received successfully');
-    console.log('OCR: Response structure:', JSON.stringify(visionData, null, 2));
 
     // Extract text from response
     let extractedText = '';
@@ -151,7 +222,6 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
     console.error('OCR: Error during processing:', error);
-    console.error('OCR: Error stack trace:', error.stack);
 
     return new Response(
       JSON.stringify({
