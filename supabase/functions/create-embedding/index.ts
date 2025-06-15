@@ -98,8 +98,7 @@ serve(async (req) => {
         const decodedContent = atob(document_content);
         console.log('Decoded content length:', decodedContent.length);
         
-        // For PDF files, we need to extract text content properly
-        // For now, we'll try to extract readable text and skip binary content
+        // Extract text content from PDF
         let textContent = '';
         
         // Simple text extraction - look for readable text patterns
@@ -182,24 +181,28 @@ serve(async (req) => {
           const embeddingData = await embeddingResponse.json();
           const embedding = embeddingData.data[0].embedding;
 
-          // Store in database with proper structure
+          // Store in database - ensuring chunk_index is set as a direct column
+          const insertData = {
+            user_id,
+            document_name,
+            content_chunk: chunk,
+            embedding,
+            chunk_index: i, // This must be set as a direct property, not in metadata
+            metadata: {
+              total_chunks: chunks.length,
+              chunk_size: chunk.length,
+              original_document_size: decodedContent.length
+            }
+          };
+
+          console.log('Inserting data for chunk', i, 'with chunk_index:', insertData.chunk_index);
+
           const { error: insertError } = await supabase
             .from('document_knowledge')
-            .insert({
-              user_id,
-              document_name,
-              content_chunk: chunk,
-              embedding,
-              chunk_index: i,
-              metadata: {
-                total_chunks: chunks.length,
-                chunk_size: chunk.length,
-                original_document_size: decodedContent.length
-              }
-            });
+            .insert(insertData);
 
           if (insertError) {
-            console.error('Database insert error:', insertError);
+            console.error('Database insert error for chunk', i, ':', insertError);
             return new Response(
               JSON.stringify({ error: `Failed to store chunk ${i}: ${insertError.message}` }),
               { 
@@ -208,6 +211,8 @@ serve(async (req) => {
               }
             );
           }
+
+          console.log('Successfully inserted chunk', i);
         }
 
         console.log(`Successfully processed ${chunks.length} chunks for ${document_name}`);
