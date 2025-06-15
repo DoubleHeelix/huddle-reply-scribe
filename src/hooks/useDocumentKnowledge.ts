@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -113,7 +114,7 @@ export const useDocumentKnowledge = () => {
         description: `${fileName} has been processed and added to your knowledge base.`,
       });
 
-      // Refresh the documents list
+      // Refresh the documents list without causing recursion
       await fetchDocuments();
 
     } catch (err) {
@@ -129,7 +130,7 @@ export const useDocumentKnowledge = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [fetchDocuments, toast]);
+  }, [toast, fetchDocuments]);
 
   const uploadDocument = useCallback(async (file: File) => {
     try {
