@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +66,70 @@ export const useDocumentKnowledge = () => {
       setError('Failed to load documents');
     }
   }, []);
+
+  const processStorageDocument = useCallback(async (fileName: string) => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+
+      console.log('📄 Starting document processing from storage:', fileName);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Download the file from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('documents')
+        .download(fileName);
+
+      if (downloadError) {
+        throw new Error(`Failed to download file: ${downloadError.message}`);
+      }
+
+      // Convert file to base64
+      const fileBuffer = await fileData.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+
+      console.log('📄 Calling create-embedding function...');
+
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: {
+          document_name: fileName,
+          document_content: base64,
+          user_id: user.id
+        }
+      });
+
+      if (error) {
+        throw new Error(`Processing failed: ${error.message}`);
+      }
+
+      console.log('✅ Document processed successfully:', data);
+
+      toast({
+        title: "Document processed!",
+        description: `${fileName} has been processed and added to your knowledge base.`,
+      });
+
+      // Refresh the documents list
+      await fetchDocuments();
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Processing failed';
+      setError(errorMessage);
+      console.error('Document processing error:', err);
+      
+      toast({
+        title: "Processing failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [fetchDocuments, toast]);
 
   const uploadDocument = useCallback(async (file: File) => {
     try {
@@ -199,6 +262,7 @@ export const useDocumentKnowledge = () => {
     documents,
     isProcessing,
     error,
+    processStorageDocument,
     uploadDocument,
     deleteDocument,
     searchDocuments,
