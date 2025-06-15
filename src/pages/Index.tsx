@@ -460,13 +460,6 @@ const Index = () => {
               </div>
             )}
 
-            {/* AI Knowledge Sources Section */}
-            <AIKnowledgeSources
-              documentKnowledge={lastUsedDocuments}
-              pastHuddles={lastUsedHuddles}
-              isVisible={showKnowledgeSources}
-            />
-
             {/* Generated Reply Section */}
             {generatedReply && (
               <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
@@ -530,6 +523,13 @@ const Index = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* AI Knowledge Sources Section - Now at the bottom */}
+            <AIKnowledgeSources
+              documentKnowledge={lastUsedDocuments}
+              pastHuddles={lastUsedHuddles}
+              isVisible={showKnowledgeSources}
+            />
           </TabsContent>
           
           <TabsContent value="interruptions" className="mt-6">
