@@ -65,14 +65,27 @@ async function getAccessToken() {
     throw new Error('Invalid private key format. Expected PEM format with BEGIN/END headers.');
   }
   
-  // Get the base64 content and remove all whitespace
-  const keyContent = keyMatch[1].replace(/\s/g, '');
+  // Get the base64 content and remove all whitespace and newlines
+  let keyContent = keyMatch[1].replace(/\s/g, '').replace(/\n/g, '').replace(/\r/g, '');
   
   console.log('OCR: Private key processed, length:', keyContent.length);
+  console.log('OCR: First 50 chars of key content:', keyContent.substring(0, 50));
+  
+  // Validate that the key content is valid base64
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(keyContent)) {
+    console.error('OCR: Invalid base64 characters found in private key');
+    // Remove any invalid characters
+    keyContent = keyContent.replace(/[^A-Za-z0-9+/=]/g, '');
+    console.log('OCR: Cleaned key content length:', keyContent.length);
+  }
   
   try {
+    // Test base64 decoding first
+    const testDecode = atob(keyContent);
+    console.log('OCR: Base64 decode test successful, decoded length:', testDecode.length);
+    
     // Import the private key for signing
-    const binaryKey = Uint8Array.from(atob(keyContent), c => c.charCodeAt(0));
+    const binaryKey = Uint8Array.from(testDecode, c => c.charCodeAt(0));
     const cryptoKey = await crypto.importKey(
       'pkcs8',
       binaryKey,
@@ -119,6 +132,10 @@ async function getAccessToken() {
     
   } catch (error) {
     console.error('OCR: Error processing private key or signing JWT:', error);
+    if (error instanceof Error && error.message.includes('Failed to decode base64')) {
+      console.error('OCR: Base64 decoding failed. Key content preview:', keyContent.substring(0, 100) + '...');
+      console.error('OCR: Key content has invalid characters. Please check the GOOGLE_PRIVATE_KEY secret.');
+    }
     throw new Error(`JWT signing failed: ${error.message}`);
   }
 }
