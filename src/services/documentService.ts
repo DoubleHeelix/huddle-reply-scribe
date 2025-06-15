@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentSummary } from '@/types/document';
+import { pdfProcessor } from './pdfProcessor';
 
 export const documentService = {
   async fetchDocuments(): Promise<DocumentSummary[]> {
@@ -43,39 +44,102 @@ export const documentService = {
       throw new Error('User not authenticated');
     }
 
-    // Download the file from storage first
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(fileName);
+    try {
+      console.log('📥 Downloading file from storage:', fileName);
+      
+      // Download the file from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('documents')
+        .download(fileName);
 
-    if (downloadError) {
-      throw new Error(`Failed to download file: ${downloadError.message}`);
-    }
-
-    // Convert to base64 without causing stack overflow for large files
-    const arrayBuffer = await fileData.arrayBuffer();
-    let binary = '';
-    const bytes = new Uint8Array(arrayBuffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
-
-    // Call the edge function with the correct parameters
-    const { data, error } = await supabase.functions.invoke('create-embedding', {
-      body: {
-        document_name: fileName,
-        document_content: base64,
-        user_id: user.id
+      if (downloadError) {
+        throw new Error(`Failed to download file: ${downloadError.message}`);
       }
-    });
 
-    if (error) {
-      throw new Error(`Processing failed: ${error.message}`);
+      console.log('📄 Processing PDF with PDF.js...');
+      
+      // Create a File object for the PDF processor
+      const file = new File([fileData], fileName, { type: 'application/pdf' });
+      
+      // Extract text using PDF.js
+      const { text, pageCount, metadata } = await pdfProcessor.extractTextFromFile(file);
+      
+      if (!text || text.length < 50) {
+        throw new Error('Could not extract sufficient text from PDF. The file may be image-based or corrupted.');
+      }
+
+      console.log('🔗 Sending extracted text to embedding function...');
+      
+      // Send the extracted text to the edge function
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: {
+          document_name: fileName,
+          extracted_text: text,
+          user_id: user.id,
+          metadata: {
+            ...metadata,
+            pageCount,
+            processingMethod: 'pdfjs'
+          }
+        }
+      });
+
+      if (error) {
+        throw new Error(`Processing failed: ${error.message}`);
+      }
+
+      console.log('✅ Document processing completed successfully');
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Document processing error:', error);
+      throw error;
+    }
+  },
+
+  async processUploadedFile(file: File): Promise<any> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
-    return data;
+    try {
+      console.log('📄 Processing uploaded PDF:', file.name);
+      
+      // Extract text using PDF.js
+      const { text, pageCount, metadata } = await pdfProcessor.extractTextFromFile(file);
+      
+      if (!text || text.length < 50) {
+        throw new Error('Could not extract sufficient text from PDF. The file may be image-based or corrupted.');
+      }
+
+      console.log('🔗 Sending extracted text to embedding function...');
+      
+      // Send the extracted text to the edge function
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: {
+          document_name: file.name,
+          extracted_text: text,
+          user_id: user.id,
+          metadata: {
+            ...metadata,
+            pageCount,
+            processingMethod: 'pdfjs'
+          }
+        }
+      });
+
+      if (error) {
+        throw new Error(`Processing failed: ${error.message}`);
+      }
+
+      console.log('✅ Document processing completed successfully');
+      return data;
+      
+    } catch (error) {
+      console.error('❌ Document processing error:', error);
+      throw error;
+    }
   },
 
   async deleteDocument(documentName: string): Promise<void> {

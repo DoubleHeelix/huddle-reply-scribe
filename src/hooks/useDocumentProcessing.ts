@@ -2,7 +2,6 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { documentService } from '@/services/documentService';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useDocumentProcessing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -54,28 +53,7 @@ export const useDocumentProcessing = () => {
 
       console.log('📄 Starting document upload:', file.name);
 
-      // Convert file to base64
-      const fileBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
-
-      console.log('📄 Calling create-embedding function...');
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data, error } = await supabase.functions.invoke('create-embedding', {
-        body: {
-          document_name: file.name,
-          document_content: base64,
-          user_id: user.id
-        }
-      });
-
-      if (error) {
-        throw new Error(`Processing failed: ${error.message}`);
-      }
+      const data = await documentService.processUploadedFile(file);
 
       console.log('✅ Document processed successfully:', data);
 
