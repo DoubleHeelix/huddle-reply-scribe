@@ -1,8 +1,9 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
-// Configure PDF.js worker using a more reliable approach
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Use the worker entry point directly to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export interface PDFProcessingResult {
   text: string;
