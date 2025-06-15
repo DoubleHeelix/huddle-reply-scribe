@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentSummary } from '@/types/document';
 import { pdfProcessor } from './pdfProcessor';
@@ -44,9 +45,9 @@ export const documentService = {
     }
 
     try {
-      console.log('📄 Processing document from storage with server-side extraction:', fileName);
+      console.log('📄 Processing document from storage with simple extraction:', fileName);
       
-      // Use the new server-side extraction method
+      // Use the simple extraction method
       const { text, pageCount, metadata } = await pdfProcessor.extractTextFromStorage(fileName);
       
       if (!text || text.length < 20) {
@@ -64,7 +65,7 @@ export const documentService = {
           metadata: {
             ...metadata,
             pageCount,
-            processingMethod: 'server-side'
+            processingMethod: 'simple-processing'
           }
         }
       });
@@ -91,7 +92,7 @@ export const documentService = {
     try {
       console.log('📄 Processing uploaded PDF:', file.name);
       
-      // Use the client-side fallback for uploaded files
+      // Use the simple extraction method for uploaded files
       const { text, pageCount, metadata } = await pdfProcessor.extractTextFromFile(file);
       
       if (!text || text.length < 20) {
@@ -109,7 +110,7 @@ export const documentService = {
           metadata: {
             ...metadata,
             pageCount,
-            processingMethod: 'client-fallback'
+            processingMethod: 'simple-processing'
           }
         }
       });
