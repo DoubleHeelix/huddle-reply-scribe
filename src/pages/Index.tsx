@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, Eye, MessageSquare, History, Camera } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAISuggestions } from "@/hooks/useAISuggestions";
 import { useOCR } from "@/hooks/useOCR";
@@ -273,8 +273,8 @@ const Index = () => {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">🤝 Huddle Assistant</h1>
-          <p className="text-purple-100">AI-powered conversation suggestions</p>
+          <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
+          <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
         </div>
       </div>
 
@@ -283,21 +283,21 @@ const Index = () => {
           <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger 
               value="huddle-play" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
             >
               <MessageSquare className="w-4 h-4" />
               Huddle Play
             </TabsTrigger>
             <TabsTrigger 
               value="interruptions" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
             >
               <Camera className="w-4 h-4" />
               Interruptions
             </TabsTrigger>
             <TabsTrigger 
               value="past-huddles" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
             >
               <History className="w-4 h-4" />
               Past Huddles
@@ -310,14 +310,14 @@ const Index = () => {
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-gray-300 text-lg">Upload Screenshot</p>
+                    <p className="text-gray-300 text-lg font-sans">Upload Screenshot</p>
                     {isOCRProcessing && (
-                      <Badge variant="secondary" className="bg-blue-600">
+                      <Badge variant="secondary" className="bg-blue-600 font-sans">
                         Processing OCR...
                       </Badge>
                     )}
                   </div>
-                  <p className="text-gray-500 text-sm">JPG, JPEG, PNG • Max 10MB</p>
+                  <p className="text-gray-500 text-sm font-sans">JPG, JPEG, PNG • Max 10MB</p>
                   
                   <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
                     <Input
@@ -334,7 +334,7 @@ const Index = () => {
                     >
                       <Upload className="w-8 h-8 text-purple-400" />
                       <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
-                        <span className="text-white">
+                        <span className="text-white font-sans">
                           {isOCRProcessing ? "Processing..." : "Choose file"}
                         </span>
                       </div>
@@ -349,35 +349,8 @@ const Index = () => {
                         className="w-full max-w-lg mx-auto rounded-lg border border-gray-600 shadow-lg"
                       />
                       <div className="flex gap-2 justify-center items-center flex-wrap">
-                        <Badge variant="secondary">Screenshot uploaded</Badge>
-                        {ocrResult && (
-                          <Badge variant="secondary" className="bg-green-600">
-                            OCR: {ocrResult.processingTime.toFixed(2)}s
-                          </Badge>
-                        )}
-                        {extractedText && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowExtractedText(!showExtractedText)}
-                            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            {showExtractedText ? 'Hide' : 'View'} OCR Text
-                          </Button>
-                        )}
+                        <Badge variant="secondary" className="font-sans">Screenshot uploaded</Badge>
                       </div>
-                      
-                      {showExtractedText && extractedText && (
-                        <Card className="bg-gray-900 border-gray-600">
-                          <CardContent className="p-4">
-                            <h4 className="text-white text-sm font-medium mb-2">Extracted Text:</h4>
-                            <pre className="text-gray-300 text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
-                              {extractedText}
-                            </pre>
-                          </CardContent>
-                        </Card>
-                      )}
                     </div>
                   )}
                 </div>
@@ -387,7 +360,7 @@ const Index = () => {
             {/* Draft Message Section */}
             <Card className="bg-gray-800 border-gray-700" data-section="draft">
               <CardContent className="p-6">
-                <h3 className="text-white text-lg font-medium mb-4">Your Draft Message</h3>
+                <h3 className="text-white text-lg font-medium mb-4 font-sans">Your Draft Message</h3>
                 <Textarea
                   placeholder="Type your draft message here..."
                   value={userDraft}
@@ -402,7 +375,7 @@ const Index = () => {
             <Button 
               onClick={handleGenerateReply}
               disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans"
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
             >
               <Zap className="w-5 h-5 mr-2" />
               {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
@@ -421,8 +394,8 @@ const Index = () => {
             {/* Generated Reply Section */}
             {generatedReply && (
               <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
-                <CardContent className="p-4 md:p-6 space-y-4">
-                  <div className="flex flex-col space-y-3 md:flex-row md:items-center md:justify-between md:space-y-0">
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex flex-col space-y-4">
                     <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
                     <ToneSelector
                       selectedTone={selectedTone}
@@ -449,7 +422,7 @@ const Index = () => {
                     </div>
                   )}
                   
-                  <div className="flex flex-col gap-3 md:flex-row">
+                  <div className="flex flex-col gap-4 sm:flex-row">
                     <Button 
                       onClick={handleRegenerate}
                       variant="outline" 
@@ -462,7 +435,7 @@ const Index = () => {
                     <Button 
                       onClick={resetHuddle}
                       variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 md:w-auto font-sans"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 sm:w-auto font-sans"
                     >
                       New Huddle
                     </Button>
