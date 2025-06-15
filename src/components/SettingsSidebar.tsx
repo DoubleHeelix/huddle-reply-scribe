@@ -1,11 +1,11 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Settings, X } from "lucide-react";
-import { OCRSettings } from "@/components/OCRSettings";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DocumentProcessor } from "@/components/DocumentProcessor";
 
 interface SettingsSidebarProps {
   googleCloudApiKey: string;
@@ -22,17 +22,8 @@ interface SettingsSidebarProps {
 }
 
 export const SettingsSidebar = ({
-  googleCloudApiKey,
-  onGoogleCloudApiKeyChange,
-  enableAutoCropping,
-  onAutoCroppingChange,
-  autoCropMargin,
-  onAutoCropMarginChange,
-  onTestOCR,
-  isTestingOCR,
   principles,
   setPrinciples,
-  uploadedImage
 }: SettingsSidebarProps) => {
   const [open, setOpen] = useState(false);
 
@@ -56,19 +47,10 @@ export const SettingsSidebar = ({
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
-          {/* OCR Settings */}
+          {/* Document Processing */}
           <Card className="bg-gray-900 border-gray-700">
             <CardContent className="p-6">
-              <OCRSettings
-                googleCloudApiKey={googleCloudApiKey}
-                onGoogleCloudApiKeyChange={onGoogleCloudApiKeyChange}
-                enableAutoCropping={enableAutoCropping}
-                onAutoCroppingChange={onAutoCroppingChange}
-                autoCropMargin={autoCropMargin}
-                onAutoCropMarginChange={onAutoCropMarginChange}
-                onTestOCR={uploadedImage ? onTestOCR : undefined}
-                isTestingOCR={isTestingOCR}
-              />
+              <DocumentProcessor />
             </CardContent>
           </Card>
 

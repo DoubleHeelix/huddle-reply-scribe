@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Brain } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
@@ -328,20 +328,13 @@ const Index = () => {
 
       <div className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger 
               value="huddle-play" 
               className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
             >
               <MessageSquare className="w-4 h-4" />
               Huddle
-            </TabsTrigger>
-            <TabsTrigger 
-              value="documents" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
-            >
-              <Brain className="w-4 h-4" />
-              Docs
             </TabsTrigger>
             <TabsTrigger 
               value="interruptions" 
@@ -505,10 +498,6 @@ const Index = () => {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-          
-          <TabsContent value="documents" className="mt-6">
-            <DocumentProcessor />
           </TabsContent>
           
           <TabsContent value="interruptions" className="mt-6">
