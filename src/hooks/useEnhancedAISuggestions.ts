@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentKnowledge } from './useDocumentKnowledge';
@@ -56,14 +55,18 @@ export const useEnhancedAISuggestions = () => {
       if (relevantKnowledge.length === 0) {
         mockDocuments = [
           {
+            id: "mock-doc-1",
             document_name: "Communication Guidelines.pdf",
             content_chunk: "When responding to feedback, always acknowledge the person's concerns first before providing your perspective. Use phrases like 'I understand your point about...' to show active listening.",
-            similarity: 0.85
+            similarity: 0.85,
+            metadata: { source: "mock", type: "communication" }
           },
           {
+            id: "mock-doc-2",
             document_name: "Team Collaboration Best Practices.pdf", 
             content_chunk: "Effective communication requires clarity and empathy. Always consider the recipient's context and adjust your tone accordingly to maintain positive working relationships.",
-            similarity: 0.78
+            similarity: 0.78,
+            metadata: { source: "mock", type: "collaboration" }
           }
         ];
       }
