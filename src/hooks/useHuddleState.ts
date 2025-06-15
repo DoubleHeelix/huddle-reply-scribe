@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedAISuggestions } from '@/hooks/useEnhancedAISuggestions';
@@ -19,6 +18,7 @@ export const useHuddleState = () => {
   const [extractedText, setExtractedText] = useState("");
   const [showExtractedText, setShowExtractedText] = useState(false);
   const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
+  const [lastUsedDocuments, setLastUsedDocuments] = useState<any[]>([]);
 
   const { toast } = useToast();
 
@@ -82,6 +82,7 @@ export const useHuddleState = () => {
     setCurrentHuddleId(null);
     setShowKnowledgeSources(false);
     setLastUsedHuddles([]);
+    setLastUsedDocuments([]);
   };
 
   return {
@@ -130,6 +131,8 @@ export const useHuddleState = () => {
     
     // Functions
     resetHuddle,
-    toast
+    toast,
+    lastUsedDocuments,
+    setLastUsedDocuments
   };
 };

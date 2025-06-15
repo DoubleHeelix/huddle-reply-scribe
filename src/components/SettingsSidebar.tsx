@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DocumentProcessor } from "./DocumentProcessor";
 
 interface SettingsSidebarProps {
   googleCloudApiKey: string;
@@ -59,6 +59,10 @@ export const SettingsSidebar = ({
               />
             </CardContent>
           </Card>
+        </div>
+
+        <div className="border-t border-gray-700 pt-4 mt-4">
+          <DocumentProcessor />
         </div>
       </SheetContent>
     </Sheet>

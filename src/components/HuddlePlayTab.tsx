@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Zap } from "lucide-react";
@@ -37,7 +36,9 @@ export const HuddlePlayTab: React.FC = () => {
     isOCRProcessing,
     ocrResult,
     resetHuddle,
-    toast
+    toast,
+    lastUsedDocuments,
+    setLastUsedDocuments
   } = useHuddleState();
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,9 +108,13 @@ export const HuddlePlayTab: React.FC = () => {
       
       // Store the knowledge sources used for this generation
       setLastUsedHuddles(result.pastHuddles || []);
+      setLastUsedDocuments(result.documentKnowledge || []);
       
       // Show knowledge sources section when we have data
-      setShowKnowledgeSources((result.pastHuddles && result.pastHuddles.length > 0));
+      setShowKnowledgeSources(
+        (result.pastHuddles && result.pastHuddles.length > 0) ||
+        (result.documentKnowledge && result.documentKnowledge.length > 0)
+      );
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
@@ -122,10 +127,11 @@ export const HuddlePlayTab: React.FC = () => {
       setCurrentHuddleId(huddleId);
       
       const huddleCount = result.pastHuddles?.length || 0;
+      const documentCount = result.documentKnowledge?.length || 0;
       
       toast({
         title: "Perfect reply generated!",
-        description: `Your optimized response is ready. Used ${huddleCount} past huddles.`,
+        description: `Your optimized response is ready. Used ${huddleCount} past huddles and ${documentCount} documents.`,
       });
 
       // Auto-scroll to generated reply section
@@ -149,6 +155,7 @@ export const HuddlePlayTab: React.FC = () => {
       setSelectedTone("none");
       
       setLastUsedHuddles(result.pastHuddles || []);
+      setLastUsedDocuments(result.documentKnowledge || []);
       
       if (currentHuddleId) {
         await updateFinalReply(currentHuddleId, result.reply);
@@ -243,10 +250,11 @@ export const HuddlePlayTab: React.FC = () => {
         onReset={resetHuddle}
       />
 
-      {/* AI Knowledge Sources Section - Only show if we have real data */}
-      {showKnowledgeSources && lastUsedHuddles.length > 0 && (
+      {/* AI Knowledge Sources Section - Show if we have any knowledge data */}
+      {showKnowledgeSources && (lastUsedHuddles.length > 0 || lastUsedDocuments.length > 0) && (
         <AIKnowledgeSources
           pastHuddles={lastUsedHuddles}
+          documentKnowledge={lastUsedDocuments}
           isVisible={true}
         />
       )}
