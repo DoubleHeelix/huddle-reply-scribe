@@ -21,10 +21,9 @@ export class PDFProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Completely disable worker to avoid loading issues
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-      pdfjsLib.GlobalWorkerOptions.workerPort = null;
-      console.log('📄 DEBUG: Worker completely disabled for browser compatibility');
+      // Properly disable worker by setting to false
+      pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+      console.log('📄 DEBUG: Worker properly disabled for browser compatibility');
       
       const arrayBuffer = await file.arrayBuffer();
       console.log('📄 DEBUG: Array buffer created, size:', arrayBuffer.byteLength);
@@ -33,14 +32,15 @@ export class PDFProcessor {
         throw new Error('PDF file is empty or corrupted');
       }
       
-      // Load PDF with minimal configuration
+      // Load PDF with worker explicitly disabled
       console.log('📄 DEBUG: Loading PDF with worker disabled...');
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0,
         useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: true
+        useSystemFonts: true,
+        disableFontFace: true,
+        isEvalSupported: false
       }).promise;
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
@@ -135,8 +135,8 @@ export class PDFProcessor {
         throw new Error(`The uploaded file is not a valid PDF or is corrupted. Please check the file and try again.`);
       } else if (error.message.includes('password')) {
         throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
-      } else if (error.message.includes('worker') || error.message.includes('fetch dynamically imported module')) {
-        throw new Error(`PDF processing failed due to worker issues. This may be a temporary problem - please try again.`);
+      } else if (error.message.includes('worker') || error.message.includes('fetch dynamically imported module') || error.message.includes('GlobalWorkerOptions')) {
+        throw new Error(`PDF processing failed due to browser compatibility issues. This is a known limitation - please try refreshing the page.`);
       }
       
       // Re-throw with original error for debugging
