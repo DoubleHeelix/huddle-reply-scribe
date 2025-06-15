@@ -1,8 +1,21 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure PDF.js worker with the correct version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker - try different approaches for compatibility
+try {
+  // First try: Use a different CDN that supports ES modules better
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+} catch (error) {
+  console.warn('Failed to set worker from unpkg, trying jsDelivr:', error);
+  try {
+    // Second try: Use jsDelivr CDN
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+  } catch (fallbackError) {
+    console.warn('Failed to set worker from jsDelivr, using legacy approach:', fallbackError);
+    // Fallback: Use a stable version that we know works
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+}
 
 interface ProcessedDocument {
   name: string;
@@ -34,7 +47,11 @@ class PDFProcessor {
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         useSystemFonts: true,
-        verbosity: 0
+        verbosity: 0,
+        // Add additional options for better compatibility
+        disableAutoFetch: true,
+        disableStream: true,
+        disableRange: true
       });
 
       const pdf = await loadingTask.promise;
