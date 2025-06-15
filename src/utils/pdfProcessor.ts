@@ -31,21 +31,11 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
-      // Load PDF with worker disabled as fallback if worker fails
-      let loadingTask;
-      try {
-        loadingTask = pdfjsLib.getDocument({
-          data: arrayBuffer,
-          verbosity: 0
-        });
-      } catch (workerError) {
-        console.log('⚠️ DEBUG: Worker failed, trying without worker...');
-        loadingTask = pdfjsLib.getDocument({
-          data: arrayBuffer,
-          verbosity: 0,
-          disableWorker: true
-        });
-      }
+      // Load PDF with basic configuration
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        verbosity: 0
+      });
 
       const pdf = await loadingTask.promise;
       console.log(`📄 DEBUG: PDF loaded successfully, ${pdf.numPages} pages`);
