@@ -18,13 +18,10 @@ export class PDFProcessor {
       // Use PDF.js to extract text from PDF with better worker setup
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Use a more reliable worker setup
+      // Use a more reliable worker setup without importing the worker directly
       if (typeof window !== 'undefined') {
-        // For browser environment, use the bundled worker
-        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.js');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(
-          new Blob([pdfjsWorker.default], { type: 'application/javascript' })
-        );
+        // For browser environment, use the CDN worker with better error handling
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
       } else {
         // Fallback for other environments
         pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
