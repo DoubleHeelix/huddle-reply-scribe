@@ -13,54 +13,124 @@ export interface DocumentChunk {
 export class PDFProcessor {
   private async extractTextFromPDF(file: File): Promise<string> {
     console.log('📄 DEBUG: Starting PDF text extraction for:', file.name);
+    console.log('📄 DEBUG: File size:', file.size, 'bytes');
+    console.log('📄 DEBUG: File type:', file.type);
     
     try {
-      // Use PDF.js to extract text from PDF
+      // Dynamic import of PDF.js
       const pdfjsLib = await import('pdfjs-dist');
+      console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Configure worker properly
+      // Try multiple worker configurations
       if (typeof window !== 'undefined') {
-        // Use a more reliable worker setup
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+        // First, try the CDN approach
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+          console.log('📄 DEBUG: Using CDN worker:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+        } catch (workerError) {
+          console.log('📄 DEBUG: CDN worker failed, trying alternative...');
+          // Fallback: try without worker (will be slower but might work)
+          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        }
       }
       
       const arrayBuffer = await file.arrayBuffer();
-      console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
+      console.log('📄 DEBUG: Array buffer created, size:', arrayBuffer.byteLength);
       
-      // Load PDF with minimal options to avoid compatibility issues
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0
-      }).promise;
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error('PDF file is empty or corrupted');
+      }
+      
+      // Try to load PDF with different configurations
+      let pdf;
+      try {
+        // First attempt: standard loading
+        pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0,
+          standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/web/standard_fonts/`,
+          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+          cMapPacked: true
+        }).promise;
+        console.log('📄 DEBUG: PDF loaded with standard config');
+      } catch (standardError) {
+        console.log('📄 DEBUG: Standard loading failed, trying basic config...', standardError);
+        
+        // Fallback: minimal config
+        try {
+          pdf = await pdfjsLib.getDocument({ 
+            data: arrayBuffer,
+            verbosity: 0,
+            disableFontFace: true,
+            nativeImageDecoderSupport: 'none'
+          }).promise;
+          console.log('📄 DEBUG: PDF loaded with basic config');
+        } catch (basicError) {
+          console.log('📄 DEBUG: Basic loading also failed:', basicError);
+          throw new Error(`Cannot load PDF: ${basicError.message}`);
+        }
+      }
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
       
+      if (pdf.numPages === 0) {
+        throw new Error('PDF has no pages');
+      }
+      
       let fullText = '';
       let extractedPages = 0;
+      let totalTextItems = 0;
       
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
           console.log(`📄 DEBUG: Processing page ${pageNum}/${pdf.numPages}`);
           const page = await pdf.getPage(pageNum);
-          const textContent = await page.getTextContent();
           
-          // Extract text more reliably
-          const pageTextItems = textContent.items.filter((item: any) => {
-            return item && typeof item.str === 'string' && item.str.trim().length > 0;
-          });
+          // Get text content with different extraction strategies
+          let textContent;
+          try {
+            textContent = await page.getTextContent({
+              normalizeWhitespace: true,
+              disableCombineTextItems: false
+            });
+            console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
+          } catch (textError) {
+            console.log(`📄 DEBUG: Page ${pageNum} - Standard text extraction failed, trying fallback...`);
+            textContent = await page.getTextContent();
+          }
           
-          if (pageTextItems.length > 0) {
-            const pageText = pageTextItems
+          if (textContent && textContent.items && textContent.items.length > 0) {
+            // Extract text with better filtering
+            const pageTextItems = textContent.items
+              .filter((item: any) => {
+                // More robust filtering
+                return item && 
+                       typeof item.str === 'string' && 
+                       item.str.trim().length > 0 &&
+                       item.str.trim() !== ' ' &&
+                       !/^[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]*$/.test(item.str); // Filter out whitespace-only
+              })
               .map((item: any) => item.str.trim())
-              .join(' ')
-              .replace(/\s+/g, ' ')
-              .trim();
+              .filter(str => str.length > 0);
             
-            if (pageText.length > 0) {
-              console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
-              fullText += `${pageText} `;
-              extractedPages++;
+            totalTextItems += pageTextItems.length;
+            console.log(`📄 DEBUG: Page ${pageNum} - Filtered text items:`, pageTextItems.length);
+            
+            if (pageTextItems.length > 0) {
+              const pageText = pageTextItems
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              
+              if (pageText.length > 0) {
+                console.log(`📄 DEBUG: Page ${pageNum} - Extracted ${pageText.length} characters`);
+                console.log(`📄 DEBUG: Page ${pageNum} - Sample text:`, pageText.substring(0, 200) + '...');
+                fullText += `${pageText} `;
+                extractedPages++;
+              }
             }
+          } else {
+            console.log(`📄 DEBUG: Page ${pageNum} - No text items found`);
           }
           
           // Clean up page resources
@@ -74,20 +144,42 @@ export class PDFProcessor {
       // Clean up PDF document
       pdf.destroy();
       
-      console.log(`📄 DEBUG: Total text extracted: ${fullText.length} characters from ${extractedPages}/${pdf.numPages} pages`);
+      console.log(`📄 DEBUG: Extraction complete:`, {
+        totalPages: pdf.numPages,
+        extractedPages,
+        totalTextItems,
+        finalTextLength: fullText.length,
+        sampleText: fullText.substring(0, 300) + '...'
+      });
       
-      // Only return text if we actually extracted something meaningful
-      if (fullText.trim().length > 50) { // Require at least 50 characters
-        return fullText.trim();
+      // More detailed validation
+      const trimmedText = fullText.trim();
+      if (trimmedText.length < 10) {
+        // Try to determine why extraction failed
+        if (totalTextItems === 0) {
+          throw new Error(`No text content found in PDF. This PDF may be image-based (scanned document), password-protected, or use unsupported encoding. Consider using OCR for image-based PDFs.`);
+        } else {
+          throw new Error(`PDF contains only ${trimmedText.length} characters of readable text. The document may be mostly images or have formatting issues.`);
+        }
       }
       
-      // If extraction failed, throw an error instead of returning a generic message
-      throw new Error(`No readable text content found in PDF. This PDF may be image-based, scanned, or encrypted.`);
+      console.log('✅ DEBUG: Text extraction successful!');
+      return trimmedText;
       
     } catch (error) {
-      console.error('❌ DEBUG: Error in PDF text extraction:', error);
-      // Don't mask the error - let it bubble up so we can handle it properly
-      throw new Error(`Failed to extract text from PDF: ${error.message}`);
+      console.error('❌ DEBUG: PDF text extraction failed:', error);
+      
+      // Provide more specific error information
+      if (error.message.includes('Invalid PDF')) {
+        throw new Error(`The uploaded file is not a valid PDF or is corrupted. Please check the file and try again.`);
+      } else if (error.message.includes('password')) {
+        throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
+      } else if (error.message.includes('worker')) {
+        throw new Error(`PDF processing failed due to worker issues. This may be a temporary problem - please try again.`);
+      }
+      
+      // Re-throw with original error for debugging
+      throw error;
     }
   }
 
@@ -182,8 +274,14 @@ export class PDFProcessor {
   async processDocument(file: File, documentName: string): Promise<boolean> {
     try {
       console.log(`🔄 DEBUG: Starting to process document: ${documentName}`);
+      console.log(`📄 DEBUG: File details:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: new Date(file.lastModified).toISOString()
+      });
       
-      // Extract text from PDF - this will throw if extraction fails
+      // Extract text from PDF - this will throw descriptive errors if extraction fails
       const fullText = await this.extractTextFromPDF(file);
       
       console.log(`✅ DEBUG: Successfully extracted ${fullText.length} characters from ${documentName}`);
