@@ -1,32 +1,22 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure PDF.js worker with multiple fallback CDNs for maximum reliability
+// Simple worker configuration - use a single reliable CDN
 const configureWorker = () => {
-  // Primary CDN: unpkg (most reliable)
-  const primaryWorkerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-  
-  // Fallback CDNs, ensuring they use the same version as the library
-  const fallbackWorkerSrcs = [
-    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
-  ];
-
   console.log(`🔧 DEBUG: Configuring PDF.js worker with version ${pdfjsLib.version}`);
-  console.log(`🔧 DEBUG: Primary worker URL: ${primaryWorkerSrc}`);
   
-  // Set the worker source
-  pdfjsLib.GlobalWorkerOptions.workerSrc = primaryWorkerSrc;
+  // Use jsdelivr as primary CDN - it's reliable and has good CORS support
+  const workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
   
-  // Additional configuration to prevent automatic worker loading
-  return {
-    primaryWorkerSrc,
-    fallbackWorkerSrcs
-  };
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+  console.log(`🔧 DEBUG: Worker configured to: ${workerSrc}`);
+  
+  return workerSrc;
 };
 
-// Initialize worker configuration immediately
-const workerConfig = configureWorker();
+// Initialize worker configuration
+configureWorker();
 
 interface ProcessedDocument {
   name: string;
@@ -36,29 +26,18 @@ interface ProcessedDocument {
 }
 
 class PDFProcessor {
-  private async waitForAuth(maxRetries: number = 10, delay: number = 1000): Promise<boolean> {
+  private async waitForAuth(maxRetries: number = 5, delay: number = 1000): Promise<boolean> {
     for (let i = 0; i < maxRetries; i++) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        console.log('✅ DEBUG: User authenticated, proceeding with processing');
+        console.log('✅ DEBUG: User authenticated');
         return true;
       }
       console.log(`⏳ DEBUG: Waiting for authentication... attempt ${i + 1}/${maxRetries}`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
-    console.log('❌ DEBUG: Authentication timeout - user not found after retries');
+    console.log('❌ DEBUG: Authentication timeout');
     return false;
-  }
-
-  private async testWorkerAvailability(workerUrl: string): Promise<boolean> {
-    try {
-      const response = await fetch(workerUrl, { method: 'HEAD' });
-      console.log(`🔧 DEBUG: Worker test for ${workerUrl} - Status: ${response.status}`);
-      return response.ok;
-    } catch (error) {
-      console.warn(`⚠️ DEBUG: Worker URL not accessible: ${workerUrl}`, error);
-      return false;
-    }
   }
 
   private async extractTextFromPDF(arrayBuffer: ArrayBuffer, fileName: string): Promise<string> {
@@ -66,43 +45,10 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
-      // Ensure worker is properly configured before processing
-      console.log(`🔧 DEBUG: Current worker source: ${pdfjsLib.GlobalWorkerOptions.workerSrc}`);
-
-      // Test primary worker availability
-      const isPrimaryWorkerAvailable = await this.testWorkerAvailability(workerConfig.primaryWorkerSrc);
-      
-      if (!isPrimaryWorkerAvailable) {
-        console.log('⚠️ DEBUG: Primary worker not available, trying fallbacks...');
-        
-        let workerFound = false;
-        for (const fallbackUrl of workerConfig.fallbackWorkerSrcs) {
-          const isAvailable = await this.testWorkerAvailability(fallbackUrl);
-          if (isAvailable) {
-            console.log(`✅ DEBUG: Using fallback worker: ${fallbackUrl}`);
-            pdfjsLib.GlobalWorkerOptions.workerSrc = fallbackUrl;
-            workerFound = true;
-            break;
-          }
-        }
-        if (!workerFound) {
-            console.error('❌ DEBUG: All primary and fallback PDF workers are unavailable.');
-            throw new Error('PDF worker could not be loaded from any CDN. Please check your network connection and try again.');
-        }
-      }
-
-      // Configure PDF.js with explicit settings to prevent worker issues
+      // Simple PDF loading configuration
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
-        verbosity: 0,
-        // Explicit worker configuration
-        isEvalSupported: false,
-        disableAutoFetch: true,
-        disableStream: true,
-        disableRange: true,
-        // Force use of our configured worker
-        useSystemFonts: true,
-        standardFontDataUrl: undefined
+        verbosity: 0
       });
 
       const pdf = await loadingTask.promise;
@@ -110,6 +56,7 @@ class PDFProcessor {
 
       let fullText = '';
       
+      // Extract text from each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
           const page = await pdf.getPage(pageNum);
@@ -130,6 +77,7 @@ class PDFProcessor {
         }
       }
 
+      // Clean up the extracted text
       const cleanedText = fullText
         .replace(/\s+/g, ' ')
         .replace(/\n+/g, '\n')
@@ -138,18 +86,12 @@ class PDFProcessor {
       console.log(`✅ DEBUG: PDF text extraction completed for ${fileName}, total characters: ${cleanedText.length}`);
       
       if (cleanedText.length === 0) {
-        throw new Error('No text content found in PDF - document may contain only images or be password protected');
+        throw new Error('No text content found in PDF');
       }
 
       return cleanedText;
     } catch (error) {
       console.error(`❌ DEBUG: PDF text extraction failed for ${fileName}:`, error);
-      
-      // Provide more helpful error messages
-      if (error.message.includes('worker')) {
-        throw new Error(`PDF worker configuration failed for ${fileName}. This may be due to network connectivity issues or an invalid worker path.`);
-      }
-      
       throw new Error(`Failed to extract text from ${fileName}: ${error.message}`);
     }
   }
@@ -202,7 +144,7 @@ class PDFProcessor {
   private async storeDocumentChunks(docName: string, chunks: string[], userId: string): Promise<void> {
     console.log(`💾 DEBUG: Storing ${chunks.length} chunks for document: ${docName}`);
 
-    // First, delete existing chunks for this document
+    // Delete existing chunks for this document
     const { error: deleteError } = await supabase
       .from('document_knowledge')
       .delete()
@@ -255,10 +197,6 @@ class PDFProcessor {
     try {
       console.log(`🔄 DEBUG: Starting document processing for bucket: ${bucketName}`);
 
-      // Re-configure worker before processing to ensure it's set correctly
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerConfig.primaryWorkerSrc;
-      console.log(`🔧 DEBUG: Re-configured worker to: ${pdfjsLib.GlobalWorkerOptions.workerSrc}`);
-
       // Wait for authentication
       const isAuthenticated = await this.waitForAuth();
       if (!isAuthenticated) {
@@ -292,6 +230,7 @@ class PDFProcessor {
       const results: ProcessedDocument[] = [];
       const errors: string[] = [];
 
+      // Process each file
       for (const file of pdfFiles) {
         try {
           console.log(`🔄 DEBUG: Processing ${file.name}...`);

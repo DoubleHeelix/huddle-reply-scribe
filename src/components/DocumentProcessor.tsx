@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
+import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle, Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { createDocumentsBucket, uploadPDFFile } from '@/utils/storageSetup';
 
 export const DocumentProcessor = () => {
   const [hasProcessed, setHasProcessed] = useState(false);
@@ -14,14 +16,21 @@ export const DocumentProcessor = () => {
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [processedDocuments, setProcessedDocuments] = useState<string[]>([]);
   const [isCleaningErrors, setIsCleaningErrors] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const { processDocuments, isProcessing, error, clearError } = useDocumentKnowledge();
   const { toast } = useToast();
 
-  // Load files from storage on component mount
   useEffect(() => {
-    loadStorageFiles();
-    loadProcessedDocuments();
+    initializeStorage();
   }, []);
+
+  const initializeStorage = async () => {
+    // First ensure the bucket exists
+    await createDocumentsBucket();
+    // Then load files
+    await loadStorageFiles();
+    await loadProcessedDocuments();
+  };
 
   const loadStorageFiles = async () => {
     try {
@@ -73,7 +82,6 @@ export const DocumentProcessor = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Only count documents that have valid content (not error messages)
       const { data, error } = await supabase
         .from('document_knowledge')
         .select('document_name')
@@ -137,11 +145,51 @@ export const DocumentProcessor = () => {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes('pdf')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadPath = await uploadPDFFile(file);
+      if (uploadPath) {
+        toast({
+          title: "File uploaded successfully",
+          description: `${file.name} is now ready for processing`,
+        });
+        await loadStorageFiles();
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload the PDF file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset the input
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   const handleProcessDocuments = async () => {
     if (storageFiles.length === 0) {
       toast({
         title: "No documents found",
-        description: "Please upload PDF files to the 'documents' bucket in Supabase Storage first.",
+        description: "Please upload PDF files first.",
         variant: "destructive",
       });
       return;
@@ -186,18 +234,52 @@ export const DocumentProcessor = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* File Upload Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-white text-sm font-medium font-sans">Upload PDF Documents</h4>
+          </div>
+          
+          <div className="border-2 border-dashed border-purple-500 rounded-xl p-4 bg-purple-500/5">
+            <Input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+              className="hidden"
+              id="pdf-upload"
+            />
+            <label 
+              htmlFor="pdf-upload" 
+              className="cursor-pointer flex flex-col items-center space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 text-purple-400" />
+                )}
+                <span className="text-purple-400 font-sans text-sm">
+                  {isUploading ? "Uploading..." : "Click to upload PDF"}
+                </span>
+              </div>
+              <span className="text-gray-400 text-xs font-sans">PDF files only • Max 10MB</span>
+            </label>
+          </div>
+        </div>
+
         {/* Files Status Section */}
         <div className="space-y-4">
           {isLoadingFiles ? (
             <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="font-sans">Loading documents from storage...</span>
+              <span className="font-sans">Loading documents...</span>
             </div>
           ) : storageFiles.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-white text-sm font-medium font-sans">
-                  📄 Found {storageFiles.length} PDF{storageFiles.length !== 1 ? 's' : ''} in Storage
+                  📄 Found {storageFiles.length} PDF{storageFiles.length !== 1 ? 's' : ''}
                 </h4>
                 <div className="flex gap-2">
                   <Button
@@ -266,17 +348,8 @@ export const DocumentProcessor = () => {
               </div>
               <div className="space-y-2">
                 <h4 className="text-white text-sm font-medium font-sans">No PDF documents found</h4>
-                <p className="text-gray-400 text-xs font-sans">Upload PDFs to the 'documents' bucket in Supabase Storage</p>
+                <p className="text-gray-400 text-xs font-sans">Upload PDFs using the upload section above</p>
               </div>
-              <Button
-                onClick={loadStorageFiles}
-                variant="outline"
-                size="sm"
-                className="text-gray-300 border-gray-600 hover:bg-gray-700 font-sans"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Check Again
-              </Button>
             </div>
           )}
         </div>
@@ -325,10 +398,10 @@ export const DocumentProcessor = () => {
         <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
           <h5 className="text-white text-sm font-medium mb-2 font-sans">How it works:</h5>
           <div className="text-xs text-gray-400 space-y-1 font-sans">
-            <p>• Extracts text from PDFs in your Supabase Storage</p>
+            <p>• Upload PDF files using the upload section above</p>
+            <p>• Extracts text from PDFs automatically</p>
             <p>• Creates AI embeddings for intelligent content search</p>
             <p>• References your documents when generating replies</p>
-            <p>• Upload PDFs to the 'documents' bucket in Storage first</p>
           </div>
         </div>
       </CardContent>
