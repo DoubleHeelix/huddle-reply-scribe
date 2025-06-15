@@ -198,6 +198,10 @@ const Index = () => {
     }
     
     const screenshotText = getScreenshotText();
+    
+    // Show knowledge sources section when starting generation
+    setShowKnowledgeSources(true);
+    
     const result = await generateReply(screenshotText, userDraft, principles, false);
     
     if (result) {
@@ -207,7 +211,6 @@ const Index = () => {
       // Store the knowledge sources used for this generation
       setLastUsedDocuments(result.documentKnowledge || []);
       setLastUsedHuddles(result.pastHuddles || []);
-      setShowKnowledgeSources(true);
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
