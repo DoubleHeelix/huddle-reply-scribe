@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,18 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Copy, FileText } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
 import { useOCR } from "@/hooks/useOCR";
-import { useDocumentKnowledge } from "@/hooks/useDocumentKnowledge";
 import { ToneSelector } from "@/components/ToneSelector";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import LandingPage from "@/components/LandingPage";
-import { DocumentProcessor } from "@/components/DocumentProcessor";
 import { AIKnowledgeSources } from "@/components/AIKnowledgeSources";
 import { AuthWrapper } from "@/components/AuthWrapper";
 
@@ -30,7 +29,6 @@ const Index = () => {
   const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
   
   // New state for tracking AI knowledge sources
-  const [lastUsedDocuments, setLastUsedDocuments] = useState<any[]>([]);
   const [lastUsedHuddles, setLastUsedHuddles] = useState<any[]>([]);
   const [showKnowledgeSources, setShowKnowledgeSources] = useState(false);
   
@@ -46,7 +44,6 @@ const Index = () => {
 
   const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
   const { saveCurrentHuddle, updateFinalReply } = useHuddlePlays();
-  const { processDocuments, isProcessing } = useDocumentKnowledge();
   
   const { 
     extractText, 
@@ -70,15 +67,6 @@ const Index = () => {
     if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
-
-  // Process documents on app load to ensure they're available
-  useEffect(() => {
-    const processDocsOnLoad = async () => {
-      console.log('Processing documents on app load...');
-      await processDocuments();
-    };
-    processDocsOnLoad();
-  }, [processDocuments]);
 
   // Add the missing handleGetStarted function
   const handleGetStarted = () => {
@@ -218,11 +206,10 @@ const Index = () => {
       setSelectedTone("none");
       
       // Store the knowledge sources used for this generation
-      setLastUsedDocuments(result.documentKnowledge || []);
       setLastUsedHuddles(result.pastHuddles || []);
       
       // Show knowledge sources section when we have data
-      setShowKnowledgeSources((result.documentKnowledge && result.documentKnowledge.length > 0) || (result.pastHuddles && result.pastHuddles.length > 0));
+      setShowKnowledgeSources((result.pastHuddles && result.pastHuddles.length > 0));
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
@@ -234,12 +221,11 @@ const Index = () => {
       );
       setCurrentHuddleId(huddleId);
       
-      const docCount = result.documentKnowledge?.length || 0;
       const huddleCount = result.pastHuddles?.length || 0;
       
       toast({
         title: "Perfect reply generated!",
-        description: `Your optimized response is ready. Used ${docCount} document sources and ${huddleCount} past huddles.`,
+        description: `Your optimized response is ready. Used ${huddleCount} past huddles.`,
       });
 
       // Auto-scroll to generated reply section
@@ -262,7 +248,6 @@ const Index = () => {
       setGeneratedReply(result.reply);
       setSelectedTone("none");
       
-      setLastUsedDocuments(result.documentKnowledge || []);
       setLastUsedHuddles(result.pastHuddles || []);
       
       if (currentHuddleId) {
@@ -322,7 +307,6 @@ const Index = () => {
     setShowExtractedText(false);
     setCurrentHuddleId(null);
     setShowKnowledgeSources(false);
-    setLastUsedDocuments([]);
     setLastUsedHuddles([]);
   };
 
@@ -358,15 +342,7 @@ const Index = () => {
         <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
-            <p className="text-purple-100 font-sans">AI-powered conversation suggestions with document knowledge</p>
-            {isProcessing && (
-              <div className="mt-2">
-                <Badge variant="secondary" className="bg-yellow-600 font-sans">
-                  <FileText className="w-3 h-3 mr-1" />
-                  Processing documents...
-                </Badge>
-              </div>
-            )}
+            <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
           </div>
         </div>
 
@@ -548,9 +524,8 @@ const Index = () => {
               )}
 
               {/* AI Knowledge Sources Section - Only show if we have real data */}
-              {showKnowledgeSources && (lastUsedDocuments.length > 0 || lastUsedHuddles.length > 0) && (
+              {showKnowledgeSources && lastUsedHuddles.length > 0 && (
                 <AIKnowledgeSources
-                  documentKnowledge={lastUsedDocuments}
                   pastHuddles={lastUsedHuddles}
                   isVisible={true}
                 />
