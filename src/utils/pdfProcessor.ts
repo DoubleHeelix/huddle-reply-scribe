@@ -14,33 +14,43 @@ export class PDFProcessor {
   private async extractTextFromPDF(file: File): Promise<string> {
     console.log('📄 DEBUG: Starting PDF text extraction for:', file.name);
     
-    // Use PDF.js to extract text from PDF
-    const pdfjsLib = await import('pdfjs-dist');
-    
-    // Set worker source
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    
-    const arrayBuffer = await file.arrayBuffer();
-    console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
-    
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    console.log('📄 DEBUG: PDF loaded, total pages:', pdf.numPages);
-    
-    let fullText = '';
-    
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
+    try {
+      // Use PDF.js to extract text from PDF
+      const pdfjsLib = await import('pdfjs-dist');
       
-      console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
-      fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+      // Set worker source
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
+      
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      console.log('📄 DEBUG: PDF loaded, total pages:', pdf.numPages);
+      
+      let fullText = '';
+      
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        try {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          
+          console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
+          fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+        } catch (pageError) {
+          console.error(`❌ DEBUG: Error extracting page ${pageNum}:`, pageError);
+          // Continue with other pages even if one fails
+        }
+      }
+      
+      console.log('📄 DEBUG: Total text extracted:', fullText.length, 'characters');
+      return fullText;
+    } catch (error) {
+      console.error('❌ DEBUG: Error in PDF text extraction:', error);
+      throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    console.log('📄 DEBUG: Total text extracted:', fullText.length, 'characters');
-    return fullText;
   }
 
   private chunkText(text: string, chunkSize: number = 1000): DocumentChunk[] {
@@ -199,28 +209,29 @@ export class PDFProcessor {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error('❌ DEBUG: User not authenticated');
-        return;
+        throw new Error('User not authenticated');
       }
 
       console.log('👤 DEBUG: User authenticated:', user.id);
 
-      // List files in the storage bucket
+      // List files in the storage bucket with better error handling
       console.log('📁 DEBUG: Listing files in storage bucket...');
       const { data: files, error: listError } = await supabase.storage
         .from(bucketName)
         .list('', {
           limit: 100,
-          offset: 0
+          offset: 0,
+          sortBy: { column: 'name', order: 'asc' }
         });
 
       if (listError) {
         console.error('❌ DEBUG: Error listing files:', listError);
-        return;
+        throw new Error(`Failed to list files from storage: ${listError.message}`);
       }
 
       if (!files || files.length === 0) {
         console.log('⚠️ DEBUG: No files found in storage bucket');
-        return;
+        throw new Error('No files found in storage bucket. Please upload PDF files first.');
       }
 
       console.log(`📁 DEBUG: Found ${files.length} files in storage:`, files.map(f => f.name));
@@ -228,13 +239,22 @@ export class PDFProcessor {
       // Filter for PDF files
       const pdfFiles = files.filter(file => 
         file.name.toLowerCase().endsWith('.pdf') && 
-        !file.name.startsWith('.') // Exclude hidden files
+        !file.name.startsWith('.') &&
+        file.name !== '.emptyFolderPlaceholder'
       );
 
-      console.log(`📄 DEBUG: Found ${pdfFiles.length} PDF files to process`);
+      console.log(`📄 DEBUG: Found ${pdfFiles.length} PDF files to process:`, pdfFiles.map(f => f.name));
+
+      if (pdfFiles.length === 0) {
+        throw new Error('No PDF files found in storage bucket. Please upload PDF files first.');
+      }
+
+      let processedCount = 0;
+      const errors: string[] = [];
 
       for (const fileInfo of pdfFiles) {
         try {
+          const documentName = fileInfo.name.replace('.pdf', '');
           console.log(`🔍 DEBUG: Checking if ${fileInfo.name} already processed...`);
           
           // Check if this document has already been processed
@@ -242,7 +262,7 @@ export class PDFProcessor {
             .from('document_knowledge')
             .select('id')
             .eq('user_id', user.id)
-            .eq('document_name', fileInfo.name.replace('.pdf', ''))
+            .eq('document_name', documentName)
             .limit(1);
 
           if (existingDocs && existingDocs.length > 0) {
@@ -259,6 +279,7 @@ export class PDFProcessor {
 
           if (downloadError) {
             console.error(`❌ DEBUG: Error downloading ${fileInfo.name}:`, downloadError);
+            errors.push(`Failed to download ${fileInfo.name}: ${downloadError.message}`);
             continue;
           }
 
@@ -268,24 +289,36 @@ export class PDFProcessor {
           const file = new File([fileData], fileInfo.name, { type: 'application/pdf' });
           
           // Process the document
-          const documentName = fileInfo.name.replace('.pdf', '');
           console.log(`🔄 DEBUG: Starting processing of ${documentName}...`);
           
           const success = await this.processDocument(file, documentName);
           
           if (success) {
             console.log(`✅ DEBUG: Successfully processed ${fileInfo.name} from storage`);
+            processedCount++;
           } else {
             console.log(`❌ DEBUG: Failed to process ${fileInfo.name}`);
+            errors.push(`Failed to process ${fileInfo.name}`);
           }
         } catch (error) {
           console.error(`❌ DEBUG: Error processing ${fileInfo.name}:`, error);
+          errors.push(`Error processing ${fileInfo.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
-      console.log('🎉 DEBUG: Finished processing all documents from storage');
+      console.log(`🎉 DEBUG: Finished processing documents. Successfully processed: ${processedCount}/${pdfFiles.length}`);
+      
+      if (errors.length > 0) {
+        console.error('❌ DEBUG: Errors encountered:', errors);
+        throw new Error(`Some documents failed to process: ${errors.join(', ')}`);
+      }
+      
+      if (processedCount === 0) {
+        throw new Error('No new documents were processed. All documents may have been processed already.');
+      }
     } catch (error) {
       console.error('❌ DEBUG: Error in processStorageDocuments:', error);
+      throw error;
     }
   }
 

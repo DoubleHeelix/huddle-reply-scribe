@@ -5,58 +5,115 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Brain, Loader2, Upload, RefreshCw } from 'lucide-react';
+import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export const DocumentProcessor = () => {
   const [hasProcessed, setHasProcessed] = useState(false);
   const [storageFiles, setStorageFiles] = useState<string[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
+  const [processedDocuments, setProcessedDocuments] = useState<string[]>([]);
   const { processDocuments, isProcessing, error, clearError } = useDocumentKnowledge();
   const { toast } = useToast();
 
   // Load files from storage on component mount
   useEffect(() => {
     loadStorageFiles();
+    loadProcessedDocuments();
   }, []);
 
   const loadStorageFiles = async () => {
     try {
       setIsLoadingFiles(true);
+      console.log('📁 DEBUG: Loading files from documents bucket...');
       
       const { data: files, error } = await supabase.storage
         .from('documents')
         .list('', {
           limit: 100,
-          offset: 0
+          offset: 0,
+          sortBy: { column: 'name', order: 'asc' }
         });
 
       if (error) {
-        console.error('Error loading storage files:', error);
+        console.error('❌ DEBUG: Error loading storage files:', error);
+        toast({
+          title: "Error loading files",
+          description: error.message,
+          variant: "destructive",
+        });
         return;
       }
 
+      console.log('📁 DEBUG: Raw files from storage:', files);
+
       const pdfFiles = (files || [])
-        .filter(file => file.name.toLowerCase().endsWith('.pdf'))
+        .filter(file => {
+          const isPdf = file.name.toLowerCase().endsWith('.pdf');
+          const isNotFolder = file.name !== '.emptyFolderPlaceholder';
+          console.log(`📄 DEBUG: File ${file.name} - isPdf: ${isPdf}, isNotFolder: ${isNotFolder}`);
+          return isPdf && isNotFolder;
+        })
         .map(file => file.name);
 
+      console.log('📄 DEBUG: Filtered PDF files:', pdfFiles);
       setStorageFiles(pdfFiles);
     } catch (err) {
-      console.error('Error in loadStorageFiles:', err);
+      console.error('❌ DEBUG: Error in loadStorageFiles:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load files from storage",
+        variant: "destructive",
+      });
     } finally {
       setIsLoadingFiles(false);
     }
   };
 
+  const loadProcessedDocuments = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('document_knowledge')
+        .select('document_name')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('❌ DEBUG: Error loading processed documents:', error);
+        return;
+      }
+
+      const uniqueDocuments = [...new Set(data.map(doc => doc.document_name))];
+      setProcessedDocuments(uniqueDocuments);
+      console.log('📋 DEBUG: Already processed documents:', uniqueDocuments);
+    } catch (err) {
+      console.error('❌ DEBUG: Error in loadProcessedDocuments:', err);
+    }
+  };
+
   const handleProcessDocuments = async () => {
+    if (storageFiles.length === 0) {
+      toast({
+        title: "No documents found",
+        description: "Please upload PDF files to the 'documents' bucket in Supabase Storage first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     clearError();
+    console.log('🔄 DEBUG: Starting document processing...');
+    
     const success = await processDocuments();
     
     if (success) {
       setHasProcessed(true);
+      await loadProcessedDocuments(); // Refresh the processed documents list
       toast({
         title: "Documents processed successfully!",
-        description: "Your PDF documents from storage have been analyzed and are now available for AI assistance.",
+        description: `${storageFiles.length} PDF document(s) have been analyzed and are now available for AI assistance.`,
       });
     } else {
       toast({
@@ -66,6 +123,15 @@ export const DocumentProcessor = () => {
       });
     }
   };
+
+  const getUnprocessedFiles = () => {
+    return storageFiles.filter(fileName => {
+      const docName = fileName.replace('.pdf', '');
+      return !processedDocuments.includes(docName);
+    });
+  };
+
+  const unprocessedFiles = getUnprocessedFiles();
 
   return (
     <Card className="bg-gray-800 border-gray-700">
@@ -90,7 +156,10 @@ export const DocumentProcessor = () => {
                   📄 Found {storageFiles.length} PDF{storageFiles.length !== 1 ? 's' : ''} in Storage
                 </h4>
                 <Button
-                  onClick={loadStorageFiles}
+                  onClick={() => {
+                    loadStorageFiles();
+                    loadProcessedDocuments();
+                  }}
                   variant="ghost"
                   size="sm"
                   className="text-gray-400 hover:text-white h-6 px-2 font-sans"
@@ -99,14 +168,36 @@ export const DocumentProcessor = () => {
                   Refresh
                 </Button>
               </div>
+              
               <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
-                {storageFiles.map((fileName) => (
-                  <div key={fileName} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded border border-gray-600">
-                    <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                    <span className="text-sm text-gray-300 font-sans truncate">{fileName}</span>
-                  </div>
-                ))}
+                {storageFiles.map((fileName) => {
+                  const docName = fileName.replace('.pdf', '');
+                  const isProcessed = processedDocuments.includes(docName);
+                  
+                  return (
+                    <div key={fileName} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded border border-gray-600">
+                      <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                      <span className="text-sm text-gray-300 font-sans truncate flex-1">{fileName}</span>
+                      {isProcessed ? (
+                        <Badge variant="secondary" className="bg-green-600 text-white text-xs px-2 py-0.5">
+                          ✓ Processed
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-yellow-600 text-white text-xs px-2 py-0.5">
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+              
+              {unprocessedFiles.length > 0 && (
+                <div className="flex items-center gap-2 text-yellow-400 text-xs">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{unprocessedFiles.length} document{unprocessedFiles.length !== 1 ? 's' : ''} need{unprocessedFiles.length === 1 ? 's' : ''} processing</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8 space-y-4">
@@ -145,15 +236,20 @@ export const DocumentProcessor = () => {
             ) : (
               <div className="flex items-center gap-2">
                 <Brain className="w-4 h-4" />
-                {hasProcessed ? 'Reprocess Storage Documents' : 'Process Storage Documents for AI'}
+                {unprocessedFiles.length > 0 
+                  ? `Process ${unprocessedFiles.length} New Document${unprocessedFiles.length !== 1 ? 's' : ''}` 
+                  : hasProcessed 
+                    ? 'Reprocess All Documents' 
+                    : 'Process All Documents for AI'
+                }
               </div>
             )}
           </Button>
           
-          {hasProcessed && (
+          {processedDocuments.length > 0 && (
             <div className="flex justify-center">
               <Badge variant="secondary" className="bg-green-600 text-white font-sans">
-                ✅ Documents ready for AI assistance
+                ✅ {processedDocuments.length} document{processedDocuments.length !== 1 ? 's' : ''} ready for AI assistance
               </Badge>
             </div>
           )}
