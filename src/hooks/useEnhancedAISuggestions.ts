@@ -27,12 +27,36 @@ export const useEnhancedAISuggestions = () => {
 
       console.log('Enhanced AI: Generating reply with document knowledge...');
 
-      // Search for relevant document knowledge with a lower threshold for better results
-      const searchQuery = `${screenshotText} ${userDraft}`;
-      console.log('Searching for document knowledge with query:', searchQuery);
+      // Create a more comprehensive search query with key terms
+      const keyTerms = [
+        ...screenshotText.split(' ').filter(word => word.length > 3),
+        ...userDraft.split(' ').filter(word => word.length > 3)
+      ].slice(0, 10).join(' ');
       
-      const relevantKnowledge = await searchKnowledge(searchQuery, 3);
-      console.log(`Found ${relevantKnowledge.length} relevant document chunks:`, relevantKnowledge);
+      const searchQueries = [
+        `${screenshotText} ${userDraft}`,
+        keyTerms,
+        screenshotText,
+        userDraft
+      ];
+
+      console.log('Searching with multiple queries:', searchQueries);
+      
+      // Try multiple search approaches to find relevant content
+      let relevantKnowledge = [];
+      for (const searchQuery of searchQueries) {
+        if (relevantKnowledge.length < 3) {
+          const results = await searchKnowledge(searchQuery, 2);
+          relevantKnowledge.push(...results);
+        }
+      }
+
+      // Remove duplicates based on content_chunk
+      const uniqueKnowledge = relevantKnowledge.filter((item, index, arr) => 
+        arr.findIndex(other => other.content_chunk === item.content_chunk) === index
+      ).slice(0, 3);
+
+      console.log(`Found ${uniqueKnowledge.length} unique relevant document chunks:`, uniqueKnowledge);
 
       const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
         body: {
@@ -41,7 +65,7 @@ export const useEnhancedAISuggestions = () => {
           userDraft,
           principles,
           isRegeneration,
-          documentKnowledge: relevantKnowledge
+          documentKnowledge: uniqueKnowledge
         },
       });
 
@@ -52,7 +76,7 @@ export const useEnhancedAISuggestions = () => {
       console.log('AI Function response:', data);
 
       // Use real data if available, otherwise provide empty arrays
-      const documentKnowledge = relevantKnowledge.length > 0 ? relevantKnowledge : [];
+      const documentKnowledge = uniqueKnowledge.length > 0 ? uniqueKnowledge : [];
       const pastHuddles = data.pastHuddles || [];
 
       console.log('Final document knowledge:', documentKnowledge);
