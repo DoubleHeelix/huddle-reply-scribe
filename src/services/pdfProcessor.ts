@@ -1,8 +1,8 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Use local worker file to avoid CORS issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
+// Configure PDF.js to use CDN worker (most reliable approach)
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js';
 
 export interface PDFProcessingResult {
   text: string;
@@ -16,15 +16,27 @@ export const pdfProcessor = {
       console.log('🔄 Starting PDF text extraction using PDF.js...');
       
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
-      console.log(`📄 PDF loaded: ${pdf.numPages} pages`);
+      console.log('📦 File converted to ArrayBuffer, loading PDF document...');
+      
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true
+      });
+      
+      const pdf = await loadingTask.promise;
+      
+      console.log(`📄 PDF loaded successfully: ${pdf.numPages} pages`);
       
       let fullText = '';
       
       // Extract text from each page
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
+          console.log(`🔍 Processing page ${pageNum}/${pdf.numPages}...`);
+          
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
           
