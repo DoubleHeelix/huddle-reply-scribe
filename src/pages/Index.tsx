@@ -14,16 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCcw, Copy, Check, AlertTriangle } from "lucide-react";
-import { useEnhancedAISuggestions, type AIResponse } from "@/hooks/useEnhancedAISuggestions";
+import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { DocumentsTab } from '@/components/DocumentsTab';
 import { PDFUploader } from '@/components/PDFUploader';
-import { AISources } from "@/components/AISources";
 
 const Index = () => {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState('');
   const [generatedReply, setGeneratedReply] = useState<string>('');
-  const [aiSources, setAiSources] = useState<AIResponse['sources'] | null>(null);
   const [selectedTone, setSelectedTone] = useState('none');
   const [principles, setPrinciples] = useState('');
   const [isCopied, setIsCopied] = useState(false);
@@ -95,7 +93,6 @@ const Index = () => {
     const result = await generateReply(screenshot, userDraft, principles);
     if (result) {
       setGeneratedReply(result.reply);
-      setAiSources(result.sources || null);
     }
   };
 
@@ -137,7 +134,6 @@ const Index = () => {
     const result = await generateReply(screenshot, userDraft, principles, true);
     if (result) {
       setGeneratedReply(result.reply);
-      setAiSources(result.sources || null);
     }
   };
 
@@ -349,10 +345,6 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
-
-              {generatedReply && aiSources && (
-                <AISources sources={aiSources} />
-              )}
             </TabsContent>
 
             <TabsContent value="past-huddles" className="mt-6">
