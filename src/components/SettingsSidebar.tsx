@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DocumentProcessor } from "@/components/DocumentProcessor";
 
 interface SettingsSidebarProps {
   googleCloudApiKey: string;
@@ -47,13 +46,6 @@ export const SettingsSidebar = ({
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
-          {/* Document Processing */}
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-6">
-              <DocumentProcessor />
-            </CardContent>
-          </Card>
-
           {/* AI Principles */}
           <Card className="bg-gray-900 border-gray-700">
             <CardContent className="p-6">
