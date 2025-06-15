@@ -5,12 +5,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, Eye, MessageSquare, History } from "lucide-react";
+import { Upload, Zap, RefreshCcw, Eye, MessageSquare, History, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAISuggestions } from "@/hooks/useAISuggestions";
 import { useOCR } from "@/hooks/useOCR";
 import { ToneSelector } from "@/components/ToneSelector";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
+import { InterruptionsTab } from "@/components/InterruptionsTab";
 import LandingPage from "@/components/LandingPage";
 
 const Index = () => {
@@ -263,13 +264,20 @@ const Index = () => {
 
       <div className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger 
               value="huddle-play" 
               className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
             >
               <MessageSquare className="w-4 h-4" />
               Huddle Play
+            </TabsTrigger>
+            <TabsTrigger 
+              value="interruptions" 
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+            >
+              <Camera className="w-4 h-4" />
+              Interruptions
             </TabsTrigger>
             <TabsTrigger 
               value="past-huddles" 
@@ -434,6 +442,10 @@ const Index = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+          
+          <TabsContent value="interruptions" className="mt-6">
+            <InterruptionsTab />
           </TabsContent>
           
           <TabsContent value="past-huddles" className="mt-6">
