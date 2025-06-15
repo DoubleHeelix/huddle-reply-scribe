@@ -1,12 +1,8 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure worker to use local worker instead of CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+// Configure worker using a reliable CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js';
 
 interface ProcessedDocument {
   name: string;
@@ -35,11 +31,21 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
-      // Load PDF with minimal configuration
-      const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer,
-        verbosity: 0
-      });
+      // Load PDF with worker disabled as fallback if worker fails
+      let loadingTask;
+      try {
+        loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          verbosity: 0
+        });
+      } catch (workerError) {
+        console.log('⚠️ DEBUG: Worker failed, trying without worker...');
+        loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          verbosity: 0,
+          disableWorker: true
+        });
+      }
 
       const pdf = await loadingTask.promise;
       console.log(`📄 DEBUG: PDF loaded successfully, ${pdf.numPages} pages`);
