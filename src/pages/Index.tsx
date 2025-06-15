@@ -13,10 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCcw, Copy, Check, AlertTriangle } from "lucide-react";
-import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
+import { useEnhancedAISuggestions, type AIResponse } from "@/hooks/useEnhancedAISuggestions";
 import { DocumentsTab } from '@/components/DocumentsTab';
 import { PDFUploader } from '@/components/PDFUploader';
-import { AISources, type AIResponse } from "@/components/AISources";
+import { AISources } from "@/components/AISources";
 
 const Index = () => {
   const [screenshot, setScreenshot] = useState<string | null>(null);
