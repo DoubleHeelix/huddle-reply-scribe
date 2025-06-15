@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -253,11 +254,30 @@ export class PDFProcessor {
       const chunks = this.chunkText(fullText);
       console.log(`✂️ DEBUG: Document chunked into ${chunks.length} pieces`);
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get current user with retry logic
+      console.log('👤 DEBUG: Checking user authentication...');
+      let user = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!user && retryCount < maxRetries) {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error(`❌ DEBUG: Auth error (attempt ${retryCount + 1}):`, error);
+        } else {
+          user = currentUser;
+        }
+        
+        if (!user && retryCount < maxRetries - 1) {
+          console.log(`⏳ DEBUG: User not found, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        retryCount++;
+      }
+      
       if (!user) {
-        console.error('❌ DEBUG: User not authenticated');
-        return false;
+        console.error('❌ DEBUG: User not authenticated after retries');
+        throw new Error('User not authenticated. Please sign in and try again.');
       }
 
       console.log('👤 DEBUG: Processing chunks for user:', user.id);
@@ -315,11 +335,30 @@ export class PDFProcessor {
     try {
       console.log('📁 DEBUG: Starting to process documents from Supabase Storage bucket:', bucketName);
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get current user with enhanced authentication check
+      console.log('👤 DEBUG: Checking user authentication...');
+      let user = null;
+      let retryCount = 0;
+      const maxRetries = 5;
+      
+      while (!user && retryCount < maxRetries) {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error(`❌ DEBUG: Auth error (attempt ${retryCount + 1}):`, error);
+        } else {
+          user = currentUser;
+        }
+        
+        if (!user && retryCount < maxRetries - 1) {
+          console.log(`⏳ DEBUG: User not found, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        retryCount++;
+      }
+      
       if (!user) {
-        console.error('❌ DEBUG: User not authenticated');
-        throw new Error('User not authenticated');
+        console.error('❌ DEBUG: User not authenticated after retries');
+        throw new Error('User not authenticated. Please sign in and try again.');
       }
 
       console.log('👤 DEBUG: User authenticated:', user.id);
