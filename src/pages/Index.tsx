@@ -20,7 +20,6 @@ const Index = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [selectedTone, setSelectedTone] = useState("none");
   const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
   
@@ -33,7 +32,7 @@ const Index = () => {
 
   const { toast } = useToast();
 
-  const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useAISuggestions({ apiKey });
+  const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useAISuggestions();
   
   const { 
     extractText, 
@@ -57,30 +56,14 @@ const Index = () => {
 
   // Load settings from localStorage on mount
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key');
     const savedGoogleCloudKey = localStorage.getItem('google_cloud_api_key');
     const savedAutoCropping = localStorage.getItem('enable_auto_cropping');
     const savedCropMargin = localStorage.getItem('auto_crop_margin');
 
-    if (savedApiKey) {
-      console.log('Loading saved OpenAI API key');
-      setApiKey(savedApiKey);
-    }
     if (savedGoogleCloudKey) setGoogleCloudApiKey(savedGoogleCloudKey);
     if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
-
-  // Save OpenAI API key to localStorage when it changes
-  const handleApiKeyChange = (key: string) => {
-    console.log('API key changed, saving to localStorage');
-    setApiKey(key);
-    if (key.trim()) {
-      localStorage.setItem('openai_api_key', key);
-    } else {
-      localStorage.removeItem('openai_api_key');
-    }
-  };
 
   // Save Google Cloud API key to localStorage
   const handleGoogleCloudApiKeyChange = (key: string) => {
@@ -174,7 +157,7 @@ const Index = () => {
   };
 
   const handleGenerateReply = async () => {
-    console.log('Generate reply clicked. API key exists:', !!apiKey, 'Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
+    console.log('Generate reply clicked. Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
     
     if (!userDraft.trim()) {
       toast({
@@ -189,15 +172,6 @@ const Index = () => {
       toast({
         title: "Screenshot required",
         description: "Please upload a screenshot first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!apiKey || !apiKey.trim()) {
-      toast({
-        title: "API Key required",
-        description: "Please enter your OpenAI API key first.",
         variant: "destructive",
       });
       return;
@@ -217,7 +191,7 @@ const Index = () => {
   };
 
   const handleRegenerate = async () => {
-    if (!userDraft.trim() || !uploadedImage || !apiKey) return;
+    if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
     const reply = await generateReply(screenshotText, userDraft, principles, true);
@@ -291,9 +265,7 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="setup" className="mt-6 space-y-6">
-            <ApiKeyInput apiKey={apiKey} onApiKeyChange={handleApiKeyChange} />
-            
+          <TabsContent value="setup" className="mt-6 space-y-6">            
             <OCRSettings
               googleCloudApiKey={googleCloudApiKey}
               onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
@@ -416,7 +388,7 @@ const Index = () => {
             {/* Generate Button */}
             <Button 
               onClick={handleGenerateReply}
-              disabled={isGenerating || !apiKey?.trim() || !userDraft.trim() || !uploadedImage}
+              disabled={isGenerating || !userDraft.trim() || !uploadedImage}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="w-5 h-5 mr-2" />
@@ -426,7 +398,6 @@ const Index = () => {
             {/* Debug info */}
             {process.env.NODE_ENV === 'development' && (
               <div className="text-xs text-gray-500 space-y-1">
-                <div>API Key: {apiKey ? '✓ Set' : '✗ Missing'}</div>
                 <div>Draft: {userDraft.trim() ? '✓ Ready' : '✗ Empty'}</div>
                 <div>Image: {uploadedImage ? '✓ Uploaded' : '✗ Missing'}</div>
               </div>
@@ -458,7 +429,7 @@ const Index = () => {
                       onClick={handleRegenerate}
                       variant="outline" 
                       className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                      disabled={isGenerating || !apiKey}
+                      disabled={isGenerating}
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
                       Regenerate

@@ -2,11 +2,7 @@
 import { useState } from 'react';
 import { generateSuggestedReply, generateAdjustedTone } from '@/utils/aiSuggestions';
 
-interface UseAISuggestionsOptions {
-  apiKey: string;
-}
-
-export const useAISuggestions = ({ apiKey }: UseAISuggestionsOptions) => {
+export const useAISuggestions = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +13,6 @@ export const useAISuggestions = ({ apiKey }: UseAISuggestionsOptions) => {
     principles: string = '',
     isRegeneration: boolean = false
   ): Promise<string | null> => {
-    if (!apiKey) {
-      setError('OpenAI API key is required');
-      return null;
-    }
-
     setIsGenerating(true);
     setError(null);
 
@@ -30,8 +21,7 @@ export const useAISuggestions = ({ apiKey }: UseAISuggestionsOptions) => {
         screenshotText,
         userDraft,
         principles,
-        isRegeneration,
-        apiKey
+        isRegeneration
       });
       
       return reply;
@@ -49,19 +39,13 @@ export const useAISuggestions = ({ apiKey }: UseAISuggestionsOptions) => {
     originalReply: string,
     selectedTone: string
   ): Promise<string | null> => {
-    if (!apiKey) {
-      setError('OpenAI API key is required');
-      return null;
-    }
-
     setIsAdjustingTone(true);
     setError(null);
 
     try {
       const adjustedReply = await generateAdjustedTone({
         originalReply,
-        selectedTone,
-        apiKey
+        selectedTone
       });
       
       return adjustedReply;
