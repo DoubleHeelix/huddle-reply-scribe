@@ -1,19 +1,47 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileText, Zap, RefreshCcw } from "lucide-react";
+import { Upload, Zap, RefreshCcw, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAISuggestions } from "@/hooks/useAISuggestions";
+import { ApiKeyInput } from "@/components/ApiKeyInput";
+import { ToneSelector } from "@/components/ToneSelector";
 
 const Index = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [selectedTone, setSelectedTone] = useState("none");
+  const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
   const { toast } = useToast();
+
+  const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useAISuggestions({ apiKey });
+
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('openai_api_key');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "AI Error",
+        description: error,
+        variant: "destructive",
+      });
+      clearError();
+    }
+  }, [error, toast, clearError]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,7 +58,13 @@ const Index = () => {
     }
   };
 
-  const handleGenerateReply = () => {
+  const extractTextFromImage = (): string => {
+    // This is a placeholder - in a real implementation, you'd use OCR
+    // For now, we'll return a default message prompting the user to describe the image
+    return "Please describe what you see in the screenshot or the conversation context that's relevant to your draft message.";
+  };
+
+  const handleGenerateReply = async () => {
     if (!userDraft.trim()) {
       toast({
         title: "Draft required",
@@ -48,50 +82,64 @@ const Index = () => {
       });
       return;
     }
+
+    if (!apiKey) {
+      toast({
+        title: "API Key required",
+        description: "Please enter your OpenAI API key first.",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    setIsGenerating(true);
+    const screenshotText = extractTextFromImage();
+    const reply = await generateReply(screenshotText, userDraft, principles, false);
     
-    // Simulate AI generation
-    setTimeout(() => {
-      setGeneratedReply(`Hey! Thanks for reaching out - it's so good to hear from you! 😊 
-
-I've been doing really well, thanks for asking. Actually, I did end up pursuing that startup idea we talked about, and it's been quite the journey! We're now 8 months in and things are really picking up momentum.
-
-I'd love to catch up properly and hear what you've been up to as well. Are you free for a coffee sometime this week? Would be great to reconnect in person!
-
-How's everything going with you? Last I remember, you were considering that graduate program - did you end up going for it?`);
-      setIsGenerating(false);
+    if (reply) {
+      setGeneratedReply(reply);
+      setSelectedTone("none"); // Reset tone selector
       toast({
         title: "Perfect reply generated!",
         description: "Your optimized response is ready.",
       });
-    }, 3000);
+    }
   };
 
-  const handleRegenerate = () => {
-    if (!userDraft.trim() || !uploadedImage) return;
+  const handleRegenerate = async () => {
+    if (!userDraft.trim() || !uploadedImage || !apiKey) return;
     
-    setIsGenerating(true);
-    setTimeout(() => {
-      setGeneratedReply(`Hi there! So great to hear from you! 🌟
-
-Things have been amazing on my end - that startup we discussed is actually happening and gaining real traction now! It's been an incredible learning experience.
-
-I'd absolutely love to catch up and hear all about what you've been up to. Coffee this week? I'm curious to know if you ended up pursuing that graduate program you were considering!
-
-Looking forward to reconnecting properly! 😊`);
-      setIsGenerating(false);
+    const screenshotText = extractTextFromImage();
+    const reply = await generateReply(screenshotText, userDraft, principles, true);
+    
+    if (reply) {
+      setGeneratedReply(reply);
+      setSelectedTone("none"); // Reset tone selector
       toast({
         title: "New reply generated!",
         description: "Here's an alternative version for you.",
       });
-    }, 2500);
+    }
+  };
+
+  const handleApplyTone = async () => {
+    if (!generatedReply || selectedTone === 'none') return;
+    
+    const adjustedReply = await adjustTone(generatedReply, selectedTone);
+    
+    if (adjustedReply && adjustedReply !== generatedReply) {
+      setGeneratedReply(adjustedReply);
+      toast({
+        title: "Tone adjusted!",
+        description: `Reply updated with ${selectedTone} tone.`,
+      });
+    }
   };
 
   const resetHuddle = () => {
     setUploadedImage(null);
     setUserDraft("");
     setGeneratedReply("");
+    setSelectedTone("none");
   };
 
   return (
@@ -100,31 +148,52 @@ Looking forward to reconnecting properly! 😊`);
       <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">🤝 Huddle Assistant</h1>
-          <p className="text-purple-100">Lead confident convos on the go</p>
+          <p className="text-purple-100">AI-powered conversation suggestions</p>
         </div>
       </div>
 
       <div className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800 border-gray-700">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
             <TabsTrigger value="huddle-play" className="text-white data-[state=active]:bg-purple-600">
               Huddle Play
+            </TabsTrigger>
+            <TabsTrigger value="setup" className="text-white data-[state=active]:bg-purple-600">
+              <Settings className="w-4 h-4 mr-1" />
+              Setup
             </TabsTrigger>
             <TabsTrigger value="interruptions" className="text-white">
               Interruptions
             </TabsTrigger>
             <TabsTrigger value="past-huddles" className="text-white">
-              📚 View Past Huddles
+              📚 Past Huddles
             </TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="setup" className="mt-6 space-y-6">
+            <ApiKeyInput apiKey={apiKey} onApiKeyChange={setApiKey} />
+            
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6">
+                <h3 className="text-white text-lg font-medium mb-4">AI Principles</h3>
+                <Textarea
+                  placeholder="Enter the key principles for AI to follow when generating replies..."
+                  value={principles}
+                  onChange={(e) => setPrinciples(e.target.value)}
+                  rows={4}
+                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
           
           <TabsContent value="huddle-play" className="mt-6 space-y-6">
             {/* File Upload Section */}
             <Card className="bg-gray-800 border-gray-700">
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
-                  <p className="text-gray-300 text-lg">Drag and drop file here</p>
-                  <p className="text-gray-500 text-sm">Limit 200MB per file • JPG, JPEG, PNG</p>
+                  <p className="text-gray-300 text-lg">Upload Screenshot</p>
+                  <p className="text-gray-500 text-sm">JPG, JPEG, PNG • Max 10MB</p>
                   
                   <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
                     <Input
@@ -138,9 +207,9 @@ Looking forward to reconnecting properly! 😊`);
                       htmlFor="file-upload" 
                       className="cursor-pointer flex flex-col items-center space-y-2"
                     >
+                      <Upload className="w-8 h-8 text-purple-400" />
                       <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
                         <span className="text-white">Choose file</span>
-                        <span className="text-gray-400 ml-4">No file chosen</span>
                       </div>
                     </label>
                   </div>
@@ -167,7 +236,7 @@ Looking forward to reconnecting properly! 😊`);
                   placeholder="Type your draft message here..."
                   value={userDraft}
                   onChange={(e) => setUserDraft(e.target.value)}
-                  rows={8}
+                  rows={6}
                   className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
                 />
               </CardContent>
@@ -176,7 +245,7 @@ Looking forward to reconnecting properly! 😊`);
             {/* Generate Button */}
             <Button 
               onClick={handleGenerateReply}
-              disabled={isGenerating}
+              disabled={isGenerating || !apiKey}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl"
             >
               <Zap className="w-5 h-5 mr-2" />
@@ -187,7 +256,17 @@ Looking forward to reconnecting properly! 😊`);
             {generatedReply && (
               <Card className="bg-gray-800 border-gray-700">
                 <CardContent className="p-6 space-y-4">
-                  <h3 className="text-white text-lg font-medium">Generated Reply</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white text-lg font-medium">Generated Reply</h3>
+                    <ToneSelector
+                      selectedTone={selectedTone}
+                      onToneChange={setSelectedTone}
+                      onApplyTone={handleApplyTone}
+                      isAdjusting={isAdjustingTone}
+                      disabled={!generatedReply || isGenerating}
+                    />
+                  </div>
+                  
                   <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
                     <pre className="whitespace-pre-wrap text-white text-sm font-normal">
                       {generatedReply}
@@ -199,7 +278,7 @@ Looking forward to reconnecting properly! 😊`);
                       onClick={handleRegenerate}
                       variant="outline" 
                       className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                      disabled={isGenerating}
+                      disabled={isGenerating || !apiKey}
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
                       Regenerate
