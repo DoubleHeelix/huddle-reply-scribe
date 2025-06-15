@@ -9,7 +9,6 @@ const configureWorker = () => {
   // Fallback CDNs, ensuring they use the same version as the library
   const fallbackWorkerSrcs = [
     `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
   ];
 
   console.log(`🔧 DEBUG: Configuring PDF.js worker with version ${pdfjsLib.version}`);
@@ -53,9 +52,10 @@ class PDFProcessor {
   private async testWorkerAvailability(workerUrl: string): Promise<boolean> {
     try {
       const response = await fetch(workerUrl, { method: 'HEAD' });
+      console.log(`🔧 DEBUG: Worker test for ${workerUrl} - Status: ${response.status}`);
       return response.ok;
     } catch (error) {
-      console.warn(`⚠️ DEBUG: Worker URL not accessible: ${workerUrl}`);
+      console.warn(`⚠️ DEBUG: Worker URL not accessible: ${workerUrl}`, error);
       return false;
     }
   }
@@ -74,13 +74,19 @@ class PDFProcessor {
       if (!isPrimaryWorkerAvailable) {
         console.log('⚠️ DEBUG: Primary worker not available, trying fallbacks...');
         
+        let workerFound = false;
         for (const fallbackUrl of workerConfig.fallbackWorkerSrcs) {
           const isAvailable = await this.testWorkerAvailability(fallbackUrl);
           if (isAvailable) {
             console.log(`✅ DEBUG: Using fallback worker: ${fallbackUrl}`);
             pdfjsLib.GlobalWorkerOptions.workerSrc = fallbackUrl;
+            workerFound = true;
             break;
           }
+        }
+        if (!workerFound) {
+            console.error('❌ DEBUG: All primary and fallback PDF workers are unavailable.');
+            throw new Error('PDF worker could not be loaded from any CDN. Please check your network connection and try again.');
         }
       }
 
@@ -140,7 +146,7 @@ class PDFProcessor {
       
       // Provide more helpful error messages
       if (error.message.includes('worker')) {
-        throw new Error(`PDF worker configuration failed for ${fileName}. This may be due to network connectivity issues.`);
+        throw new Error(`PDF worker configuration failed for ${fileName}. This may be due to network connectivity issues or an invalid worker path.`);
       }
       
       throw new Error(`Failed to extract text from ${fileName}: ${error.message}`);
