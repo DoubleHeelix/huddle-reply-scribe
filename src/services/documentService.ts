@@ -37,16 +37,30 @@ export const documentService = {
     );
   },
 
-  async processDocument(fileName: string, documentContent: string): Promise<any> {
+  async processDocumentFromStorage(fileName: string): Promise<any> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
     }
 
+    // Download the file from storage first
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(fileName);
+
+    if (downloadError) {
+      throw new Error(`Failed to download file: ${downloadError.message}`);
+    }
+
+    // Convert to base64
+    const arrayBuffer = await fileData.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+    // Call the edge function with the correct parameters
     const { data, error } = await supabase.functions.invoke('create-embedding', {
       body: {
         document_name: fileName,
-        document_content: documentContent,
+        document_content: base64,
         user_id: user.id
       }
     });
@@ -69,17 +83,5 @@ export const documentService = {
       .eq('document_name', documentName);
 
     if (error) throw error;
-  },
-
-  async downloadFromStorage(fileName: string): Promise<ArrayBuffer> {
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(fileName);
-
-    if (downloadError) {
-      throw new Error(`Failed to download file: ${downloadError.message}`);
-    }
-
-    return await fileData.arrayBuffer();
   }
 };

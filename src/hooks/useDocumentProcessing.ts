@@ -19,15 +19,7 @@ export const useDocumentProcessing = () => {
 
       console.log('📄 Starting document processing from storage:', fileName);
 
-      // Download the file from storage
-      const fileBuffer = await documentService.downloadFromStorage(fileName);
-
-      // Convert file to base64
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
-
-      console.log('📄 Calling create-embedding function...');
-
-      const data = await documentService.processDocument(fileName, base64);
+      const data = await documentService.processDocumentFromStorage(fileName);
 
       console.log('✅ Document processed successfully:', data);
 
@@ -67,7 +59,22 @@ export const useDocumentProcessing = () => {
 
       console.log('📄 Calling create-embedding function...');
 
-      const data = await documentService.processDocument(file.name, base64);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-embedding', {
+        body: {
+          document_name: file.name,
+          document_content: base64,
+          user_id: user.id
+        }
+      });
+
+      if (error) {
+        throw new Error(`Processing failed: ${error.message}`);
+      }
 
       console.log('✅ Document processed successfully:', data);
 
