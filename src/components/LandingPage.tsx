@@ -51,22 +51,19 @@ const LandingPage = ({ onGetStarted }: LandingPageProps) => {
             <div className="w-12 h-12 mx-auto bg-purple-500/20 rounded-lg flex items-center justify-center mb-3">
               <span className="text-2xl">📸</span>
             </div>
-            <h3 className="text-white font-semibold mb-2">Smart OCR</h3>
-            <p className="text-gray-400 text-sm">Upload screenshots and extract text automatically</p>
+            <h3 className="text-white font-semibold mb-2">Upload Screenshot</h3>
           </div>
           <div className="text-center">
             <div className="w-12 h-12 mx-auto bg-blue-500/20 rounded-lg flex items-center justify-center mb-3">
               <span className="text-2xl">🤖</span>
             </div>
             <h3 className="text-white font-semibold mb-2">AI Suggestions</h3>
-            <p className="text-gray-400 text-sm">Get optimized replies with perfect tone</p>
           </div>
           <div className="text-center">
             <div className="w-12 h-12 mx-auto bg-pink-500/20 rounded-lg flex items-center justify-center mb-3">
               <span className="text-2xl">⚡</span>
             </div>
             <h3 className="text-white font-semibold mb-2">Instant Results</h3>
-            <p className="text-gray-400 text-sm">Generate professional responses in seconds</p>
           </div>
         </div>
 
