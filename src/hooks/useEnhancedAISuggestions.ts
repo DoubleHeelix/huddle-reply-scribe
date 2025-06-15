@@ -27,11 +27,12 @@ export const useEnhancedAISuggestions = () => {
 
       console.log('Enhanced AI: Generating reply with document knowledge...');
 
-      // Search for relevant document knowledge
+      // Search for relevant document knowledge with a lower threshold for better results
       const searchQuery = `${screenshotText} ${userDraft}`;
-      const relevantKnowledge = await searchKnowledge(searchQuery, 3);
+      console.log('Searching for document knowledge with query:', searchQuery);
       
-      console.log(`Found ${relevantKnowledge.length} relevant document chunks`);
+      const relevantKnowledge = await searchKnowledge(searchQuery, 3);
+      console.log(`Found ${relevantKnowledge.length} relevant document chunks:`, relevantKnowledge);
 
       const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
         body: {
@@ -48,45 +49,19 @@ export const useEnhancedAISuggestions = () => {
         throw new Error(`Function Error: ${error.message}`);
       }
 
-      // For testing purposes, add some mock data when no real knowledge is found
-      let mockDocuments = relevantKnowledge;
-      let mockHuddles = data.pastHuddles || [];
-      
-      if (relevantKnowledge.length === 0) {
-        mockDocuments = [
-          {
-            id: "mock-doc-1",
-            document_name: "Communication Guidelines.pdf",
-            content_chunk: "When responding to feedback, always acknowledge the person's concerns first before providing your perspective. Use phrases like 'I understand your point about...' to show active listening.",
-            similarity: 0.85,
-            metadata: { source: "mock", type: "communication" }
-          },
-          {
-            id: "mock-doc-2",
-            document_name: "Team Collaboration Best Practices.pdf", 
-            content_chunk: "Effective communication requires clarity and empathy. Always consider the recipient's context and adjust your tone accordingly to maintain positive working relationships.",
-            similarity: 0.78,
-            metadata: { source: "mock", type: "collaboration" }
-          }
-        ];
-      }
+      console.log('AI Function response:', data);
 
-      if (mockHuddles.length === 0) {
-        mockHuddles = [
-          {
-            id: "mock-1",
-            screenshot_text: "Team member expressing concern about project timeline in Slack",
-            user_draft: "I think we can make it work",
-            generated_reply: "I understand your concerns about the timeline. Let me review the current progress and see where we can optimize our approach to meet the deadline while maintaining quality.",
-            created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
-          }
-        ];
-      }
+      // Use real data if available, otherwise provide empty arrays
+      const documentKnowledge = relevantKnowledge.length > 0 ? relevantKnowledge : [];
+      const pastHuddles = data.pastHuddles || [];
+
+      console.log('Final document knowledge:', documentKnowledge);
+      console.log('Final past huddles:', pastHuddles);
 
       return {
         reply: data.reply || '',
-        documentKnowledge: mockDocuments,
-        pastHuddles: mockHuddles
+        documentKnowledge,
+        pastHuddles
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';

@@ -5,11 +5,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Copy } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Copy, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
 import { useOCR } from "@/hooks/useOCR";
+import { useDocumentKnowledge } from "@/hooks/useDocumentKnowledge";
 import { ToneSelector } from "@/components/ToneSelector";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
@@ -44,6 +45,7 @@ const Index = () => {
 
   const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
   const { saveCurrentHuddle, updateFinalReply } = useHuddlePlays();
+  const { processDocuments, isProcessing } = useDocumentKnowledge();
   
   const { 
     extractText, 
@@ -67,6 +69,15 @@ const Index = () => {
     if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
+
+  // Process documents on app load to ensure they're available
+  useEffect(() => {
+    const processDocsOnLoad = async () => {
+      console.log('Processing documents on app load...');
+      await processDocuments();
+    };
+    processDocsOnLoad();
+  }, [processDocuments]);
 
   // Add the missing handleGetStarted function
   const handleGetStarted = () => {
@@ -210,7 +221,7 @@ const Index = () => {
       setLastUsedHuddles(result.pastHuddles || []);
       
       // Show knowledge sources section when we have data
-      setShowKnowledgeSources(true);
+      setShowKnowledgeSources((result.documentKnowledge && result.documentKnowledge.length > 0) || (result.pastHuddles && result.pastHuddles.length > 0));
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
@@ -222,9 +233,12 @@ const Index = () => {
       );
       setCurrentHuddleId(huddleId);
       
+      const docCount = result.documentKnowledge?.length || 0;
+      const huddleCount = result.pastHuddles?.length || 0;
+      
       toast({
         title: "Perfect reply generated!",
-        description: "Your optimized response is ready and incorporates relevant document knowledge.",
+        description: `Your optimized response is ready. Used ${docCount} document sources and ${huddleCount} past huddles.`,
       });
 
       // Auto-scroll to generated reply section
@@ -247,11 +261,9 @@ const Index = () => {
       setGeneratedReply(result.reply);
       setSelectedTone("none");
       
-      // Update knowledge sources for regeneration
       setLastUsedDocuments(result.documentKnowledge || []);
       setLastUsedHuddles(result.pastHuddles || []);
       
-      // Update the current huddle with the new reply
       if (currentHuddleId) {
         await updateFinalReply(currentHuddleId, result.reply);
       }
@@ -271,7 +283,6 @@ const Index = () => {
     if (adjustedReply && adjustedReply !== generatedReply) {
       setGeneratedReply(adjustedReply);
       
-      // Update the final reply in the database
       if (currentHuddleId) {
         await updateFinalReply(currentHuddleId, adjustedReply);
       }
@@ -344,6 +355,14 @@ const Index = () => {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
           <p className="text-purple-100 font-sans">AI-powered conversation suggestions with document knowledge</p>
+          {isProcessing && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="bg-yellow-600 font-sans">
+                <FileText className="w-3 h-3 mr-1" />
+                Processing documents...
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
 
@@ -524,8 +543,8 @@ const Index = () => {
               </Card>
             )}
 
-            {/* AI Knowledge Sources Section - Always show if we have data */}
-            {(lastUsedDocuments.length > 0 || lastUsedHuddles.length > 0) && (
+            {/* AI Knowledge Sources Section - Only show if we have real data */}
+            {showKnowledgeSources && (lastUsedDocuments.length > 0 || lastUsedHuddles.length > 0) && (
               <AIKnowledgeSources
                 documentKnowledge={lastUsedDocuments}
                 pastHuddles={lastUsedHuddles}

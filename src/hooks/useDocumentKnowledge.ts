@@ -41,6 +41,8 @@ export const useDocumentKnowledge = () => {
         return [];
       }
 
+      console.log('Creating embedding for query:', query);
+
       // Create embedding for the query
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('create-embedding', {
         body: { text: query }
@@ -51,11 +53,13 @@ export const useDocumentKnowledge = () => {
         return [];
       }
 
-      // Search for similar documents
+      console.log('Embedding created successfully, searching documents...');
+
+      // Search for similar documents with a lower threshold for better results
       const { data, error } = await supabase.rpc('search_document_knowledge', {
         query_embedding: embeddingData.embedding,
         target_user_id: user.id,
-        match_threshold: 0.7,
+        match_threshold: 0.5, // Lowered from 0.7 to get more results
         match_count: limit
       });
 
@@ -64,6 +68,7 @@ export const useDocumentKnowledge = () => {
         return [];
       }
 
+      console.log('Document search results:', data);
       return data || [];
     } catch (err) {
       console.error('Knowledge search error:', err);
