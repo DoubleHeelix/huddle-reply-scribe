@@ -34,6 +34,13 @@ export const useDocumentKnowledge = () => {
 
   const searchKnowledge = useCallback(async (query: string, limit: number = 5): Promise<DocumentKnowledge[]> => {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('User not authenticated - skipping document knowledge search');
+        return [];
+      }
+
       // Create embedding for the query
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('create-embedding', {
         body: { text: query }
@@ -41,13 +48,6 @@ export const useDocumentKnowledge = () => {
 
       if (embeddingError) {
         console.error('Error creating query embedding:', embeddingError);
-        return [];
-      }
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('User not authenticated');
         return [];
       }
 
