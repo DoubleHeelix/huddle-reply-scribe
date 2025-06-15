@@ -3,6 +3,12 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentKnowledge } from './useDocumentKnowledge';
 
+interface GenerateReplyResult {
+  reply: string;
+  documentKnowledge?: any[];
+  pastHuddles?: any[];
+}
+
 export const useEnhancedAISuggestions = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
@@ -15,7 +21,7 @@ export const useEnhancedAISuggestions = () => {
     userDraft: string,
     principles: string,
     isRegeneration: boolean = false
-  ): Promise<string | null> => {
+  ): Promise<GenerateReplyResult | null> => {
     try {
       setIsGenerating(true);
       setError(null);
@@ -43,7 +49,11 @@ export const useEnhancedAISuggestions = () => {
         throw new Error(`Function Error: ${error.message}`);
       }
 
-      return data.reply || null;
+      return {
+        reply: data.reply || '',
+        documentKnowledge: relevantKnowledge,
+        pastHuddles: data.pastHuddles || []
+      };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
       setError(errorMessage);

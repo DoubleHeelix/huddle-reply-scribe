@@ -16,6 +16,7 @@ import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import LandingPage from "@/components/LandingPage";
 import { DocumentProcessor } from "@/components/DocumentProcessor";
+import { AIKnowledgeSources } from "@/components/AIKnowledgeSources";
 
 const Index = () => {
   const [showLanding, setShowLanding] = useState(true);
@@ -25,6 +26,11 @@ const Index = () => {
   const [generatedReply, setGeneratedReply] = useState("");
   const [selectedTone, setSelectedTone] = useState("none");
   const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
+  
+  // New state for tracking AI knowledge sources
+  const [lastUsedDocuments, setLastUsedDocuments] = useState<any[]>([]);
+  const [lastUsedHuddles, setLastUsedHuddles] = useState<any[]>([]);
+  const [showKnowledgeSources, setShowKnowledgeSources] = useState(false);
   
   // OCR Settings
   const [googleCloudApiKey, setGoogleCloudApiKey] = useState("");
@@ -50,14 +56,6 @@ const Index = () => {
     enableAutoCropping,
     autoCropMargin
   });
-
-  const handleGetStarted = () => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setShowLanding(false);
-      setIsTransitioning(false);
-    }, 500);
-  };
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -191,17 +189,22 @@ const Index = () => {
     }
     
     const screenshotText = getScreenshotText();
-    const reply = await generateReply(screenshotText, userDraft, principles, false);
+    const result = await generateReply(screenshotText, userDraft, principles, false);
     
-    if (reply) {
-      setGeneratedReply(reply);
+    if (result) {
+      setGeneratedReply(result.reply);
       setSelectedTone("none");
+      
+      // Store the knowledge sources used for this generation
+      setLastUsedDocuments(result.documentKnowledge || []);
+      setLastUsedHuddles(result.pastHuddles || []);
+      setShowKnowledgeSources(true);
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
         screenshotText,
         userDraft,
-        reply,
+        result.reply,
         principles,
         selectedTone
       );
@@ -226,15 +229,19 @@ const Index = () => {
     if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
-    const reply = await generateReply(screenshotText, userDraft, principles, true);
+    const result = await generateReply(screenshotText, userDraft, principles, true);
     
-    if (reply) {
-      setGeneratedReply(reply);
+    if (result) {
+      setGeneratedReply(result.reply);
       setSelectedTone("none");
+      
+      // Update knowledge sources for regeneration
+      setLastUsedDocuments(result.documentKnowledge || []);
+      setLastUsedHuddles(result.pastHuddles || []);
       
       // Update the current huddle with the new reply
       if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, reply);
+        await updateFinalReply(currentHuddleId, result.reply);
       }
       
       toast({
@@ -272,6 +279,9 @@ const Index = () => {
     setExtractedText("");
     setShowExtractedText(false);
     setCurrentHuddleId(null);
+    setShowKnowledgeSources(false);
+    setLastUsedDocuments([]);
+    setLastUsedHuddles([]);
   };
 
   if (showLanding) {
@@ -426,6 +436,13 @@ const Index = () => {
                 </div>
               </div>
             )}
+
+            {/* AI Knowledge Sources Section */}
+            <AIKnowledgeSources
+              documentKnowledge={lastUsedDocuments}
+              pastHuddles={lastUsedHuddles}
+              isVisible={showKnowledgeSources}
+            />
 
             {/* Generated Reply Section */}
             {generatedReply && (

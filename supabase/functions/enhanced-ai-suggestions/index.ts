@@ -179,6 +179,16 @@ Please provide an improved version of this message:`;
       const data = await response.json();
       const reply = data.choices[0].message.content.trim();
 
+      // Format past huddles for frontend display
+      const pastHuddlesForDisplay = similarHuddles.map((huddle: any) => ({
+        id: huddle.id,
+        screenshot_text: huddle.payload.screenshot_text,
+        user_draft: huddle.payload.user_draft,
+        generated_reply: huddle.payload.generated_reply,
+        final_reply: huddle.payload.final_reply,
+        created_at: huddle.payload.created_at
+      }));
+
       // Store in Qdrant for future learning (background task)
       if (qdrantApiKey && qdrantUrl && userId) {
         const storeInQdrant = async () => {
@@ -233,7 +243,10 @@ Please provide an improved version of this message:`;
       }
 
       return new Response(
-        JSON.stringify({ reply }),
+        JSON.stringify({ 
+          reply,
+          pastHuddles: pastHuddlesForDisplay
+        }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
