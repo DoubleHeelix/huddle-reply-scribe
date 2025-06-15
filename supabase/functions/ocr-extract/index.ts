@@ -19,7 +19,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const startTime = performance.now(); // Declare startTime at function scope
+  const startTime = performance.now();
   
   try {
     console.log('OCR: Starting text extraction process');
@@ -37,6 +37,7 @@ serve(async (req) => {
     }
 
     console.log('OCR: Google API key found, length:', googleApiKey.length);
+    console.log('OCR: API key starts with:', googleApiKey.substring(0, 10) + '...');
 
     // Remove data URL prefix if present
     const base64Data = imageData.startsWith('data:') 
@@ -45,68 +46,80 @@ serve(async (req) => {
 
     console.log(`OCR: Processing image (${base64Data.length} characters of base64)`);
 
-    // Call Google Cloud Vision API with better error handling
-    console.log('OCR: Making request to Google Cloud Vision API...');
-    const visionResponse = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          requests: [
+    // Construct the API URL
+    const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`;
+    console.log('OCR: API URL constructed (without key):', apiUrl.replace(/key=.*/, 'key=***'));
+
+    // Prepare the request body
+    const requestBody = {
+      requests: [
+        {
+          image: {
+            content: base64Data,
+          },
+          features: [
             {
-              image: {
-                content: base64Data,
-              },
-              features: [
-                {
-                  type: 'TEXT_DETECTION',
-                  maxResults: 1,
-                },
-              ],
+              type: 'TEXT_DETECTION',
+              maxResults: 1,
             },
           ],
-        }),
-      }
-    );
+        },
+      ],
+    };
+
+    console.log('OCR: Making request to Google Cloud Vision API...');
+    console.log('OCR: Request body prepared, image content length:', base64Data.length);
+
+    const visionResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
 
     console.log(`OCR: Vision API response status: ${visionResponse.status}`);
+    console.log(`OCR: Vision API response headers:`, Object.fromEntries(visionResponse.headers.entries()));
 
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
-      console.error('OCR: Google Vision API error response:', errorText);
+      console.error('OCR: Google Vision API error response (full):', errorText);
       
       let errorData;
       try {
         errorData = JSON.parse(errorText);
+        console.error('OCR: Parsed error data:', JSON.stringify(errorData, null, 2));
       } catch (e) {
+        console.error('OCR: Could not parse error response as JSON');
         errorData = { error: { message: errorText } };
       }
       
       const errorMessage = errorData.error?.message || errorText || 'Unknown Google Vision API error';
       
       // Check for specific error types and provide helpful messages
-      if (errorMessage.includes('billing')) {
-        throw new Error('Billing must be enabled for your Google Cloud project. Please enable billing at https://console.cloud.google.com/billing');
-      } else if (errorMessage.includes('API key not valid')) {
-        throw new Error('Invalid Google Cloud API key. Please check your API key configuration.');
-      } else if (errorMessage.includes('not been used') || errorMessage.includes('disabled')) {
-        throw new Error('Google Cloud Vision API is not enabled. Please enable it in the Google Cloud Console.');
+      if (errorMessage.includes('billing') || errorMessage.includes('BILLING_DISABLED')) {
+        const projectInfo = errorData.error?.details?.find(d => d.metadata?.consumer);
+        const projectId = projectInfo?.metadata?.consumer?.replace('projects/', '') || 'unknown';
+        throw new Error(`Billing issue detected for project ${projectId}. Please verify billing is enabled and the API key has the correct project permissions. Full error: ${errorMessage}`);
+      } else if (errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT')) {
+        throw new Error(`Invalid Google Cloud API key. Please check your API key configuration. Full error: ${errorMessage}`);
+      } else if (errorMessage.includes('not been used') || errorMessage.includes('disabled') || errorMessage.includes('PERMISSION_DENIED')) {
+        throw new Error(`Google Cloud Vision API access issue. Please ensure the API is enabled and has proper permissions. Full error: ${errorMessage}`);
       } else {
-        throw new Error(`Google Vision API error: ${errorMessage}`);
+        throw new Error(`Google Vision API error (${visionResponse.status}): ${errorMessage}`);
       }
     }
 
     const visionData = await visionResponse.json();
     console.log('OCR: Google Vision API response received successfully');
+    console.log('OCR: Response structure:', JSON.stringify(visionData, null, 2));
 
     // Extract text from response
     let extractedText = '';
     if (visionData.responses?.[0]?.textAnnotations?.[0]?.description) {
       extractedText = visionData.responses[0].textAnnotations[0].description;
       console.log(`OCR: Successfully extracted ${extractedText.length} characters`);
+      console.log(`OCR: First 100 chars: ${extractedText.substring(0, 100)}`);
     } else if (visionData.responses?.[0]?.error) {
       const apiError = visionData.responses[0].error;
       console.error('OCR: Vision API returned error in response:', apiError);
@@ -138,6 +151,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
     console.error('OCR: Error during processing:', error);
+    console.error('OCR: Error stack trace:', error.stack);
 
     return new Response(
       JSON.stringify({
