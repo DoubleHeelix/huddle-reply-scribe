@@ -17,7 +17,7 @@ export const DocumentProcessor = () => {
   const [processedDocuments, setProcessedDocuments] = useState<string[]>([]);
   const [isCleaningErrors, setIsCleaningErrors] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const { processDocuments, isProcessing, error, clearError } = useDocumentKnowledge();
+  const { processDocuments, isProcessing, clearError } = useDocumentKnowledge();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -210,7 +210,7 @@ export const DocumentProcessor = () => {
     } else {
       toast({
         title: "Processing failed",
-        description: error || "Failed to process documents. Please try again.",
+        description: "Failed to process documents. Please try again.",
         variant: "destructive",
       });
     }
@@ -384,12 +384,6 @@ export const DocumentProcessor = () => {
               <Badge variant="secondary" className="bg-green-600 text-white font-sans">
                 ✅ {processedDocuments.length} document{processedDocuments.length !== 1 ? 's' : ''} ready for AI assistance
               </Badge>
-            </div>
-          )}
-          
-          {error && (
-            <div className="p-3 bg-red-900/20 border border-red-600 rounded-lg">
-              <p className="text-sm text-red-400 font-sans">{error}</p>
             </div>
           )}
         </div>
