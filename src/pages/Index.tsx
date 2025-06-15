@@ -1,384 +1,245 @@
-
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useCallback } from "react";
+import { useScreenshot } from 'use-react-screenshot';
+import { useToast } from "@/hooks/use-toast";
+import { SettingsSidebar } from "@/components/SettingsSidebar";
+import { PastHuddlesTab } from "@/components/PastHuddlesTab";
+import { InterruptionsTab } from "@/components/InterruptionsTab";
+import { LandingPage } from "@/components/LandingPage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { RefreshCcw, Copy, Check, AlertTriangle } from "lucide-react";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
-import { useHuddlePlays } from "@/hooks/useHuddlePlays";
-import { useOCR } from "@/hooks/useOCR";
-import { ToneSelector } from "@/components/ToneSelector";
-import { SettingsSidebar } from "@/components/SettingsSidebar";
-import { InterruptionsTab } from "@/components/InterruptionsTab";
-import { PastHuddlesTab } from "@/components/PastHuddlesTab";
-import LandingPage from "@/components/LandingPage";
+import { DocumentsTab } from '@/components/DocumentsTab';
+import { PDFUploader } from '@/components/PDFUploader';
 
 const Index = () => {
-  const [showLanding, setShowLanding] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [userDraft, setUserDraft] = useState("");
-  const [generatedReply, setGeneratedReply] = useState("");
-  const [selectedTone, setSelectedTone] = useState("none");
-  const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
-  
-  // OCR Settings
-  const [googleCloudApiKey, setGoogleCloudApiKey] = useState("");
+  const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [userDraft, setUserDraft] = useState('');
+  const [generatedReply, setGeneratedReply] = useState<string>('');
+  const [selectedTone, setSelectedTone] = useState('none');
+  const [principles, setPrinciples] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const [googleCloudApiKey, setGoogleCloudApiKey] = useState('');
   const [enableAutoCropping, setEnableAutoCropping] = useState(true);
-  const [autoCropMargin, setAutoCropMargin] = useState(12);
-  const [extractedText, setExtractedText] = useState("");
-  const [showExtractedText, setShowExtractedText] = useState(false);
-  const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
-
+  const [autoCropMargin, setAutoCropMargin] = useState(10);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isTestingOCR, setIsTestingOCR] = useState(false);
   const { toast } = useToast();
-
   const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
-  const { saveCurrentHuddle, updateFinalReply } = useHuddlePlays();
-  
-  const { 
-    extractText, 
-    isProcessing: isOCRProcessing, 
-    lastResult: ocrResult, 
-    error: ocrError, 
-    clearError: clearOCRError 
-  } = useOCR({
-    googleCloudApiKey,
-    enableAutoCropping,
-    autoCropMargin
+
+  const ref = useRef(null);
+  const { image, takeScreenshot } = useScreenshot({
+    component: ref,
+    quality: 1.0,
+    type: "image/png",
   });
 
-  const handleGetStarted = () => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setShowLanding(false);
-      setIsTransitioning(false);
-    }, 500);
-  };
-
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    const savedGoogleCloudKey = localStorage.getItem('google_cloud_api_key');
-    const savedAutoCropping = localStorage.getItem('enable_auto_cropping');
-    const savedCropMargin = localStorage.getItem('auto_crop_margin');
-
-    if (savedGoogleCloudKey) setGoogleCloudApiKey(savedGoogleCloudKey);
-    if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
-    if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
-  }, []);
-
-  // Save Google Cloud API key to localStorage
-  const handleGoogleCloudApiKeyChange = (key: string) => {
-    setGoogleCloudApiKey(key);
-    localStorage.setItem('google_cloud_api_key', key);
-  };
-
-  // Save auto-cropping settings
-  const handleAutoCroppingChange = (enabled: boolean) => {
-    setEnableAutoCropping(enabled);
-    localStorage.setItem('enable_auto_cropping', JSON.stringify(enabled));
-  };
-
-  const handleAutoCropMarginChange = (margin: number) => {
-    setAutoCropMargin(margin);
-    localStorage.setItem('auto_crop_margin', margin.toString());
-  };
-
-  // Show error toast when error occurs
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "AI Error",
-        description: error,
-        variant: "destructive",
-      });
+  const handleScreenshot = useCallback(async () => {
+    try {
+      const img = await takeScreenshot();
+      setScreenshot(img);
+      setUploadedImage(null);
       clearError();
-    }
-  }, [error, toast, clearError]);
-
-  // Show OCR error toast when OCR error occurs
-  useEffect(() => {
-    if (ocrError) {
+    } catch (error) {
+      console.error("Failed to take screenshot:", error);
       toast({
-        title: "OCR Error",
-        description: ocrError,
+        title: "Screenshot Failed",
+        description: "Failed to capture the screen. Please try again.",
         variant: "destructive",
       });
-      clearOCRError();
     }
-  }, [ocrError, toast, clearOCRError]);
+  }, [takeScreenshot, toast, clearError]);
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const imageDataUrl = e.target?.result as string;
-        setUploadedImage(imageDataUrl);
-        
-        // Immediately start OCR processing
-        console.log('OCR: Starting text extraction from uploaded image...');
-        const text = await extractText(file);
-        setExtractedText(text);
-        
-        toast({
-          title: "Screenshot uploaded!",
-          description: ocrResult?.success 
-            ? `OCR completed in ${ocrResult.processingTime.toFixed(2)}s. Text extracted successfully.`
-            : "Image uploaded. OCR processing may have encountered issues.",
-        });
+    if (!file) return;
 
-        // Auto-scroll to draft section after upload
-        setTimeout(() => {
-          const draftSection = document.querySelector('[data-section="draft"]');
-          if (draftSection) {
-            draftSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 500);
-      };
-      reader.readAsDataURL(file);
-    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageUrl = e.target?.result as string;
+      setScreenshot(imageUrl);
+      setUploadedImage(imageUrl);
+      clearError();
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleTestOCR = async () => {
-    if (!uploadedImage) {
+  const handleGenerate = async () => {
+    if (!screenshot) {
       toast({
-        title: "No image to test",
-        description: "Please upload a screenshot first.",
+        title: "Missing Screenshot",
+        description: "Please upload an image or take a screenshot first.",
         variant: "destructive",
       });
       return;
     }
 
-    console.log('OCR: Testing OCR with current screenshot...');
-    const text = await extractText(uploadedImage);
-    setExtractedText(text);
-    
-    toast({
-      title: "OCR Test Complete",
-      description: ocrResult?.success 
-        ? `Extracted ${text.length} characters in ${ocrResult.processingTime.toFixed(2)}s`
-        : "OCR test completed with issues. Check console for details.",
-    });
-  };
-
-  const getScreenshotText = (): string => {
-    return extractedText || "Please describe what you see in the screenshot or the conversation context that's relevant to your draft message.";
-  };
-
-  const handleGenerateReply = async () => {
-    console.log('Generate reply clicked. Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
-    
-    if (!userDraft.trim()) {
+    if (!userDraft) {
       toast({
-        title: "Draft required",
-        description: "Please write your draft message first.",
+        title: "Missing Draft",
+        description: "Please enter your draft message.",
         variant: "destructive",
       });
       return;
     }
-    
-    if (!uploadedImage) {
-      toast({
-        title: "Screenshot required",
-        description: "Please upload a screenshot first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const screenshotText = getScreenshotText();
-    const reply = await generateReply(screenshotText, userDraft, principles, false);
-    
+
+    const reply = await generateReply(screenshot, userDraft, principles);
     if (reply) {
       setGeneratedReply(reply);
-      setSelectedTone("none");
-      
-      // Save the huddle play to database for future learning
-      const huddleId = await saveCurrentHuddle(
-        screenshotText,
-        userDraft,
-        reply,
-        principles,
-        selectedTone
-      );
-      setCurrentHuddleId(huddleId);
-      
-      toast({
-        title: "Perfect reply generated!",
-        description: "Your optimized response is ready and saved for future learning.",
-      });
+    }
+  };
 
-      // Auto-scroll to generated reply section
-      setTimeout(() => {
-        const replySection = document.querySelector('[data-section="generated-reply"]');
-        if (replySection) {
-          replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 500);
+  const handleAdjustTone = async () => {
+    if (!generatedReply) {
+      toast({
+        title: "No Reply Generated",
+        description: "Please generate a reply first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const adjustedReply = await adjustTone(generatedReply, selectedTone);
+    if (adjustedReply) {
+      setGeneratedReply(adjustedReply);
     }
   };
 
   const handleRegenerate = async () => {
-    if (!userDraft.trim() || !uploadedImage) return;
-    
-    const screenshotText = getScreenshotText();
-    const reply = await generateReply(screenshotText, userDraft, principles, true);
-    
+    if (!screenshot) {
+      toast({
+        title: "Missing Screenshot",
+        description: "Please upload an image or take a screenshot first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userDraft) {
+      toast({
+        title: "Missing Draft",
+        description: "Please enter your draft message.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reply = await generateReply(screenshot, userDraft, principles, true);
     if (reply) {
       setGeneratedReply(reply);
-      setSelectedTone("none");
-      
-      // Update the current huddle with the new reply
-      if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, reply);
-      }
-      
-      toast({
-        title: "New reply generated!",
-        description: "Here's an alternative version for you.",
-      });
     }
   };
 
-  const handleApplyTone = async () => {
-    if (!generatedReply || selectedTone === 'none') return;
-    
-    const adjustedReply = await adjustTone(generatedReply, selectedTone);
-    
-    if (adjustedReply && adjustedReply !== generatedReply) {
-      setGeneratedReply(adjustedReply);
-      
-      // Update the final reply in the database
-      if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, adjustedReply);
-      }
-      
-      toast({
-        title: "Tone adjusted!",
-        description: `Reply updated with ${selectedTone} tone and saved.`,
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generatedReply);
+    setIsCopied(true);
+    toast({
+      title: "Reply Copied",
+      description: "The generated reply has been copied to your clipboard.",
+    });
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleTestOCR = async () => {
+    setIsTestingOCR(true);
+    try {
+      const response = await fetch('/api/test-ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: screenshot,
+          googleCloudApiKey: googleCloudApiKey,
+          enableAutoCropping: enableAutoCropping,
+          autoCropMargin: autoCropMargin,
+        }),
       });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "OCR Test Successful",
+          description: data.text,
+        });
+      } else {
+        toast({
+          title: "OCR Test Failed",
+          description: data.error || "Failed to test OCR",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("OCR test error:", error);
+      toast({
+        title: "OCR Test Error",
+        description: "An unexpected error occurred during OCR testing.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingOCR(false);
     }
   };
 
-  const resetHuddle = () => {
-    setUploadedImage(null);
-    setUserDraft("");
-    setGeneratedReply("");
-    setSelectedTone("none");
-    setExtractedText("");
-    setShowExtractedText(false);
-    setCurrentHuddleId(null);
-  };
-
-  if (showLanding) {
-    return (
-      <div className={`transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-        <LandingPage onGetStarted={handleGetStarted} />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`min-h-screen bg-gray-900 text-white transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-      {/* Settings Sidebar */}
-      <SettingsSidebar
-        googleCloudApiKey={googleCloudApiKey}
-        onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
-        enableAutoCropping={enableAutoCropping}
-        onAutoCroppingChange={handleAutoCroppingChange}
-        autoCropMargin={autoCropMargin}
-        onAutoCropMarginChange={handleAutoCropMarginChange}
-        onTestOCR={uploadedImage ? handleTestOCR : undefined}
-        isTestingOCR={isOCRProcessing}
-        principles={principles}
-        setPrinciples={setPrinciples}
-        uploadedImage={uploadedImage}
-      />
-
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
-          <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
-        </div>
-      </div>
-
-      <div className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
-            <TabsTrigger 
-              value="huddle-play" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Huddle Play
+return (
+  <div className="min-h-screen bg-gray-900 text-white">
+    <LandingPage />
+    
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto">
+        <Tabs defaultValue="upload" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 bg-gray-800 border-gray-700">
+            <TabsTrigger value="upload" className="text-white data-[state=active]:bg-gray-700">
+              Upload Image
             </TabsTrigger>
-            <TabsTrigger 
-              value="interruptions" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
-            >
-              <Camera className="w-4 h-4" />
-              Interruptions
-            </TabsTrigger>
-            <TabsTrigger 
-              value="past-huddles" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
-            >
-              <History className="w-4 h-4" />
+            <TabsTrigger value="past-huddles" className="text-white data-[state=active]:bg-gray-700">
               Past Huddles
             </TabsTrigger>
+            <TabsTrigger value="interruptions" className="text-white data-[state=active]:bg-gray-700">
+              Interruptions
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="text-white data-[state=active]:bg-gray-700">
+              Documents
+            </TabsTrigger>
+            <TabsTrigger value="pdf-upload" className="text-white data-[state=active]:bg-gray-700">
+              Upload PDF
+            </TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="huddle-play" className="mt-6 space-y-6">
-            {/* File Upload Section */}
+
+          <TabsContent value="upload" className="mt-6">
             <Card className="bg-gray-800 border-gray-700">
               <CardContent className="p-6">
-                <div className="text-center space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-gray-300 text-lg font-sans">Upload Screenshot</p>
-                    {isOCRProcessing && (
-                      <Badge variant="secondary" className="bg-blue-600 font-sans">
-                        Processing OCR...
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-gray-500 text-sm font-sans">JPG, JPEG, PNG • Max 10MB</p>
-                  
-                  <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
+                <div className="grid gap-4">
+                  <h2 className="text-xl font-semibold">1. Capture Context</h2>
+                  <p className="text-gray-400">Take a screenshot or upload an image to provide context for the AI.</p>
+
+                  <div className="flex space-x-4">
+                    <Button onClick={handleScreenshot} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                      Take Screenshot
+                    </Button>
                     <Input
                       type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
+                      id="upload"
                       className="hidden"
-                      id="file-upload"
-                      disabled={isOCRProcessing}
+                      accept="image/*"
+                      onChange={handleUpload}
                     />
-                    <label 
-                      htmlFor="file-upload" 
-                      className="cursor-pointer flex flex-col items-center space-y-2"
-                    >
-                      <Upload className="w-8 h-8 text-purple-400" />
-                      <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
-                        <span className="text-white font-sans">
-                          {isOCRProcessing ? "Processing..." : "Choose file"}
-                        </span>
-                      </div>
-                    </label>
+                    <Label htmlFor="upload" className="cursor-pointer bg-gray-700 border-gray-600 text-white hover:bg-gray-600 rounded-md px-4 py-2">
+                      Upload Image
+                    </Label>
                   </div>
-                  
-                  {uploadedImage && (
-                    <div className="mt-4 space-y-3">
-                      <img 
-                        src={uploadedImage} 
-                        alt="Uploaded screenshot" 
-                        className="w-full max-w-lg mx-auto rounded-lg border border-gray-600 shadow-lg"
-                      />
-                      <div className="flex gap-2 justify-center items-center flex-wrap">
-                        <Badge variant="secondary" className="font-sans">Screenshot uploaded</Badge>
+
+                  {screenshot && (
+                    <div className="mt-4">
+                      <h3 className="text-lg font-medium">Captured Image</h3>
+                      <div ref={ref} className="mt-2">
+                        <img src={screenshot} alt="Captured" style={{ maxWidth: '100%', height: 'auto' }} />
                       </div>
                     </div>
                   )}
@@ -386,105 +247,176 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            {/* Draft Message Section */}
-            <Card className="bg-gray-800 border-gray-700" data-section="draft">
+            <Card className="bg-gray-800 border-gray-700 mt-6">
               <CardContent className="p-6">
-                <h3 className="text-white text-lg font-medium mb-4 font-sans">Your Draft Message</h3>
-                <Textarea
-                  placeholder="Type your draft message here..."
-                  value={userDraft}
-                  onChange={(e) => setUserDraft(e.target.value)}
-                  rows={6}
-                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none font-sans"
-                />
+                <div className="grid gap-4">
+                  <h2 className="text-xl font-semibold">2. Enter Your Draft</h2>
+                  <p className="text-gray-400">Write your initial message or draft to be improved by the AI.</p>
+                  <Textarea
+                    placeholder="Enter your draft message here..."
+                    value={userDraft}
+                    onChange={(e) => setUserDraft(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                  />
+                </div>
               </CardContent>
             </Card>
 
-            {/* Generate Button */}
-            <Button 
-              onClick={handleGenerateReply}
-              disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
-            >
-              <Zap className="w-5 h-5 mr-2" />
-              {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
-            </Button>
+            <Card className="bg-gray-800 border-gray-700 mt-6">
+              <CardContent className="p-6">
+                <div className="grid gap-4">
+                  <h2 className="text-xl font-semibold">3. Generate Reply</h2>
+                  <p className="text-gray-400">Generate an improved reply using the AI assistant.</p>
 
-            {/* Loading state for AI generation */}
-            {isGenerating && (
-              <div className="text-center py-8">
-                <div className="inline-flex items-center gap-2 text-purple-400">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-                  <span className="font-sans">AI is crafting your perfect reply...</span>
-                </div>
-              </div>
-            )}
+                  <div className="flex items-center space-x-4">
+                    <Button onClick={handleGenerate} disabled={isGenerating} className="bg-purple-600 text-white hover:bg-purple-500">
+                      {isGenerating ? (
+                        <>
+                          Generating...
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                        </>
+                      ) : (
+                        "Generate Reply"
+                      )}
+                    </Button>
 
-            {/* Generated Reply Section */}
-            {generatedReply && (
-              <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
-                <CardContent className="p-6 space-y-6">
-                  <div className="flex flex-col space-y-4">
-                    <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
-                    <ToneSelector
-                      selectedTone={selectedTone}
-                      onToneChange={setSelectedTone}
-                      onApplyTone={handleApplyTone}
-                      isAdjusting={isAdjustingTone}
-                      disabled={!generatedReply || isGenerating}
-                    />
+                    <Button onClick={handleRegenerate} disabled={isGenerating} variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                      {isGenerating ? (
+                        <>
+                          Regenerating...
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCcw className="w-4 h-4 mr-2" />
+                          Regenerate
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  
-                  <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                    <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed">
-                      {generatedReply}
-                    </pre>
-                  </div>
-                  
-                  {/* Loading state for tone adjustment */}
-                  {isAdjustingTone && (
-                    <div className="text-center py-4">
-                      <div className="inline-flex items-center gap-2 text-purple-400">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
-                        <span className="text-sm font-sans">Adjusting tone...</span>
+
+                  {error && (
+                    <div className="rounded-md bg-red-100 px-4 py-3 mt-2">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">
+                            Error
+                          </h3>
+                          <div className="mt-2 text-sm text-red-700">
+                            <p>{error}</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
-                  
-                  <div className="flex flex-col gap-4 sm:flex-row">
-                    <Button 
-                      onClick={handleRegenerate}
-                      variant="outline" 
-                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
-                      disabled={isGenerating}
-                    >
-                      <RefreshCcw className="w-4 h-4 mr-2" />
-                      {isGenerating ? "Regenerating..." : "Regenerate"}
-                    </Button>
-                    <Button 
-                      onClick={resetHuddle}
-                      variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 sm:w-auto font-sans"
-                    >
-                      New Huddle
-                    </Button>
+
+                  {generatedReply && (
+                    <div className="mt-4">
+                      <h3 className="text-lg font-medium">Generated Reply</h3>
+                      <Textarea
+                        readOnly
+                        value={generatedReply}
+                        className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                      />
+                      <div className="flex justify-end mt-2">
+                        <Button onClick={handleCopy} disabled={isCopied} variant="secondary" className="bg-green-600 text-white hover:bg-green-500">
+                          {isCopied ? (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4 mr-2" />
+                              Copy to Clipboard
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {generatedReply && (
+              <Card className="bg-gray-800 border-gray-700 mt-6">
+                <CardContent className="p-6">
+                  <div className="grid gap-4">
+                    <h2 className="text-xl font-semibold">4. Adjust Tone</h2>
+                    <p className="text-gray-400">Fine-tune the tone of the generated reply.</p>
+
+                    <div className="flex items-center space-x-4">
+                      <Select value={selectedTone} onValueChange={setSelectedTone}>
+                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 w-[180px]">
+                          <SelectValue placeholder="Select Tone" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="casual">Casual</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="friendly">Friendly</SelectItem>
+                          <SelectItem value="direct">Direct</SelectItem>
+                          <SelectItem value="warm">Warm</SelectItem>
+                          <SelectItem value="confident">Confident</SelectItem>
+                          <SelectItem value="curious">Curious</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Button onClick={handleAdjustTone} disabled={isAdjustingTone} className="bg-blue-600 text-white hover:bg-blue-500">
+                        {isAdjustingTone ? (
+                          <>
+                            Adjusting...
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                          </>
+                        ) : (
+                          "Adjust Tone"
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
           </TabsContent>
-          
+
+          <TabsContent value="past-huddles" className="mt-6">
+            <PastHuddlesTab />
+          </TabsContent>
+
           <TabsContent value="interruptions" className="mt-6">
             <InterruptionsTab />
           </TabsContent>
-          
-          <TabsContent value="past-huddles" className="mt-6">
-            <PastHuddlesTab />
+
+          <TabsContent value="documents" className="mt-6">
+            <DocumentsTab />
+          </TabsContent>
+
+          <TabsContent value="pdf-upload" className="mt-6">
+            <PDFUploader />
           </TabsContent>
         </Tabs>
       </div>
     </div>
-  );
+
+    <SettingsSidebar
+      googleCloudApiKey={googleCloudApiKey}
+      onGoogleCloudApiKeyChange={setGoogleCloudApiKey}
+      enableAutoCropping={enableAutoCropping}
+      onAutoCroppingChange={setEnableAutoCropping}
+      autoCropMargin={autoCropMargin}
+      onAutoCropMarginChange={setAutoCropMargin}
+      onTestOCR={handleTestOCR}
+      isTestingOCR={isTestingOCR}
+      principles={principles}
+      setPrinciples={setPrinciples}
+      uploadedImage={uploadedImage}
+    />
+  </div>
+);
 };
 
 export default Index;
