@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -100,46 +101,6 @@ serve(async (req) => {
         }
       }
 
-      // Search for relevant document knowledge using the new function
-      let documentKnowledge = [];
-      if (userId && !isRegeneration) {
-        try {
-          console.log('Searching document knowledge...');
-          
-          // Create embedding for document search
-          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openaiApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              input: `${screenshotText} ${userDraft}`,
-              model: 'text-embedding-3-small'
-            }),
-          });
-
-          const embeddingData = await embeddingResponse.json();
-          const embedding = embeddingData.data[0].embedding;
-
-          // Search for similar document chunks
-          const { data: docResults, error: docError } = await supabase
-            .rpc('search_document_knowledge', {
-              query_embedding: embedding,
-              target_user_id: userId,
-              match_threshold: 0.7,
-              match_count: 3
-            });
-
-          if (!docError && docResults) {
-            documentKnowledge = docResults;
-            console.log(`Found ${documentKnowledge.length} relevant document chunks`);
-          }
-        } catch (error) {
-          console.error('Error searching document knowledge:', error);
-        }
-      }
-
       // Build context from similar huddles
       let contextFromPastHuddles = '';
       if (similarHuddles.length > 0) {
@@ -151,16 +112,6 @@ serve(async (req) => {
         contextFromPastHuddles += '\nUse these examples to inform your response style and approach.\n';
       }
 
-      // Build context from document knowledge
-      let contextFromDocuments = '';
-      if (documentKnowledge.length > 0) {
-        contextFromDocuments = '\n\nRelevant information from your knowledge base:\n';
-        documentKnowledge.forEach((doc: any, index: number) => {
-          contextFromDocuments += `\nDocument "${doc.document_name}" (relevance: ${(doc.similarity * 100).toFixed(1)}%):\n${doc.content_chunk}\n`;
-        });
-        contextFromDocuments += '\nUse this information to provide more informed and accurate responses.\n';
-      }
-
       // Generate AI response with context
       const systemPrompt = `You are an expert communication assistant that helps people craft perfect responses for conversations. Your goal is to help improve their draft messages to be more effective, clear, and engaging.
 
@@ -168,15 +119,12 @@ ${principles || 'Follow huddle principles: Clarity, Connection, Brevity, Flow, E
 
 ${contextFromPastHuddles}
 
-${contextFromDocuments}
-
 Given the conversation context and the user's draft, provide an improved version that:
 1. Maintains the user's authentic voice and intent
 2. Improves clarity and engagement
 3. Follows the communication principles
 4. Is appropriate for the conversation context
 5. Feels natural and not over-engineered
-6. Incorporates relevant knowledge from documents when applicable
 
 Always respond with ONLY the improved message text, no explanations or additional commentary.`;
 
@@ -205,23 +153,6 @@ Please provide an improved version of this message:`;
 
       const data = await response.json();
       const reply = data.choices[0].message.content.trim();
-
-      // Prepare sources for the response
-      const sources = {
-        huddles: similarHuddles.map((huddle: any) => ({
-          id: huddle.id,
-          screenshot_text: huddle.payload.screenshot_text,
-          user_draft: huddle.payload.user_draft,
-          final_reply: huddle.payload.final_reply || huddle.payload.generated_reply,
-          similarity: huddle.score
-        })),
-        documents: documentKnowledge.map((doc: any) => ({
-          id: doc.id,
-          document_name: doc.document_name,
-          content_chunk: doc.content_chunk,
-          similarity: doc.similarity
-        }))
-      };
 
       // Store in Qdrant for future learning (background task)
       if (qdrantApiKey && qdrantUrl && userId) {
@@ -280,7 +211,7 @@ Please provide an improved version of this message:`;
       }
 
       return new Response(
-        JSON.stringify({ reply, sources }),
+        JSON.stringify({ reply }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
