@@ -16,6 +16,13 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Function started, checking API key...');
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not found');
+      throw new Error('OpenAI API key not configured');
+    }
+
     const { storyText, imageUrl, count = 3 } = await req.json();
 
     console.log('Generating story interruptions for:', { 
