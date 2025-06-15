@@ -1,9 +1,8 @@
 
 import * as pdfjsLib from 'pdfjs-dist';
-import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
-// Use the worker entry point directly to avoid CORS issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Use local worker file to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
 
 export interface PDFProcessingResult {
   text: string;
