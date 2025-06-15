@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, Settings, Eye } from "lucide-react";
+import { Upload, Zap, RefreshCcw, Eye, MessageSquare, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAISuggestions } from "@/hooks/useAISuggestions";
 import { useOCR } from "@/hooks/useOCR";
@@ -249,49 +249,58 @@ const Index = () => {
 
       <div className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
-            <TabsTrigger value="huddle-play" className="text-white data-[state=active]:bg-purple-600">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
+            <TabsTrigger 
+              value="huddle-play" 
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+            >
+              <MessageSquare className="w-4 h-4" />
               Huddle Play
             </TabsTrigger>
-            <TabsTrigger value="setup" className="text-white data-[state=active]:bg-purple-600">
-              <Settings className="w-4 h-4 mr-1" />
-              Setup
-            </TabsTrigger>
-            <TabsTrigger value="interruptions" className="text-white">
+            <TabsTrigger 
+              value="interruptions" 
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+            >
+              <Zap className="w-4 h-4" />
               Interruptions
             </TabsTrigger>
-            <TabsTrigger value="past-huddles" className="text-white">
-              📚 Past Huddles
+            <TabsTrigger 
+              value="past-huddles" 
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200"
+            >
+              <History className="w-4 h-4" />
+              Past Huddles
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="setup" className="mt-6 space-y-6">            
-            <OCRSettings
-              googleCloudApiKey={googleCloudApiKey}
-              onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
-              enableAutoCropping={enableAutoCropping}
-              onAutoCroppingChange={handleAutoCroppingChange}
-              autoCropMargin={autoCropMargin}
-              onAutoCropMarginChange={handleAutoCropMarginChange}
-              onTestOCR={uploadedImage ? handleTestOCR : undefined}
-              isTestingOCR={isOCRProcessing}
-            />
-            
+          <TabsContent value="huddle-play" className="mt-6 space-y-6">
+            {/* Settings Section */}
             <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <h3 className="text-white text-lg font-medium mb-4">AI Principles</h3>
-                <Textarea
-                  placeholder="Enter the key principles for AI to follow when generating replies..."
-                  value={principles}
-                  onChange={(e) => setPrinciples(e.target.value)}
-                  rows={4}
-                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+              <CardContent className="p-6 space-y-6">
+                <OCRSettings
+                  googleCloudApiKey={googleCloudApiKey}
+                  onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
+                  enableAutoCropping={enableAutoCropping}
+                  onAutoCroppingChange={handleAutoCroppingChange}
+                  autoCropMargin={autoCropMargin}
+                  onAutoCropMarginChange={handleAutoCropMarginChange}
+                  onTestOCR={uploadedImage ? handleTestOCR : undefined}
+                  isTestingOCR={isOCRProcessing}
                 />
+                
+                <div>
+                  <h3 className="text-white text-lg font-medium mb-4">AI Principles</h3>
+                  <Textarea
+                    placeholder="Enter the key principles for AI to follow when generating replies..."
+                    value={principles}
+                    onChange={(e) => setPrinciples(e.target.value)}
+                    rows={4}
+                    className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                  />
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="huddle-play" className="mt-6 space-y-6">
+
             {/* File Upload Section */}
             <Card className="bg-gray-800 border-gray-700">
               <CardContent className="p-6">
