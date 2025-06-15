@@ -77,7 +77,6 @@ const LandingPage = ({ onGetStarted }: LandingPageProps) => {
             Get Started
             <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
           </Button>
-          <p className="text-gray-400 text-sm mt-4">No signup required • Start immediately</p>
         </div>
       </div>
     </div>
