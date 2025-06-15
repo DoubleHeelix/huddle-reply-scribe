@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -88,6 +87,8 @@ serve(async (req) => {
       // Process each chunk
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
+        // Sanitize chunk to remove null characters that cause database errors
+        const sanitizedChunk = chunk.replace(/\u0000/g, "");
         
         // Create embedding for chunk
         const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -97,7 +98,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            input: chunk,
+            input: sanitizedChunk,
             model: 'text-embedding-3-small'
           }),
         });
@@ -116,7 +117,7 @@ serve(async (req) => {
           .insert({
             user_id,
             document_name,
-            content_chunk: chunk,
+            content_chunk: sanitizedChunk,
             embedding,
             metadata: {
               chunk_index: i,
