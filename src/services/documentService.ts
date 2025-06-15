@@ -52,9 +52,15 @@ export const documentService = {
       throw new Error(`Failed to download file: ${downloadError.message}`);
     }
 
-    // Convert to base64
+    // Convert to base64 without causing stack overflow for large files
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    let binary = '';
+    const bytes = new Uint8Array(arrayBuffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
 
     // Call the edge function with the correct parameters
     const { data, error } = await supabase.functions.invoke('create-embedding', {
