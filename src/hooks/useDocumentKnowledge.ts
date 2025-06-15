@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pdfProcessor } from '@/utils/pdfProcessor';
@@ -20,7 +19,8 @@ export const useDocumentKnowledge = () => {
     setError(null);
 
     try {
-      await pdfProcessor.processExistingDocuments();
+      // Use the new storage-based processing
+      await pdfProcessor.processStorageDocuments('documents');
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to process documents';

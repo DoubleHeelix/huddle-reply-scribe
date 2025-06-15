@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -165,25 +164,93 @@ export class PDFProcessor {
     }
   }
 
-  async processExistingDocuments(): Promise<void> {
-    const documents = [
-      { path: '/src/Docs/DTM.pdf', name: 'DTM' },
-      { path: '/src/Docs/FAQ.pdf', name: 'FAQ' },
-      { path: '/src/Docs/MPA.pdf', name: 'MPA' },
-      { path: '/src/Docs/OLB.pdf', name: 'OLB' }
-    ];
-
-    for (const doc of documents) {
-      try {
-        const response = await fetch(doc.path);
-        const blob = await response.blob();
-        const file = new File([blob], `${doc.name}.pdf`, { type: 'application/pdf' });
-        
-        await this.processDocument(file, doc.name);
-      } catch (error) {
-        console.error(`Error processing ${doc.name}:`, error);
+  async processStorageDocuments(bucketName: string = 'documents'): Promise<void> {
+    try {
+      console.log('Fetching documents from Supabase Storage...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return;
       }
+
+      // List files in the storage bucket
+      const { data: files, error: listError } = await supabase.storage
+        .from(bucketName)
+        .list('', {
+          limit: 100,
+          offset: 0
+        });
+
+      if (listError) {
+        console.error('Error listing files:', listError);
+        return;
+      }
+
+      if (!files || files.length === 0) {
+        console.log('No files found in storage bucket');
+        return;
+      }
+
+      console.log(`Found ${files.length} files in storage:`, files.map(f => f.name));
+
+      // Filter for PDF files
+      const pdfFiles = files.filter(file => 
+        file.name.toLowerCase().endsWith('.pdf') && 
+        !file.name.startsWith('.') // Exclude hidden files
+      );
+
+      console.log(`Processing ${pdfFiles.length} PDF files...`);
+
+      for (const fileInfo of pdfFiles) {
+        try {
+          // Check if this document has already been processed
+          const { data: existingDocs } = await supabase
+            .from('document_knowledge')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('document_name', fileInfo.name.replace('.pdf', ''))
+            .limit(1);
+
+          if (existingDocs && existingDocs.length > 0) {
+            console.log(`Document ${fileInfo.name} already processed, skipping...`);
+            continue;
+          }
+
+          // Download the file from storage
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from(bucketName)
+            .download(fileInfo.name);
+
+          if (downloadError) {
+            console.error(`Error downloading ${fileInfo.name}:`, downloadError);
+            continue;
+          }
+
+          // Convert blob to File object
+          const file = new File([fileData], fileInfo.name, { type: 'application/pdf' });
+          
+          // Process the document
+          const documentName = fileInfo.name.replace('.pdf', '');
+          await this.processDocument(file, documentName);
+          
+          console.log(`Successfully processed ${fileInfo.name} from storage`);
+        } catch (error) {
+          console.error(`Error processing ${fileInfo.name}:`, error);
+        }
+      }
+
+      console.log('Finished processing all documents from storage');
+    } catch (error) {
+      console.error('Error in processStorageDocuments:', error);
     }
+  }
+
+  // Keep the old method for backwards compatibility
+  async processExistingDocuments(): Promise<void> {
+    console.log('processExistingDocuments called - redirecting to storage...');
+    await this.processStorageDocuments();
   }
 }
 
