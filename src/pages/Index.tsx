@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -392,11 +393,13 @@ const Index = () => {
               {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
             </Button>
 
-            {/* Debug info */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="text-xs text-gray-500 space-y-1">
-                <div>Draft: {userDraft.trim() ? '✓ Ready' : '✗ Empty'}</div>
-                <div>Image: {uploadedImage ? '✓ Uploaded' : '✗ Missing'}</div>
+            {/* Loading state for AI generation */}
+            {isGenerating && (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center gap-2 text-purple-400">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
+                  <span>AI is crafting your perfect reply...</span>
+                </div>
               </div>
             )}
 
@@ -421,6 +424,16 @@ const Index = () => {
                     </pre>
                   </div>
                   
+                  {/* Loading state for tone adjustment */}
+                  {isAdjustingTone && (
+                    <div className="text-center py-4">
+                      <div className="inline-flex items-center gap-2 text-purple-400">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
+                        <span className="text-sm">Adjusting tone...</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="flex gap-3">
                     <Button 
                       onClick={handleRegenerate}
@@ -429,7 +442,7 @@ const Index = () => {
                       disabled={isGenerating}
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
-                      Regenerate
+                      {isGenerating ? "Regenerating..." : "Regenerate"}
                     </Button>
                     <Button 
                       onClick={resetHuddle}
