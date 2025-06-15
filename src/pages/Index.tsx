@@ -62,11 +62,25 @@ const Index = () => {
     const savedAutoCropping = localStorage.getItem('enable_auto_cropping');
     const savedCropMargin = localStorage.getItem('auto_crop_margin');
 
-    if (savedApiKey) setApiKey(savedApiKey);
+    if (savedApiKey) {
+      console.log('Loading saved OpenAI API key');
+      setApiKey(savedApiKey);
+    }
     if (savedGoogleCloudKey) setGoogleCloudApiKey(savedGoogleCloudKey);
     if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
+
+  // Save OpenAI API key to localStorage when it changes
+  const handleApiKeyChange = (key: string) => {
+    console.log('API key changed, saving to localStorage');
+    setApiKey(key);
+    if (key.trim()) {
+      localStorage.setItem('openai_api_key', key);
+    } else {
+      localStorage.removeItem('openai_api_key');
+    }
+  };
 
   // Save Google Cloud API key to localStorage
   const handleGoogleCloudApiKeyChange = (key: string) => {
@@ -160,6 +174,8 @@ const Index = () => {
   };
 
   const handleGenerateReply = async () => {
+    console.log('Generate reply clicked. API key exists:', !!apiKey, 'Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
+    
     if (!userDraft.trim()) {
       toast({
         title: "Draft required",
@@ -178,7 +194,7 @@ const Index = () => {
       return;
     }
 
-    if (!apiKey) {
+    if (!apiKey || !apiKey.trim()) {
       toast({
         title: "API Key required",
         description: "Please enter your OpenAI API key first.",
@@ -276,7 +292,7 @@ const Index = () => {
           </TabsList>
           
           <TabsContent value="setup" className="mt-6 space-y-6">
-            <ApiKeyInput apiKey={apiKey} onApiKeyChange={setApiKey} />
+            <ApiKeyInput apiKey={apiKey} onApiKeyChange={handleApiKeyChange} />
             
             <OCRSettings
               googleCloudApiKey={googleCloudApiKey}
@@ -400,12 +416,21 @@ const Index = () => {
             {/* Generate Button */}
             <Button 
               onClick={handleGenerateReply}
-              disabled={isGenerating || !apiKey}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl"
+              disabled={isGenerating || !apiKey?.trim() || !userDraft.trim() || !uploadedImage}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="w-5 h-5 mr-2" />
               {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
             </Button>
+
+            {/* Debug info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div>API Key: {apiKey ? '✓ Set' : '✗ Missing'}</div>
+                <div>Draft: {userDraft.trim() ? '✓ Ready' : '✗ Empty'}</div>
+                <div>Image: {uploadedImage ? '✓ Uploaded' : '✗ Missing'}</div>
+              </div>
+            )}
 
             {/* Generated Reply Section */}
             {generatedReply && (
