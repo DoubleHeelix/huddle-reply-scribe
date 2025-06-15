@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { documentService } from '@/services/documentService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useDocumentProcessing = () => {
   const [isProcessing, setIsProcessing] = useState(false);
