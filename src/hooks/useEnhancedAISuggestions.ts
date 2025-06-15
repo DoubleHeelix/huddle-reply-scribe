@@ -1,11 +1,14 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useDocumentKnowledge } from './useDocumentKnowledge';
 
 export const useEnhancedAISuggestions = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const { searchKnowledge } = useDocumentKnowledge();
 
   const generateReply = async (
     screenshotText: string,
@@ -17,7 +20,13 @@ export const useEnhancedAISuggestions = () => {
       setIsGenerating(true);
       setError(null);
 
-      console.log('Enhanced AI: Generating reply with past huddle learning...');
+      console.log('Enhanced AI: Generating reply with document knowledge...');
+
+      // Search for relevant document knowledge
+      const searchQuery = `${screenshotText} ${userDraft}`;
+      const relevantKnowledge = await searchKnowledge(searchQuery, 3);
+      
+      console.log(`Found ${relevantKnowledge.length} relevant document chunks`);
 
       const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
         body: {
@@ -25,7 +34,8 @@ export const useEnhancedAISuggestions = () => {
           screenshotText,
           userDraft,
           principles,
-          isRegeneration
+          isRegeneration,
+          documentKnowledge: relevantKnowledge
         },
       });
 

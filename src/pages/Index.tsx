@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
@@ -16,6 +15,7 @@ import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import LandingPage from "@/components/LandingPage";
+import { DocumentProcessor } from "@/components/DocumentProcessor";
 
 const Index = () => {
   const [showLanding, setShowLanding] = useState(true);
@@ -209,7 +209,7 @@ const Index = () => {
       
       toast({
         title: "Perfect reply generated!",
-        description: "Your optimized response is ready and saved for future learning.",
+        description: "Your optimized response is ready and incorporates relevant document knowledge.",
       });
 
       // Auto-scroll to generated reply section
@@ -303,33 +303,40 @@ const Index = () => {
       <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
-          <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
+          <p className="text-purple-100 font-sans">AI-powered conversation suggestions with document knowledge</p>
         </div>
       </div>
 
       <div className="p-4 max-w-2xl mx-auto">
         <Tabs defaultValue="huddle-play" className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger 
               value="huddle-play" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
             >
               <MessageSquare className="w-4 h-4" />
-              Huddle Play
+              Huddle
+            </TabsTrigger>
+            <TabsTrigger 
+              value="documents" 
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
+            >
+              <Brain className="w-4 h-4" />
+              Docs
             </TabsTrigger>
             <TabsTrigger 
               value="interruptions" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
             >
               <Camera className="w-4 h-4" />
               Interruptions
             </TabsTrigger>
             <TabsTrigger 
               value="past-huddles" 
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
             >
               <History className="w-4 h-4" />
-              Past Huddles
+              History
             </TabsTrigger>
           </TabsList>
           
@@ -472,6 +479,10 @@ const Index = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+          
+          <TabsContent value="documents" className="mt-6">
+            <DocumentProcessor />
           </TabsContent>
           
           <TabsContent value="interruptions" className="mt-6">

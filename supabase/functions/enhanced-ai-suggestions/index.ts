@@ -15,6 +15,11 @@ interface RequestBody {
   isRegeneration?: boolean;
   originalReply?: string;
   selectedTone?: string;
+  documentKnowledge?: Array<{
+    document_name: string;
+    content_chunk: string;
+    similarity: number;
+  }>;
 }
 
 serve(async (req) => {
@@ -32,7 +37,16 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, screenshotText, userDraft, principles, isRegeneration, originalReply, selectedTone }: RequestBody = await req.json();
+    const { 
+      action, 
+      screenshotText, 
+      userDraft, 
+      principles, 
+      isRegeneration, 
+      originalReply, 
+      selectedTone,
+      documentKnowledge 
+    }: RequestBody = await req.json();
 
     console.log('Enhanced AI Suggestions - Action:', action);
 
@@ -53,7 +67,6 @@ serve(async (req) => {
         try {
           console.log('Fetching similar huddles from Qdrant...');
           
-          // Create embedding for current context
           const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
             method: 'POST',
             headers: {
@@ -69,7 +82,6 @@ serve(async (req) => {
           const embeddingData = await embeddingResponse.json();
           const embedding = embeddingData.data[0].embedding;
 
-          // Search for similar vectors in Qdrant
           const qdrantResponse = await fetch(`${qdrantUrl}/collections/huddle_plays/points/search`, {
             method: 'POST',
             headers: {
@@ -112,19 +124,32 @@ serve(async (req) => {
         contextFromPastHuddles += '\nUse these examples to inform your response style and approach.\n';
       }
 
-      // Generate AI response with context
+      // Build context from document knowledge
+      let contextFromDocuments = '';
+      if (documentKnowledge && documentKnowledge.length > 0) {
+        contextFromDocuments = '\n\nRelevant information from your knowledge documents:\n';
+        documentKnowledge.forEach((doc, index) => {
+          contextFromDocuments += `\nFrom ${doc.document_name} (relevance: ${(doc.similarity * 100).toFixed(1)}%):\n${doc.content_chunk}\n`;
+        });
+        contextFromDocuments += '\nUse this information to inform your response when relevant.\n';
+      }
+
+      // Generate AI response with enhanced context
       const systemPrompt = `You are an expert communication assistant that helps people craft perfect responses for conversations. Your goal is to help improve their draft messages to be more effective, clear, and engaging.
 
 ${principles || 'Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.'}
 
 ${contextFromPastHuddles}
 
+${contextFromDocuments}
+
 Given the conversation context and the user's draft, provide an improved version that:
 1. Maintains the user's authentic voice and intent
 2. Improves clarity and engagement
 3. Follows the communication principles
 4. Is appropriate for the conversation context
-5. Feels natural and not over-engineered
+5. Incorporates relevant knowledge from documents when applicable
+6. Feels natural and not over-engineered
 
 Always respond with ONLY the improved message text, no explanations or additional commentary.`;
 
@@ -160,7 +185,6 @@ Please provide an improved version of this message:`;
           try {
             console.log('Storing huddle in Qdrant for future learning...');
             
-            // Create embedding for storage
             const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
               method: 'POST',
               headers: {
@@ -176,7 +200,6 @@ Please provide an improved version of this message:`;
             const embeddingData = await embeddingResponse.json();
             const embedding = embeddingData.data[0].embedding;
 
-            // Store in Qdrant
             const pointId = `${userId}_${Date.now()}`;
             await fetch(`${qdrantUrl}/collections/huddle_plays/points/upsert`, {
               method: 'PUT',
@@ -206,7 +229,6 @@ Please provide an improved version of this message:`;
           }
         };
 
-        // Run as background task
         storeInQdrant();
       }
 
