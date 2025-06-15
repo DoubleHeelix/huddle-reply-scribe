@@ -2,8 +2,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker with a stable CDN URL
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 interface ProcessedDocument {
   name: string;
@@ -148,13 +148,17 @@ class PDFProcessor {
         
         const embedding = await this.createEmbedding(chunk);
         
+        // Convert embedding array to JSON string for storage
+        const embeddingString = JSON.stringify(embedding);
+        
         const { error: insertError } = await supabase
           .from('document_knowledge')
           .insert({
             user_id: userId,
             document_name: docName,
             content_chunk: chunk,
-            embedding: embedding,
+            embedding: embeddingString,
+            chunk_index: i,
             metadata: {
               chunk_index: i,
               total_chunks: chunks.length,
@@ -212,6 +216,7 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Found ${pdfFiles.length} PDF files to process`);
 
       const results: ProcessedDocument[] = [];
+      const errors: string[] = [];
 
       for (const file of pdfFiles) {
         try {
@@ -250,11 +255,13 @@ class PDFProcessor {
 
         } catch (error) {
           console.error(`❌ DEBUG: Error processing ${file.name}:`, error);
+          const errorMessage = `Error processing ${file.name}: ${error.message}`;
+          errors.push(errorMessage);
           results.push({
             name: file.name,
             chunks: [],
             success: false,
-            error: error.message
+            error: errorMessage
           });
         }
       }
@@ -265,9 +272,8 @@ class PDFProcessor {
 
       console.log(`📊 DEBUG: Processing complete - ${successful} successful, ${failed} failed`);
 
-      if (failed > 0) {
-        const errors = results.filter(r => !r.success).map(r => `${r.name}: ${r.error}`);
-        console.log('❌ DEBUG: Failed documents:', errors);
+      if (errors.length > 0) {
+        console.log('❌ DEBUG: Errors encountered:', errors);
         throw new Error(`Some documents failed to process: ${errors.join(', ')}`);
       }
 
