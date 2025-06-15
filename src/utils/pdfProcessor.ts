@@ -58,10 +58,8 @@ export class PDFProcessor {
           console.log(`📄 DEBUG: Processing page ${pageNum}/${pdf.numPages}`);
           const page = await pdf.getPage(pageNum);
           
-          // Get text content with simple extraction
-          const textContent = await page.getTextContent({
-            disableCombineTextItems: false
-          });
+          // Get text content with minimal configuration
+          const textContent = await page.getTextContent();
           
           console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
           
@@ -138,7 +136,7 @@ export class PDFProcessor {
       } else if (error.message.includes('password')) {
         throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
       } else if (error.message.includes('worker') || error.message.includes('fetch dynamically imported module')) {
-        throw new Error(`PDF processing failed due to browser limitations. Please try refreshing the page and try again.`);
+        throw new Error(`PDF processing failed due to worker issues. This may be a temporary problem - please try again.`);
       }
       
       // Re-throw with original error for debugging
