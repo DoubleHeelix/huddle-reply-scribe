@@ -103,8 +103,8 @@ serve(async (req) => {
       console.log('📄 Processing document:', document_name, 'for user:', user_id);
       console.log('📝 Text length:', extracted_text.length);
 
-      // Validate inputs
-      if (typeof extracted_text !== 'string' || extracted_text.length < 50) {
+      // For simplified processing, we'll accept shorter text content
+      if (typeof extracted_text !== 'string' || extracted_text.length < 10) {
         console.error('❌ Invalid or insufficient text content');
         return new Response(
           JSON.stringify({ error: 'Text content is too short or invalid' }),
@@ -113,14 +113,20 @@ serve(async (req) => {
       }
 
       try {
-        // Create text chunks
-        const chunkSize = 1000;
+        // For simplified processing, create fewer, larger chunks or single chunk
+        const chunkSize = Math.max(500, extracted_text.length); // Use entire text if short
         const chunks = [];
         
-        for (let i = 0; i < extracted_text.length; i += chunkSize) {
-          const chunk = extracted_text.slice(i, i + chunkSize).trim();
-          if (chunk.length > 50) { // Only include meaningful chunks
-            chunks.push(chunk);
+        if (extracted_text.length <= 500) {
+          // Single chunk for short content
+          chunks.push(extracted_text);
+        } else {
+          // Multiple chunks for longer content
+          for (let i = 0; i < extracted_text.length; i += chunkSize) {
+            const chunk = extracted_text.slice(i, i + chunkSize).trim();
+            if (chunk.length > 10) { // Lower threshold for meaningful chunks
+              chunks.push(chunk);
+            }
           }
         }
 
@@ -136,7 +142,7 @@ serve(async (req) => {
         // Process each chunk
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          console.log(`🔄 Processing chunk ${i + 1}/${chunks.length}`);
+          console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`);
 
           try {
             // Generate embedding
