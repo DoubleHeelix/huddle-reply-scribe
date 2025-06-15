@@ -21,10 +21,9 @@ export const useDocumentKnowledge = () => {
 
     try {
       console.log('🔄 DEBUG: Starting document processing...');
-      // Use the new storage-based processing
-      await pdfProcessor.processStorageDocuments('documents');
+      const success = await pdfProcessor.processStorageDocuments('documents');
       console.log('✅ DEBUG: Document processing completed successfully');
-      return true;
+      return success;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to process documents';
       setError(errorMessage);
@@ -48,18 +47,25 @@ export const useDocumentKnowledge = () => {
 
       console.log('👤 DEBUG: User authenticated, user ID:', user.id);
 
-      // First, let's check what documents are available in the database
+      // First, check what documents are available and filter out error entries
       const { data: availableDocs, error: docsError } = await supabase
         .from('document_knowledge')
         .select('document_name, content_chunk')
         .eq('user_id', user.id)
-        .limit(5);
+        .not('content_chunk', 'like', '%Unable to extract text%')
+        .not('content_chunk', 'like', '%PDF processing failed%')
+        .limit(10);
 
       if (docsError) {
         console.error('❌ DEBUG: Error checking available documents:', docsError);
       } else {
-        console.log(`📄 DEBUG: Found ${availableDocs?.length || 0} document chunks in database for user:`, 
-          availableDocs?.map(d => ({ name: d.document_name, preview: d.content_chunk.substring(0, 100) + '...' })));
+        console.log(`📄 DEBUG: Found ${availableDocs?.length || 0} valid document chunks in database for user`);
+      }
+
+      // If no valid documents found, return empty array
+      if (!availableDocs || availableDocs.length === 0) {
+        console.log('⚠️ DEBUG: No valid document content found in database');
+        return [];
       }
 
       console.log('🧠 DEBUG: Creating embedding for query:', query);
@@ -76,27 +82,28 @@ export const useDocumentKnowledge = () => {
 
       console.log('✅ DEBUG: Embedding created successfully, length:', embeddingData.embedding?.length);
 
-      // Search for similar documents with a much lower threshold for better results
+      // Search for similar documents with vector similarity
       console.log('🎯 DEBUG: Searching documents with vector similarity...');
       const { data, error } = await supabase.rpc('search_document_knowledge', {
         query_embedding: embeddingData.embedding,
         target_user_id: user.id,
-        match_threshold: 0.1, // Much lower threshold to capture more potential matches
-        match_count: limit * 2 // Get more results to filter from
+        match_threshold: 0.1,
+        match_count: limit * 2
       });
 
       if (error) {
         console.error('❌ DEBUG: Error in vector search:', error);
         
-        // Fallback: try a basic text search if vector search fails
+        // Fallback: try a basic text search
         console.log('🔄 DEBUG: Attempting fallback text search...');
         const searchTerms = query.split(' ').filter(word => word.length > 2).slice(0, 3);
-        console.log('🔍 DEBUG: Using search terms:', searchTerms);
         
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('document_knowledge')
           .select('id, document_name, content_chunk, metadata')
           .eq('user_id', user.id)
+          .not('content_chunk', 'like', '%Unable to extract text%')
+          .not('content_chunk', 'like', '%PDF processing failed%')
           .or(searchTerms.map(term => `content_chunk.ilike.%${term}%`).join(','))
           .limit(limit);
 
@@ -105,24 +112,24 @@ export const useDocumentKnowledge = () => {
           return [];
         }
 
-        // Format fallback results to match expected structure
         const fallbackResults = (fallbackData || []).map(item => ({
           ...item,
-          similarity: 0.5 // Default similarity for text-based matches
+          similarity: 0.5
         }));
 
-        console.log(`✅ DEBUG: Fallback search found ${fallbackResults.length} results:`, 
-          fallbackResults.map(r => ({ name: r.document_name, similarity: r.similarity, preview: r.content_chunk.substring(0, 100) + '...' })));
+        console.log(`✅ DEBUG: Fallback search found ${fallbackResults.length} results`);
         return fallbackResults;
       }
 
-      console.log(`🎯 DEBUG: Vector search returned ${data?.length || 0} raw results`);
+      // Filter out error entries and low similarity results
+      const validResults = (data || []).filter(item => 
+        item.similarity > 0.1 && 
+        !item.content_chunk.includes('Unable to extract text') &&
+        !item.content_chunk.includes('PDF processing failed')
+      );
       
-      // Filter results to only include those with reasonable similarity
-      const filteredResults = (data || []).filter(item => item.similarity > 0.1);
-      
-      console.log(`✅ DEBUG: After filtering (similarity > 0.1): ${filteredResults.length} results`);
-      filteredResults.forEach((result, index) => {
+      console.log(`✅ DEBUG: Vector search returned ${validResults.length} valid results`);
+      validResults.forEach((result, index) => {
         console.log(`📋 DEBUG: Result ${index + 1}:`, {
           document: result.document_name,
           similarity: (result.similarity * 100).toFixed(1) + '%',
@@ -130,30 +137,12 @@ export const useDocumentKnowledge = () => {
         });
       });
       
-      const finalResults = filteredResults.slice(0, limit);
+      const finalResults = validResults.slice(0, limit);
       console.log(`🎯 DEBUG: Final results being returned: ${finalResults.length} documents`);
       
       return finalResults;
     } catch (err) {
       console.error('❌ DEBUG: Knowledge search error:', err);
-      
-      // Additional fallback: try to get any documents for debugging
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: debugData, error: debugError } = await supabase
-            .from('document_knowledge')
-            .select('document_name, content_chunk')
-            .eq('user_id', user.id)
-            .limit(3);
-          
-          console.log('🐛 DEBUG: Available documents for debugging:', debugData);
-          if (debugError) console.error('❌ DEBUG: Debug query error:', debugError);
-        }
-      } catch (debugErr) {
-        console.error('❌ DEBUG: Debug query failed:', debugErr);
-      }
-      
       return [];
     }
   }, []);

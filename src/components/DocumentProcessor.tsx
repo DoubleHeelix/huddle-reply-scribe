@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle } from 'lucide-react';
+import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export const DocumentProcessor = () => {
@@ -13,6 +12,7 @@ export const DocumentProcessor = () => {
   const [storageFiles, setStorageFiles] = useState<string[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [processedDocuments, setProcessedDocuments] = useState<string[]>([]);
+  const [isCleaningErrors, setIsCleaningErrors] = useState(false);
   const { processDocuments, isProcessing, error, clearError } = useDocumentKnowledge();
   const { toast } = useToast();
 
@@ -45,13 +45,10 @@ export const DocumentProcessor = () => {
         return;
       }
 
-      console.log('📁 DEBUG: Raw files from storage:', files);
-
       const pdfFiles = (files || [])
         .filter(file => {
           const isPdf = file.name.toLowerCase().endsWith('.pdf');
           const isNotFolder = file.name !== '.emptyFolderPlaceholder';
-          console.log(`📄 DEBUG: File ${file.name} - isPdf: ${isPdf}, isNotFolder: ${isNotFolder}`);
           return isPdf && isNotFolder;
         })
         .map(file => file.name);
@@ -75,10 +72,13 @@ export const DocumentProcessor = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Only count documents that have valid content (not error messages)
       const { data, error } = await supabase
         .from('document_knowledge')
         .select('document_name')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .not('content_chunk', 'like', '%Unable to extract text%')
+        .not('content_chunk', 'like', '%PDF processing failed%');
 
       if (error) {
         console.error('❌ DEBUG: Error loading processed documents:', error);
@@ -87,9 +87,52 @@ export const DocumentProcessor = () => {
 
       const uniqueDocuments = [...new Set(data.map(doc => doc.document_name))];
       setProcessedDocuments(uniqueDocuments);
-      console.log('📋 DEBUG: Already processed documents:', uniqueDocuments);
+      console.log('📋 DEBUG: Successfully processed documents:', uniqueDocuments);
     } catch (err) {
       console.error('❌ DEBUG: Error in loadProcessedDocuments:', err);
+    }
+  };
+
+  const cleanErrorEntries = async () => {
+    try {
+      setIsCleaningErrors(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log('🧹 DEBUG: Cleaning error entries from database...');
+
+      const { error } = await supabase
+        .from('document_knowledge')
+        .delete()
+        .eq('user_id', user.id)
+        .or('content_chunk.like.%Unable to extract text%,content_chunk.like.%PDF processing failed%');
+
+      if (error) {
+        console.error('❌ DEBUG: Error cleaning database:', error);
+        toast({
+          title: "Error",
+          description: "Failed to clean error entries",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ DEBUG: Error entries cleaned successfully');
+      await loadProcessedDocuments();
+      
+      toast({
+        title: "Database cleaned",
+        description: "Removed error entries from the database",
+      });
+    } catch (err) {
+      console.error('❌ DEBUG: Error cleaning entries:', err);
+      toast({
+        title: "Error",
+        description: "Failed to clean database",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCleaningErrors(false);
     }
   };
 
@@ -110,7 +153,7 @@ export const DocumentProcessor = () => {
     
     if (success) {
       setHasProcessed(true);
-      await loadProcessedDocuments(); // Refresh the processed documents list
+      await loadProcessedDocuments();
       toast({
         title: "Documents processed successfully!",
         description: `${storageFiles.length} PDF document(s) have been analyzed and are now available for AI assistance.`,
@@ -155,18 +198,34 @@ export const DocumentProcessor = () => {
                 <h4 className="text-white text-sm font-medium font-sans">
                   📄 Found {storageFiles.length} PDF{storageFiles.length !== 1 ? 's' : ''} in Storage
                 </h4>
-                <Button
-                  onClick={() => {
-                    loadStorageFiles();
-                    loadProcessedDocuments();
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-white h-6 px-2 font-sans"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={cleanErrorEntries}
+                    variant="ghost"
+                    size="sm"
+                    disabled={isCleaningErrors}
+                    className="text-red-400 hover:text-red-300 h-6 px-2 font-sans"
+                  >
+                    {isCleaningErrors ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3 mr-1" />
+                    )}
+                    Clean Errors
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      loadStorageFiles();
+                      loadProcessedDocuments();
+                    }}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white h-6 px-2 font-sans"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
