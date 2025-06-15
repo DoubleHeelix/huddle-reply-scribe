@@ -2,21 +2,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Simple worker configuration - use a single reliable CDN
-const configureWorker = () => {
-  console.log(`🔧 DEBUG: Configuring PDF.js worker with version ${pdfjsLib.version}`);
-  
-  // Use jsdelivr as primary CDN - it's reliable and has good CORS support
-  const workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-  
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-  console.log(`🔧 DEBUG: Worker configured to: ${workerSrc}`);
-  
-  return workerSrc;
-};
-
-// Initialize worker configuration
-configureWorker();
+// Configure worker using the installed package version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 interface ProcessedDocument {
   name: string;
@@ -45,10 +32,11 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
-      // Simple PDF loading configuration
+      // Load PDF with minimal configuration
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
-        verbosity: 0
+        verbosity: 0,
+        disableWorker: false
       });
 
       const pdf = await loadingTask.promise;
