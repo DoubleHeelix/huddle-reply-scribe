@@ -199,9 +199,6 @@ const Index = () => {
     
     const screenshotText = getScreenshotText();
     
-    // Show knowledge sources section when starting generation
-    setShowKnowledgeSources(true);
-    
     const result = await generateReply(screenshotText, userDraft, principles, false);
     
     if (result) {
@@ -211,6 +208,9 @@ const Index = () => {
       // Store the knowledge sources used for this generation
       setLastUsedDocuments(result.documentKnowledge || []);
       setLastUsedHuddles(result.pastHuddles || []);
+      
+      // Show knowledge sources section when we have data
+      setShowKnowledgeSources(true);
       
       // Save the huddle play to database for future learning
       const huddleId = await saveCurrentHuddle(
@@ -524,12 +524,14 @@ const Index = () => {
               </Card>
             )}
 
-            {/* AI Knowledge Sources Section - Now at the bottom */}
-            <AIKnowledgeSources
-              documentKnowledge={lastUsedDocuments}
-              pastHuddles={lastUsedHuddles}
-              isVisible={showKnowledgeSources}
-            />
+            {/* AI Knowledge Sources Section - Always show if we have data */}
+            {(lastUsedDocuments.length > 0 || lastUsedHuddles.length > 0) && (
+              <AIKnowledgeSources
+                documentKnowledge={lastUsedDocuments}
+                pastHuddles={lastUsedHuddles}
+                isVisible={true}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="interruptions" className="mt-6">
