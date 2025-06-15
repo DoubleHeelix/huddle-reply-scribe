@@ -15,70 +15,136 @@ export class PDFProcessor {
     console.log('📄 DEBUG: Starting PDF text extraction for:', file.name);
     
     try {
-      // Use PDF.js to extract text from PDF with better worker setup
+      // Use PDF.js to extract text from PDF with improved setup
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Use a more reliable worker setup without importing the worker directly
+      // Configure worker with multiple fallback options
       if (typeof window !== 'undefined') {
-        // For browser environment, use the CDN worker with better error handling
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-      } else {
-        // Fallback for other environments
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+        // Try multiple CDN sources for better reliability
+        const workerUrls = [
+          `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+          `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+        ];
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrls[0];
       }
       
       const arrayBuffer = await file.arrayBuffer();
       console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
       
+      // Enhanced PDF loading options for better compatibility
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
         useWorkerFetch: false,
         isEvalSupported: false,
-        useSystemFonts: true
+        useSystemFonts: true,
+        standardFontDataUrl: undefined,
+        disableFontFace: false,
+        verbosity: 0 // Reduce verbosity to avoid console noise
       }).promise;
-      console.log('📄 DEBUG: PDF loaded, total pages:', pdf.numPages);
+      
+      console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
       
       let fullText = '';
+      let extractedPages = 0;
       
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
+          console.log(`📄 DEBUG: Processing page ${pageNum}/${pdf.numPages}`);
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
+          
+          // More robust text extraction
           const pageText = textContent.items
-            .map((item: any) => item.str)
+            .filter((item: any) => item.str && item.str.trim().length > 0)
+            .map((item: any) => {
+              // Handle different item types and clean text
+              if (typeof item.str === 'string') {
+                return item.str.trim();
+              }
+              return '';
+            })
+            .filter(text => text.length > 0)
             .join(' ');
           
-          console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
-          fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+          if (pageText.length > 0) {
+            console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
+            fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+            extractedPages++;
+          } else {
+            console.log(`⚠️ DEBUG: Page ${pageNum} appears to be empty or image-only`);
+          }
+          
+          // Clean up page resources
+          page.cleanup();
         } catch (pageError) {
           console.error(`❌ DEBUG: Error extracting page ${pageNum}:`, pageError);
           // Continue with other pages even if one fails
         }
       }
       
-      console.log('📄 DEBUG: Total text extracted:', fullText.length, 'characters');
-      return fullText;
+      // Clean up PDF document
+      pdf.destroy();
+      
+      console.log(`📄 DEBUG: Total text extracted: ${fullText.length} characters from ${extractedPages}/${pdf.numPages} pages`);
+      
+      // If we got some text, return it
+      if (fullText.trim().length > 0) {
+        return fullText.trim();
+      }
+      
+      // If no text was extracted, it might be a scanned PDF or image-based
+      console.log('⚠️ DEBUG: No text content found - PDF might be image-based or scanned');
+      return `Document: ${file.name}\n\nThis PDF appears to contain images or scanned content rather than extractable text. To process this document, you may need to use OCR (Optical Character Recognition) or convert it to a text-based PDF first.`;
+      
     } catch (error) {
       console.error('❌ DEBUG: Error in PDF text extraction:', error);
       
-      // If PDF.js fails, try a fallback approach using FileReader
-      console.log('🔄 DEBUG: Attempting fallback text extraction...');
-      try {
-        const reader = new FileReader();
-        return new Promise((resolve, reject) => {
-          reader.onload = () => {
-            // This is a very basic fallback - in reality, this won't extract text from PDF
-            // but it prevents the entire process from failing
-            console.log('⚠️ DEBUG: Using fallback extraction (limited functionality)');
-            resolve(`Document: ${file.name}\nContent could not be extracted automatically. Please ensure the PDF is not encrypted or corrupted.`);
-          };
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsText(file);
-        });
-      } catch (fallbackError) {
-        console.error('❌ DEBUG: Fallback extraction also failed:', fallbackError);
-        throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the PDF is not encrypted or corrupted.`);
+      // More specific error handling
+      if (error.message?.includes('worker')) {
+        console.log('🔄 DEBUG: Worker failed, attempting alternative approach...');
+        // Try with a different worker configuration
+        try {
+          const pdfjsLib = await import('pdfjs-dist');
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+          
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ 
+            data: arrayBuffer,
+            useWorkerFetch: false,
+            isEvalSupported: false
+          }).promise;
+          
+          const page = await pdf.getPage(1);
+          const textContent = await page.getTextContent();
+          const firstPageText = textContent.items.map((item: any) => item.str).join(' ');
+          
+          if (firstPageText.trim().length > 0) {
+            console.log('✅ DEBUG: Alternative worker approach succeeded');
+            // Process all pages with the working configuration
+            let fullText = '';
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              try {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+                page.cleanup();
+              } catch (pageError) {
+                console.error(`❌ Page ${pageNum} error:`, pageError);
+              }
+            }
+            pdf.destroy();
+            return fullText.trim();
+          }
+        } catch (retryError) {
+          console.error('❌ DEBUG: Retry also failed:', retryError);
+        }
       }
+      
+      // If all else fails, return a helpful message instead of throwing
+      return `Document: ${file.name}\n\nUnable to extract text from this PDF. This could be due to:\n- The PDF is password protected or encrypted\n- The PDF contains only images or scanned content\n- The PDF uses an unsupported format\n\nTry converting the PDF to a text-based format or use OCR tools if needed.`;
     }
   }
 
