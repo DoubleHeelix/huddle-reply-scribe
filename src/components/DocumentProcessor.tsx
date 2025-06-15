@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
+import { FileText, Brain, Loader2, Upload, RefreshCw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export const DocumentProcessor = () => {
@@ -13,7 +13,6 @@ export const DocumentProcessor = () => {
   const [storageFiles, setStorageFiles] = useState<string[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [processedDocuments, setProcessedDocuments] = useState<string[]>([]);
-  const [isClearing, setIsClearing] = useState(false);
   const { processDocuments, isProcessing, error, clearError } = useDocumentKnowledge();
   const { toast } = useToast();
 
@@ -91,55 +90,6 @@ export const DocumentProcessor = () => {
       console.log('📋 DEBUG: Already processed documents:', uniqueDocuments);
     } catch (err) {
       console.error('❌ DEBUG: Error in loadProcessedDocuments:', err);
-    }
-  };
-
-  const clearAllProcessedDocuments = async () => {
-    try {
-      setIsClearing(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to clear processed documents.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('🗑️ DEBUG: Clearing all processed documents for user:', user.id);
-
-      const { error } = await supabase
-        .from('document_knowledge')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('❌ DEBUG: Error clearing processed documents:', error);
-        toast({
-          title: "Error clearing documents",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ DEBUG: Successfully cleared all processed documents');
-      await loadProcessedDocuments(); // Refresh the list
-      
-      toast({
-        title: "Documents cleared",
-        description: "All processed documents have been cleared. You can now reprocess them.",
-      });
-    } catch (err) {
-      console.error('❌ DEBUG: Error in clearAllProcessedDocuments:', err);
-      toast({
-        title: "Error",
-        description: "Failed to clear processed documents",
-        variant: "destructive",
-      });
-    } finally {
-      setIsClearing(false);
     }
   };
 
@@ -273,45 +223,28 @@ export const DocumentProcessor = () => {
         
         {/* Processing Section */}
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Button
-              onClick={handleProcessDocuments}
-              disabled={isProcessing || storageFiles.length === 0}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 font-sans h-12"
-            >
-              {isProcessing ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing Documents...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4" />
-                  {unprocessedFiles.length > 0 
-                    ? `Process ${unprocessedFiles.length} New Document${unprocessedFiles.length !== 1 ? 's' : ''}` 
-                    : hasProcessed 
-                      ? 'Reprocess All Documents' 
-                      : 'Process All Documents for AI'
-                  }
-                </div>
-              )}
-            </Button>
-            
-            {processedDocuments.length > 0 && (
-              <Button
-                onClick={clearAllProcessedDocuments}
-                disabled={isClearing || isProcessing}
-                variant="outline"
-                className="text-red-400 border-red-600 hover:bg-red-600 hover:text-white font-sans h-12 px-4"
-              >
-                {isClearing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </Button>
+          <Button
+            onClick={handleProcessDocuments}
+            disabled={isProcessing || storageFiles.length === 0}
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 font-sans h-12"
+          >
+            {isProcessing ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing Documents...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                {unprocessedFiles.length > 0 
+                  ? `Process ${unprocessedFiles.length} New Document${unprocessedFiles.length !== 1 ? 's' : ''}` 
+                  : hasProcessed 
+                    ? 'Reprocess All Documents' 
+                    : 'Process All Documents for AI'
+                }
+              </div>
             )}
-          </div>
+          </Button>
           
           {processedDocuments.length > 0 && (
             <div className="flex justify-center">
@@ -336,7 +269,6 @@ export const DocumentProcessor = () => {
             <p>• Creates AI embeddings for intelligent content search</p>
             <p>• References your documents when generating replies</p>
             <p>• Upload PDFs to the 'documents' bucket in Storage first</p>
-            <p>• Use the trash button to clear and reprocess documents if needed</p>
           </div>
         </div>
       </CardContent>

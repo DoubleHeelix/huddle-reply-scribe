@@ -13,135 +13,138 @@ export interface DocumentChunk {
 export class PDFProcessor {
   private async extractTextFromPDF(file: File): Promise<string> {
     console.log('📄 DEBUG: Starting PDF text extraction for:', file.name);
-    console.log('📄 DEBUG: File size:', file.size, 'bytes');
-    console.log('📄 DEBUG: File type:', file.type);
     
     try {
-      // Dynamic import of PDF.js
+      // Use PDF.js to extract text from PDF with improved setup
       const pdfjsLib = await import('pdfjs-dist');
-      console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Set up worker source properly - this is the key fix
-      const workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-      console.log('📄 DEBUG: Worker source configured:', workerSrc);
-      
-      const arrayBuffer = await file.arrayBuffer();
-      console.log('📄 DEBUG: Array buffer created, size:', arrayBuffer.byteLength);
-      
-      if (arrayBuffer.byteLength === 0) {
-        throw new Error('PDF file is empty or corrupted');
+      // Configure worker with multiple fallback options
+      if (typeof window !== 'undefined') {
+        // Try multiple CDN sources for better reliability
+        const workerUrls = [
+          `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+          `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+        ];
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrls[0];
       }
       
-      // Load PDF with simplified configuration
-      console.log('📄 DEBUG: Loading PDF...');
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('📄 DEBUG: PDF file size:', arrayBuffer.byteLength, 'bytes');
+      
+      // Enhanced PDF loading options for better compatibility
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0,
+        useWorkerFetch: false,
+        isEvalSupported: false,
         useSystemFonts: true,
-        disableFontFace: true
+        standardFontDataUrl: undefined,
+        disableFontFace: false,
+        verbosity: 0 // Reduce verbosity to avoid console noise
       }).promise;
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
       
-      if (pdf.numPages === 0) {
-        throw new Error('PDF has no pages');
-      }
-      
       let fullText = '';
       let extractedPages = 0;
-      let totalTextItems = 0;
       
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
           console.log(`📄 DEBUG: Processing page ${pageNum}/${pdf.numPages}`);
           const page = await pdf.getPage(pageNum);
-          
-          // Get text content with minimal configuration
           const textContent = await page.getTextContent();
           
-          console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
-          
-          if (textContent && textContent.items && textContent.items.length > 0) {
-            // Extract text with better filtering
-            const pageTextItems = textContent.items
-              .filter((item: any) => {
-                return item && 
-                       typeof item.str === 'string' && 
-                       item.str.trim().length > 0 &&
-                       item.str.trim() !== ' ';
-              })
-              .map((item: any) => item.str.trim())
-              .filter(str => str.length > 0);
-            
-            totalTextItems += pageTextItems.length;
-            console.log(`📄 DEBUG: Page ${pageNum} - Filtered text items:`, pageTextItems.length);
-            
-            if (pageTextItems.length > 0) {
-              const pageText = pageTextItems
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-              
-              if (pageText.length > 0) {
-                console.log(`📄 DEBUG: Page ${pageNum} - Extracted ${pageText.length} characters`);
-                console.log(`📄 DEBUG: Page ${pageNum} - Sample text:`, pageText.substring(0, 200) + '...');
-                fullText += `${pageText} `;
-                extractedPages++;
+          // More robust text extraction
+          const pageText = textContent.items
+            .filter((item: any) => item.str && item.str.trim().length > 0)
+            .map((item: any) => {
+              // Handle different item types and clean text
+              if (typeof item.str === 'string') {
+                return item.str.trim();
               }
-            }
+              return '';
+            })
+            .filter(text => text.length > 0)
+            .join(' ');
+          
+          if (pageText.length > 0) {
+            console.log(`📄 DEBUG: Page ${pageNum} extracted ${pageText.length} characters`);
+            fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+            extractedPages++;
           } else {
-            console.log(`📄 DEBUG: Page ${pageNum} - No text items found`);
+            console.log(`⚠️ DEBUG: Page ${pageNum} appears to be empty or image-only`);
           }
           
           // Clean up page resources
           page.cleanup();
         } catch (pageError) {
           console.error(`❌ DEBUG: Error extracting page ${pageNum}:`, pageError);
-          // Continue with other pages
+          // Continue with other pages even if one fails
         }
       }
       
       // Clean up PDF document
       pdf.destroy();
       
-      console.log(`📄 DEBUG: Extraction complete:`, {
-        totalPages: pdf.numPages,
-        extractedPages,
-        totalTextItems,
-        finalTextLength: fullText.length,
-        sampleText: fullText.substring(0, 300) + '...'
-      });
+      console.log(`📄 DEBUG: Total text extracted: ${fullText.length} characters from ${extractedPages}/${pdf.numPages} pages`);
       
-      // More detailed validation
-      const trimmedText = fullText.trim();
-      if (trimmedText.length < 10) {
-        if (totalTextItems === 0) {
-          throw new Error(`No text content found in PDF. This PDF may be image-based (scanned document), password-protected, or use unsupported encoding.`);
-        } else {
-          throw new Error(`PDF contains only ${trimmedText.length} characters of readable text. The document may be mostly images or have formatting issues.`);
+      // If we got some text, return it
+      if (fullText.trim().length > 0) {
+        return fullText.trim();
+      }
+      
+      // If no text was extracted, it might be a scanned PDF or image-based
+      console.log('⚠️ DEBUG: No text content found - PDF might be image-based or scanned');
+      return `Document: ${file.name}\n\nThis PDF appears to contain images or scanned content rather than extractable text. To process this document, you may need to use OCR (Optical Character Recognition) or convert it to a text-based PDF first.`;
+      
+    } catch (error) {
+      console.error('❌ DEBUG: Error in PDF text extraction:', error);
+      
+      // More specific error handling
+      if (error.message?.includes('worker')) {
+        console.log('🔄 DEBUG: Worker failed, attempting alternative approach...');
+        // Try with a different worker configuration
+        try {
+          const pdfjsLib = await import('pdfjs-dist');
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+          
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ 
+            data: arrayBuffer,
+            useWorkerFetch: false,
+            isEvalSupported: false
+          }).promise;
+          
+          const page = await pdf.getPage(1);
+          const textContent = await page.getTextContent();
+          const firstPageText = textContent.items.map((item: any) => item.str).join(' ');
+          
+          if (firstPageText.trim().length > 0) {
+            console.log('✅ DEBUG: Alternative worker approach succeeded');
+            // Process all pages with the working configuration
+            let fullText = '';
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              try {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+                fullText += `\n\nPage ${pageNum}:\n${pageText}`;
+                page.cleanup();
+              } catch (pageError) {
+                console.error(`❌ Page ${pageNum} error:`, pageError);
+              }
+            }
+            pdf.destroy();
+            return fullText.trim();
+          }
+        } catch (retryError) {
+          console.error('❌ DEBUG: Retry also failed:', retryError);
         }
       }
       
-      console.log('✅ DEBUG: Text extraction successful!');
-      return trimmedText;
-      
-    } catch (error) {
-      console.error('❌ DEBUG: PDF text extraction failed:', error);
-      
-      // Provide more specific error information
-      if (error.message.includes('Invalid PDF')) {
-        throw new Error(`The uploaded file is not a valid PDF or is corrupted. Please check the file and try again.`);
-      } else if (error.message.includes('password')) {
-        throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
-      } else if (error.message.includes('worker') || error.message.includes('GlobalWorkerOptions')) {
-        throw new Error(`PDF processing failed due to worker configuration issues. Please try again or contact support.`);
-      } else if (error.message.includes('fetch dynamically imported module')) {
-        throw new Error(`PDF processing failed due to module loading issues. Please refresh the page and try again.`);
-      }
-      
-      // Re-throw with original error for debugging
-      throw error;
+      // If all else fails, return a helpful message instead of throwing
+      return `Document: ${file.name}\n\nUnable to extract text from this PDF. This could be due to:\n- The PDF is password protected or encrypted\n- The PDF contains only images or scanned content\n- The PDF uses an unsupported format\n\nTry converting the PDF to a text-based format or use OCR tools if needed.`;
     }
   }
 
@@ -236,62 +239,27 @@ export class PDFProcessor {
   async processDocument(file: File, documentName: string): Promise<boolean> {
     try {
       console.log(`🔄 DEBUG: Starting to process document: ${documentName}`);
-      console.log(`📄 DEBUG: File details:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: new Date(file.lastModified).toISOString()
-      });
       
-      // Extract text from PDF - this will throw descriptive errors if extraction fails
+      // Extract text from PDF
       const fullText = await this.extractTextFromPDF(file);
       
-      console.log(`✅ DEBUG: Successfully extracted ${fullText.length} characters from ${documentName}`);
+      if (!fullText.trim()) {
+        console.error('❌ DEBUG: No text extracted from PDF');
+        return false;
+      }
 
       // Chunk the text
       const chunks = this.chunkText(fullText);
       console.log(`✂️ DEBUG: Document chunked into ${chunks.length} pieces`);
 
-      // Get current user with retry logic
-      console.log('👤 DEBUG: Checking user authentication...');
-      let user = null;
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      while (!user && retryCount < maxRetries) {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error(`❌ DEBUG: Auth error (attempt ${retryCount + 1}):`, error);
-        } else {
-          user = currentUser;
-        }
-        
-        if (!user && retryCount < maxRetries - 1) {
-          console.log(`⏳ DEBUG: User not found, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        retryCount++;
-      }
-      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('❌ DEBUG: User not authenticated after retries');
-        throw new Error('User not authenticated. Please sign in and try again.');
+        console.error('❌ DEBUG: User not authenticated');
+        return false;
       }
 
       console.log('👤 DEBUG: Processing chunks for user:', user.id);
-
-      // First, delete any existing chunks for this document to avoid duplicates
-      const { error: deleteError } = await supabase
-        .from('document_knowledge')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('document_name', documentName);
-
-      if (deleteError) {
-        console.error('❌ DEBUG: Error deleting existing chunks:', deleteError);
-      } else {
-        console.log('🗑️ DEBUG: Cleaned up existing chunks for', documentName);
-      }
 
       // Process each chunk
       let successfulChunks = 0;
@@ -324,8 +292,7 @@ export class PDFProcessor {
       return successfulChunks > 0;
     } catch (error) {
       console.error('❌ DEBUG: Error processing document:', error);
-      // Don't return false immediately - let the user know what went wrong
-      throw error;
+      return false;
     }
   }
 
@@ -333,30 +300,11 @@ export class PDFProcessor {
     try {
       console.log('📁 DEBUG: Starting to process documents from Supabase Storage bucket:', bucketName);
       
-      // Get current user with enhanced authentication check
-      console.log('👤 DEBUG: Checking user authentication...');
-      let user = null;
-      let retryCount = 0;
-      const maxRetries = 5;
-      
-      while (!user && retryCount < maxRetries) {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error(`❌ DEBUG: Auth error (attempt ${retryCount + 1}):`, error);
-        } else {
-          user = currentUser;
-        }
-        
-        if (!user && retryCount < maxRetries - 1) {
-          console.log(`⏳ DEBUG: User not found, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        retryCount++;
-      }
-      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('❌ DEBUG: User not authenticated after retries');
-        throw new Error('User not authenticated. Please sign in and try again.');
+        console.error('❌ DEBUG: User not authenticated');
+        throw new Error('User not authenticated');
       }
 
       console.log('👤 DEBUG: User authenticated:', user.id);

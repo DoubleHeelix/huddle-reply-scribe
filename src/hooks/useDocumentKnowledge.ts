@@ -21,15 +21,6 @@ export const useDocumentKnowledge = () => {
 
     try {
       console.log('🔄 DEBUG: Starting document processing...');
-      
-      // Check if user is authenticated before processing
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        throw new Error('Please sign in to process documents');
-      }
-      
-      console.log('👤 DEBUG: User authenticated, proceeding with processing...');
-      
       // Use the new storage-based processing
       await pdfProcessor.processStorageDocuments('documents');
       console.log('✅ DEBUG: Document processing completed successfully');
