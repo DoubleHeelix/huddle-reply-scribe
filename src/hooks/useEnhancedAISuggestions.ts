@@ -2,6 +2,29 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface HuddleSource {
+  id: string;
+  screenshot_text: string;
+  user_draft: string;
+  final_reply: string;
+  similarity: number;
+}
+
+export interface DocumentSource {
+  id: string;
+  document_name: string;
+  content_chunk: string;
+  similarity: number;
+}
+
+export interface AIResponse {
+  reply: string;
+  sources?: {
+    huddles: HuddleSource[];
+    documents: DocumentSource[];
+  };
+}
+
 export const useEnhancedAISuggestions = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
@@ -12,7 +35,7 @@ export const useEnhancedAISuggestions = () => {
     userDraft: string,
     principles: string,
     isRegeneration: boolean = false
-  ): Promise<string | null> => {
+  ): Promise<AIResponse | null> => {
     try {
       setIsGenerating(true);
       setError(null);
@@ -33,7 +56,7 @@ export const useEnhancedAISuggestions = () => {
         throw new Error(`Function Error: ${error.message}`);
       }
 
-      return data.reply || null;
+      return data || null;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
       setError(errorMessage);

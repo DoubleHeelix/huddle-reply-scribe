@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -207,6 +206,23 @@ Please provide an improved version of this message:`;
       const data = await response.json();
       const reply = data.choices[0].message.content.trim();
 
+      // Prepare sources for the response
+      const sources = {
+        huddles: similarHuddles.map((huddle: any) => ({
+          id: huddle.id,
+          screenshot_text: huddle.payload.screenshot_text,
+          user_draft: huddle.payload.user_draft,
+          final_reply: huddle.payload.final_reply || huddle.payload.generated_reply,
+          similarity: huddle.score
+        })),
+        documents: documentKnowledge.map((doc: any) => ({
+          id: doc.id,
+          document_name: doc.document_name,
+          content_chunk: doc.content_chunk,
+          similarity: doc.similarity
+        }))
+      };
+
       // Store in Qdrant for future learning (background task)
       if (qdrantApiKey && qdrantUrl && userId) {
         const storeInQdrant = async () => {
@@ -264,7 +280,7 @@ Please provide an improved version of this message:`;
       }
 
       return new Response(
-        JSON.stringify({ reply }),
+        JSON.stringify({ reply, sources }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 

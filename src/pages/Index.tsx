@@ -16,11 +16,13 @@ import { RefreshCcw, Copy, Check, AlertTriangle } from "lucide-react";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { DocumentsTab } from '@/components/DocumentsTab';
 import { PDFUploader } from '@/components/PDFUploader';
+import { AISources, type AIResponse } from "@/components/AISources";
 
 const Index = () => {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState('');
   const [generatedReply, setGeneratedReply] = useState<string>('');
+  const [aiSources, setAiSources] = useState<AIResponse['sources'] | null>(null);
   const [selectedTone, setSelectedTone] = useState('none');
   const [principles, setPrinciples] = useState('');
   const [isCopied, setIsCopied] = useState(false);
@@ -89,9 +91,10 @@ const Index = () => {
       return;
     }
 
-    const reply = await generateReply(screenshot, userDraft, principles);
-    if (reply) {
-      setGeneratedReply(reply);
+    const result = await generateReply(screenshot, userDraft, principles);
+    if (result) {
+      setGeneratedReply(result.reply);
+      setAiSources(result.sources || null);
     }
   };
 
@@ -130,9 +133,10 @@ const Index = () => {
       return;
     }
 
-    const reply = await generateReply(screenshot, userDraft, principles, true);
-    if (reply) {
-      setGeneratedReply(reply);
+    const result = await generateReply(screenshot, userDraft, principles, true);
+    if (result) {
+      setGeneratedReply(result.reply);
+      setAiSources(result.sources || null);
     }
   };
 
@@ -345,44 +349,8 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              {generatedReply && (
-                <Card className="bg-gray-800 border-gray-700 mt-6">
-                  <CardContent className="p-6">
-                    <div className="grid gap-4">
-                      <h2 className="text-xl font-semibold">4. Adjust Tone</h2>
-                      <p className="text-gray-400">Fine-tune the tone of the generated reply.</p>
-
-                      <div className="flex items-center space-x-4">
-                        <Select value={selectedTone} onValueChange={setSelectedTone}>
-                          <SelectTrigger className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 w-[180px]">
-                            <SelectValue placeholder="Select Tone" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="casual">Casual</SelectItem>
-                            <SelectItem value="professional">Professional</SelectItem>
-                            <SelectItem value="friendly">Friendly</SelectItem>
-                            <SelectItem value="direct">Direct</SelectItem>
-                            <SelectItem value="warm">Warm</SelectItem>
-                            <SelectItem value="confident">Confident</SelectItem>
-                            <SelectItem value="curious">Curious</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Button onClick={handleAdjustTone} disabled={isAdjustingTone} className="bg-blue-600 text-white hover:bg-blue-500">
-                          {isAdjustingTone ? (
-                            <>
-                              Adjusting...
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                            </>
-                          ) : (
-                            "Adjust Tone"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {generatedReply && aiSources && (
+                <AISources sources={aiSources} />
               )}
             </TabsContent>
 
