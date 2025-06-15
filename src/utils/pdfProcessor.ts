@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -22,17 +21,11 @@ export class PDFProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Try multiple worker configurations
+      // Configure worker for browser environment
       if (typeof window !== 'undefined') {
-        // First, try the CDN approach
-        try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-          console.log('📄 DEBUG: Using CDN worker:', pdfjsLib.GlobalWorkerOptions.workerSrc);
-        } catch (workerError) {
-          console.log('📄 DEBUG: CDN worker failed, trying alternative...');
-          // Fallback: try without worker (will be slower but might work)
-          pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-        }
+        // Disable worker to avoid loading issues
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        console.log('📄 DEBUG: Disabled PDF.js worker for browser compatibility');
       }
       
       const arrayBuffer = await file.arrayBuffer();
@@ -42,33 +35,27 @@ export class PDFProcessor {
         throw new Error('PDF file is empty or corrupted');
       }
       
-      // Try to load PDF with different configurations
+      // Load PDF with minimal configuration to avoid worker issues
       let pdf;
       try {
-        // First attempt: standard loading
+        console.log('📄 DEBUG: Loading PDF with minimal config...');
         pdf = await pdfjsLib.getDocument({ 
           data: arrayBuffer,
           verbosity: 0,
-          standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/web/standard_fonts/`,
-          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
-          cMapPacked: true
+          disableAutoFetch: false,
+          disableStream: false,
+          disableRange: false
         }).promise;
-        console.log('📄 DEBUG: PDF loaded with standard config');
-      } catch (standardError) {
-        console.log('📄 DEBUG: Standard loading failed, trying basic config...', standardError);
+        console.log('📄 DEBUG: PDF loaded successfully');
+      } catch (loadError) {
+        console.log('📄 DEBUG: Standard loading failed, trying fallback...', loadError);
         
-        // Fallback: minimal config
-        try {
-          pdf = await pdfjsLib.getDocument({ 
-            data: arrayBuffer,
-            verbosity: 0,
-            disableFontFace: true
-          }).promise;
-          console.log('📄 DEBUG: PDF loaded with basic config');
-        } catch (basicError) {
-          console.log('📄 DEBUG: Basic loading also failed:', basicError);
-          throw new Error(`Cannot load PDF: ${basicError.message}`);
-        }
+        // Fallback: even more minimal config
+        pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0
+        }).promise;
+        console.log('📄 DEBUG: PDF loaded with fallback config');
       }
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
@@ -86,29 +73,21 @@ export class PDFProcessor {
           console.log(`📄 DEBUG: Processing page ${pageNum}/${pdf.numPages}`);
           const page = await pdf.getPage(pageNum);
           
-          // Get text content with different extraction strategies
-          let textContent;
-          try {
-            textContent = await page.getTextContent({
-              normalizeWhitespace: true,
-              disableCombineTextItems: false
-            });
-            console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
-          } catch (textError) {
-            console.log(`📄 DEBUG: Page ${pageNum} - Standard text extraction failed, trying fallback...`);
-            textContent = await page.getTextContent();
-          }
+          // Get text content with simple extraction
+          const textContent = await page.getTextContent({
+            normalizeWhitespace: true
+          });
+          
+          console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
           
           if (textContent && textContent.items && textContent.items.length > 0) {
             // Extract text with better filtering
             const pageTextItems = textContent.items
               .filter((item: any) => {
-                // More robust filtering
                 return item && 
                        typeof item.str === 'string' && 
                        item.str.trim().length > 0 &&
-                       item.str.trim() !== ' ' &&
-                       !/^[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]*$/.test(item.str); // Filter out whitespace-only
+                       item.str.trim() !== ' ';
               })
               .map((item: any) => item.str.trim())
               .filter(str => str.length > 0);
@@ -155,9 +134,8 @@ export class PDFProcessor {
       // More detailed validation
       const trimmedText = fullText.trim();
       if (trimmedText.length < 10) {
-        // Try to determine why extraction failed
         if (totalTextItems === 0) {
-          throw new Error(`No text content found in PDF. This PDF may be image-based (scanned document), password-protected, or use unsupported encoding. Consider using OCR for image-based PDFs.`);
+          throw new Error(`No text content found in PDF. This PDF may be image-based (scanned document), password-protected, or use unsupported encoding.`);
         } else {
           throw new Error(`PDF contains only ${trimmedText.length} characters of readable text. The document may be mostly images or have formatting issues.`);
         }
@@ -174,8 +152,6 @@ export class PDFProcessor {
         throw new Error(`The uploaded file is not a valid PDF or is corrupted. Please check the file and try again.`);
       } else if (error.message.includes('password')) {
         throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
-      } else if (error.message.includes('worker')) {
-        throw new Error(`PDF processing failed due to worker issues. This may be a temporary problem - please try again.`);
       }
       
       // Re-throw with original error for debugging
