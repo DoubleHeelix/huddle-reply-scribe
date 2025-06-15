@@ -42,7 +42,7 @@ serve(async (req) => {
     let requestBody;
     try {
       requestBody = await req.json();
-      console.log('📥 Request received with keys:', Object.keys(requestBody));
+      console.log('📥 Request received:', JSON.stringify(requestBody, null, 2));
     } catch (err) {
       console.error('❌ Failed to parse JSON body:', err);
       return new Response(
@@ -96,122 +96,89 @@ serve(async (req) => {
       }
     }
 
-    // DOCUMENT PROCESSING FLOW - Process extracted text
+    // DOCUMENT PROCESSING FLOW - Check for all required fields
     if (requestBody.document_name && requestBody.extracted_text && requestBody.user_id) {
       const { document_name, extracted_text, user_id, metadata } = requestBody;
       
       console.log('📄 Processing document:', document_name, 'for user:', user_id);
+      console.log('📝 Text content:', extracted_text);
       console.log('📝 Text length:', extracted_text.length);
 
-      // For simplified processing, we'll accept shorter text content
-      if (typeof extracted_text !== 'string' || extracted_text.length < 10) {
-        console.error('❌ Invalid or insufficient text content');
+      // Basic validation
+      if (typeof extracted_text !== 'string' || extracted_text.trim().length === 0) {
+        console.error('❌ Invalid text content');
         return new Response(
-          JSON.stringify({ error: 'Text content is too short or invalid' }),
+          JSON.stringify({ error: 'Text content is invalid or empty' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
       }
 
       try {
-        // For simplified processing, create fewer, larger chunks or single chunk
-        const chunkSize = Math.max(500, extracted_text.length); // Use entire text if short
-        const chunks = [];
+        // Process the text as a single chunk since our simplified approach creates shorter content
+        const textToProcess = extracted_text.trim();
         
-        if (extracted_text.length <= 500) {
-          // Single chunk for short content
-          chunks.push(extracted_text);
-        } else {
-          // Multiple chunks for longer content
-          for (let i = 0; i < extracted_text.length; i += chunkSize) {
-            const chunk = extracted_text.slice(i, i + chunkSize).trim();
-            if (chunk.length > 10) { // Lower threshold for meaningful chunks
-              chunks.push(chunk);
-            }
-          }
-        }
+        console.log('🔄 Processing single text chunk');
 
-        console.log(`📦 Created ${chunks.length} chunks from document`);
+        // Generate embedding
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: textToProcess,
+            model: 'text-embedding-3-small'
+          }),
+        });
 
-        if (chunks.length === 0) {
+        if (!embeddingResponse.ok) {
+          const errorData = await embeddingResponse.text();
+          console.error('❌ OpenAI API error:', embeddingResponse.status, errorData);
           return new Response(
-            JSON.stringify({ error: 'No meaningful text chunks could be created' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+            JSON.stringify({ error: `OpenAI API error: ${embeddingResponse.status}` }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
           );
         }
 
-        // Process each chunk
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
-          console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`);
+        const embeddingData = await embeddingResponse.json();
+        const embedding = embeddingData.data[0].embedding;
 
-          try {
-            // Generate embedding
-            const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${openaiApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                input: chunk,
-                model: 'text-embedding-3-small'
-              }),
-            });
+        console.log('💾 Storing document in database');
 
-            if (!embeddingResponse.ok) {
-              const errorData = await embeddingResponse.text();
-              console.error(`❌ OpenAI API error for chunk ${i}:`, errorData);
-              throw new Error(`OpenAI API error: ${embeddingResponse.status}`);
+        // Store in database
+        const { error: insertError } = await supabase
+          .from('document_knowledge')
+          .insert({
+            user_id,
+            document_name,
+            content_chunk: textToProcess,
+            embedding,
+            chunk_index: 0,
+            metadata: {
+              ...metadata,
+              total_chunks: 1,
+              chunk_size: textToProcess.length,
+              created_at: new Date().toISOString()
             }
+          });
 
-            const embeddingData = await embeddingResponse.json();
-            const embedding = embeddingData.data[0].embedding;
-
-            // Store in database with all required fields
-            const insertData = {
-              user_id,
-              document_name,
-              content_chunk: chunk,
-              embedding,
-              chunk_index: i,
-              metadata: {
-                ...metadata,
-                total_chunks: chunks.length,
-                chunk_size: chunk.length,
-                created_at: new Date().toISOString()
-              }
-            };
-
-            console.log(`💾 Storing chunk ${i} in database`);
-
-            const { error: insertError } = await supabase
-              .from('document_knowledge')
-              .insert(insertData);
-
-            if (insertError) {
-              console.error(`❌ Database insert error for chunk ${i}:`, insertError);
-              throw new Error(`Database error: ${insertError.message}`);
-            }
-
-            console.log(`✅ Chunk ${i + 1} processed and stored successfully`);
-
-          } catch (chunkError) {
-            console.error(`❌ Error processing chunk ${i}:`, chunkError);
-            return new Response(
-              JSON.stringify({ error: `Failed to process chunk ${i}: ${chunkError.message}` }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-            );
-          }
+        if (insertError) {
+          console.error('❌ Database insert error:', insertError);
+          return new Response(
+            JSON.stringify({ error: `Database error: ${insertError.message}` }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          );
         }
 
-        console.log(`🎉 Successfully processed all ${chunks.length} chunks for ${document_name}`);
+        console.log('🎉 Document processed successfully');
 
         return new Response(
           JSON.stringify({
             success: true,
-            chunks_processed: chunks.length,
+            chunks_processed: 1,
             document_name,
-            text_length: extracted_text.length
+            text_length: textToProcess.length
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
@@ -226,9 +193,13 @@ serve(async (req) => {
     }
 
     // Invalid request format
-    console.error('❌ Invalid request format');
+    console.error('❌ Invalid request format - missing required fields');
+    console.log('Available fields:', Object.keys(requestBody));
     return new Response(
-      JSON.stringify({ error: 'Invalid request format. Expected query_text or document processing parameters.' }),
+      JSON.stringify({ 
+        error: 'Invalid request format. Expected query_text for search or document_name, extracted_text, and user_id for processing.',
+        received_fields: Object.keys(requestBody)
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
 
