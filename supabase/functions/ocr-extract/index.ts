@@ -51,58 +51,76 @@ async function getAccessToken() {
   
   const signingInput = `${headerB64}.${payloadB64}`;
   
-  // Clean and format the private key
-  const cleanPrivateKey = privateKey
-    .replace(/\\n/g, '\n')
-    .replace(/-----BEGIN PRIVATE KEY-----\n?/, '')
-    .replace(/\n?-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
+  // Clean and format the private key - handle both escaped and unescaped newlines
+  let cleanPrivateKey = privateKey;
   
-  // Import the private key for signing
-  const binaryKey = Uint8Array.from(atob(cleanPrivateKey), c => c.charCodeAt(0));
-  const cryptoKey = await crypto.importKey(
-    'pkcs8',
-    binaryKey,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  
-  // Sign the JWT
-  const signature = await crypto.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    encoder.encode(signingInput)
-  );
-  
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-  
-  const jwt = `${signingInput}.${signatureB64}`;
-  
-  // Request access token
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt
-    })
-  });
-
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    console.error('OCR: Token request failed:', errorText);
-    throw new Error(`Failed to get access token: ${errorText}`);
+  // First handle escaped newlines from environment variables
+  if (cleanPrivateKey.includes('\\n')) {
+    cleanPrivateKey = cleanPrivateKey.replace(/\\n/g, '\n');
   }
+  
+  // Extract the key content between the headers
+  const keyMatch = cleanPrivateKey.match(/-----BEGIN PRIVATE KEY-----\s*([\s\S]*?)\s*-----END PRIVATE KEY-----/);
+  if (!keyMatch) {
+    throw new Error('Invalid private key format. Expected PEM format with BEGIN/END headers.');
+  }
+  
+  // Get the base64 content and remove all whitespace
+  const keyContent = keyMatch[1].replace(/\s/g, '');
+  
+  console.log('OCR: Private key processed, length:', keyContent.length);
+  
+  try {
+    // Import the private key for signing
+    const binaryKey = Uint8Array.from(atob(keyContent), c => c.charCodeAt(0));
+    const cryptoKey = await crypto.importKey(
+      'pkcs8',
+      binaryKey,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    
+    // Sign the JWT
+    const signature = await crypto.sign(
+      'RSASSA-PKCS1-v1_5',
+      cryptoKey,
+      encoder.encode(signingInput)
+    );
+    
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+    
+    const jwt = `${signingInput}.${signatureB64}`;
+    
+    // Request access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt
+      })
+    });
 
-  const tokenData = await tokenResponse.json();
-  console.log('OCR: Successfully obtained access token');
-  return tokenData.access_token;
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('OCR: Token request failed:', errorText);
+      throw new Error(`Failed to get access token: ${errorText}`);
+    }
+
+    const tokenData = await tokenResponse.json();
+    console.log('OCR: Successfully obtained access token');
+    return tokenData.access_token;
+    
+  } catch (error) {
+    console.error('OCR: Error processing private key or signing JWT:', error);
+    throw new Error(`JWT signing failed: ${error.message}`);
+  }
 }
 
 serve(async (req) => {
