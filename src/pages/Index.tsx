@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAISuggestions } from "@/hooks/useAISuggestions";
-import { useOCR } from "@/hooks/useOCR";
+import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
+import { useHuddlePlays } from "@/hooks/useHuddlePlays";
 import { ToneSelector } from "@/components/ToneSelector";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
+import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import LandingPage from "@/components/LandingPage";
 
 const Index = () => {
@@ -29,10 +30,12 @@ const Index = () => {
   const [autoCropMargin, setAutoCropMargin] = useState(12);
   const [extractedText, setExtractedText] = useState("");
   const [showExtractedText, setShowExtractedText] = useState(false);
+  const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
-  const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useAISuggestions();
+  const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
+  const { saveCurrentHuddle, updateFinalReply } = useHuddlePlays();
   
   const { 
     extractText, 
@@ -191,9 +194,20 @@ const Index = () => {
     if (reply) {
       setGeneratedReply(reply);
       setSelectedTone("none");
+      
+      // Save the huddle play to database for future learning
+      const huddleId = await saveCurrentHuddle(
+        screenshotText,
+        userDraft,
+        reply,
+        principles,
+        selectedTone
+      );
+      setCurrentHuddleId(huddleId);
+      
       toast({
         title: "Perfect reply generated!",
-        description: "Your optimized response is ready.",
+        description: "Your optimized response is ready and saved for future learning.",
       });
 
       // Auto-scroll to generated reply section
@@ -215,6 +229,12 @@ const Index = () => {
     if (reply) {
       setGeneratedReply(reply);
       setSelectedTone("none");
+      
+      // Update the current huddle with the new reply
+      if (currentHuddleId) {
+        await updateFinalReply(currentHuddleId, reply);
+      }
+      
       toast({
         title: "New reply generated!",
         description: "Here's an alternative version for you.",
@@ -229,9 +249,15 @@ const Index = () => {
     
     if (adjustedReply && adjustedReply !== generatedReply) {
       setGeneratedReply(adjustedReply);
+      
+      // Update the final reply in the database
+      if (currentHuddleId) {
+        await updateFinalReply(currentHuddleId, adjustedReply);
+      }
+      
       toast({
         title: "Tone adjusted!",
-        description: `Reply updated with ${selectedTone} tone.`,
+        description: `Reply updated with ${selectedTone} tone and saved.`,
       });
     }
   };
@@ -243,6 +269,7 @@ const Index = () => {
     setSelectedTone("none");
     setExtractedText("");
     setShowExtractedText(false);
+    setCurrentHuddleId(null);
   };
 
   if (showLanding) {
@@ -450,11 +477,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="past-huddles" className="mt-6">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <p className="text-gray-300 font-sans">Past huddles will be displayed here...</p>
-              </CardContent>
-            </Card>
+            <PastHuddlesTab />
           </TabsContent>
         </Tabs>
       </div>
