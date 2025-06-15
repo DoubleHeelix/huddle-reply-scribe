@@ -12,8 +12,11 @@ import { useOCR } from "@/hooks/useOCR";
 import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { ToneSelector } from "@/components/ToneSelector";
 import { OCRSettings } from "@/components/OCRSettings";
+import LandingPage from "@/components/LandingPage";
 
 const Index = () => {
+  const [showLanding, setShowLanding] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
@@ -43,6 +46,14 @@ const Index = () => {
     enableAutoCropping,
     autoCropMargin
   });
+
+  const handleGetStarted = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setShowLanding(false);
+      setIsTransitioning(false);
+    }, 500);
+  };
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -228,8 +239,16 @@ const Index = () => {
     setShowExtractedText(false);
   };
 
+  if (showLanding) {
+    return (
+      <div className={`transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+        <LandingPage onGetStarted={handleGetStarted} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className={`min-h-screen bg-gray-900 text-white transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
         <div className="text-center">
