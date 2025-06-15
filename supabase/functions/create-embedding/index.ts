@@ -16,20 +16,34 @@ serve(async (req) => {
   try {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.error('OpenAI API key not configured');
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration missing');
+      console.error('Supabase configuration missing');
+      return new Response(
+        JSON.stringify({ error: 'Supabase configuration missing' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const requestBody = await req.json();
-    console.log('Request body:', requestBody);
+    console.log('Request body keys:', Object.keys(requestBody));
 
     // Handle search query (for document search)
     if (requestBody.query_text) {
@@ -51,7 +65,14 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorData = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+        console.error('OpenAI API error:', response.status, errorData);
+        return new Response(
+          JSON.stringify({ error: `OpenAI API error: ${response.status} - ${errorData}` }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
 
       const data = await response.json();
@@ -72,83 +93,157 @@ serve(async (req) => {
       
       console.log('Processing document:', document_name, 'for user:', user_id);
 
-      // Decode base64 content
-      const decodedContent = atob(document_content);
-      
-      // For now, create simple chunks (in production, you'd want proper PDF parsing)
-      const chunkSize = 1000;
-      const chunks = [];
-      
-      for (let i = 0; i < decodedContent.length; i += chunkSize) {
-        chunks.push(decodedContent.slice(i, i + chunkSize));
-      }
-
-      console.log(`Created ${chunks.length} chunks from document`);
-
-      // Process each chunk
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        // Sanitize chunk to remove null characters that cause database errors
-        const sanitizedChunk = chunk.replace(/\u0000/g, "");
+      try {
+        // Decode base64 content
+        const decodedContent = atob(document_content);
+        console.log('Decoded content length:', decodedContent.length);
         
-        // Create embedding for chunk
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            input: sanitizedChunk,
-            model: 'text-embedding-3-small'
-          }),
-        });
-
-        if (!embeddingResponse.ok) {
-          const errorData = await embeddingResponse.text();
-          throw new Error(`OpenAI API error: ${embeddingResponse.status} - ${errorData}`);
+        // For PDF files, we need to extract text content properly
+        // For now, we'll try to extract readable text and skip binary content
+        let textContent = '';
+        
+        // Simple text extraction - look for readable text patterns
+        const lines = decodedContent.split('\n');
+        for (const line of lines) {
+          // Skip lines that are mostly binary data or have too many control characters
+          const readableText = line.replace(/[^\x20-\x7E\s]/g, '').trim();
+          if (readableText.length > 10 && readableText.length > line.length * 0.3) {
+            textContent += readableText + ' ';
+          }
         }
 
-        const embeddingData = await embeddingResponse.json();
-        const embedding = embeddingData.data[0].embedding;
-
-        // Store in database with proper structure
-        const { error: insertError } = await supabase
-          .from('document_knowledge')
-          .insert({
-            user_id,
-            document_name,
-            content_chunk: sanitizedChunk,
-            embedding,
-            chunk_index: i,
-            metadata: {
-              total_chunks: chunks.length,
-              chunk_size: chunk.length
+        if (textContent.length < 50) {
+          console.error('Could not extract sufficient text from PDF');
+          return new Response(
+            JSON.stringify({ error: 'Could not extract text from PDF. Please ensure the PDF contains readable text.' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
             }
+          );
+        }
+
+        console.log('Extracted text length:', textContent.length);
+        
+        // Create chunks from the extracted text
+        const chunkSize = 1000;
+        const chunks = [];
+        
+        for (let i = 0; i < textContent.length; i += chunkSize) {
+          const chunk = textContent.slice(i, i + chunkSize).trim();
+          if (chunk.length > 10) { // Only add meaningful chunks
+            chunks.push(chunk);
+          }
+        }
+
+        console.log(`Created ${chunks.length} chunks from document`);
+
+        if (chunks.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No meaningful text content found in the document' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          );
+        }
+
+        // Process each chunk
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          
+          console.log(`Processing chunk ${i + 1}/${chunks.length}, length: ${chunk.length}`);
+          
+          // Create embedding for chunk
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              input: chunk,
+              model: 'text-embedding-3-small'
+            }),
           });
 
-        if (insertError) {
-          console.error('Database insert error:', insertError);
-          throw new Error(`Failed to store chunk ${i}: ${insertError.message}`);
+          if (!embeddingResponse.ok) {
+            const errorData = await embeddingResponse.text();
+            console.error('OpenAI API error for chunk:', embeddingResponse.status, errorData);
+            return new Response(
+              JSON.stringify({ error: `OpenAI API error for chunk ${i}: ${embeddingResponse.status} - ${errorData}` }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500 
+              }
+            );
+          }
+
+          const embeddingData = await embeddingResponse.json();
+          const embedding = embeddingData.data[0].embedding;
+
+          // Store in database with proper structure
+          const { error: insertError } = await supabase
+            .from('document_knowledge')
+            .insert({
+              user_id,
+              document_name,
+              content_chunk: chunk,
+              embedding,
+              chunk_index: i,
+              metadata: {
+                total_chunks: chunks.length,
+                chunk_size: chunk.length,
+                original_document_size: decodedContent.length
+              }
+            });
+
+          if (insertError) {
+            console.error('Database insert error:', insertError);
+            return new Response(
+              JSON.stringify({ error: `Failed to store chunk ${i}: ${insertError.message}` }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500 
+              }
+            );
+          }
         }
+
+        console.log(`Successfully processed ${chunks.length} chunks for ${document_name}`);
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            chunks_processed: chunks.length,
+            document_name,
+            text_extracted: textContent.length
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
+
+      } catch (processingError) {
+        console.error('Document processing error:', processingError);
+        return new Response(
+          JSON.stringify({ error: `Document processing failed: ${processingError.message}` }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
-
-      console.log(`Successfully processed ${chunks.length} chunks for ${document_name}`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          chunks_processed: chunks.length,
-          document_name 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      );
     }
 
-    throw new Error('Invalid request format. Expected query_text or document processing parameters.');
+    return new Response(
+      JSON.stringify({ error: 'Invalid request format. Expected query_text or document processing parameters.' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      }
+    );
 
   } catch (error) {
     console.error('Error in create-embedding function:', error);
