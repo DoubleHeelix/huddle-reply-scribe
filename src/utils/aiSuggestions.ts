@@ -1,4 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
 interface SuggestionOptions {
   screenshotText: string;
   userDraft: string;
@@ -18,26 +20,20 @@ export const generateSuggestedReply = async ({
   isRegeneration = false,
 }: SuggestionOptions): Promise<string> => {
   try {
-    const response = await fetch('/api/ai-suggestions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('ai-suggestions', {
+      body: {
         action: 'generateReply',
         screenshotText,
         userDraft,
         principles,
         isRegeneration
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API Error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+    if (error) {
+      throw new Error(`Supabase Function Error: ${error.message}`);
     }
 
-    const data = await response.json();
     return data.reply || '';
   } catch (error) {
     console.error('Error generating suggestion:', error);
@@ -57,24 +53,18 @@ export const generateAdjustedTone = async ({
   }
 
   try {
-    const response = await fetch('/api/ai-suggestions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('ai-suggestions', {
+      body: {
         action: 'adjustTone',
         originalReply,
         selectedTone
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API Error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+    if (error) {
+      throw new Error(`Supabase Function Error: ${error.message}`);
     }
 
-    const data = await response.json();
     return data.reply || originalReply;
   } catch (error) {
     console.error('Error adjusting tone:', error);
