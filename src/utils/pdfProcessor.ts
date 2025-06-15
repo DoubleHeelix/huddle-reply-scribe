@@ -21,12 +21,10 @@ export class PDFProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Configure worker for browser environment
-      if (typeof window !== 'undefined') {
-        // Disable worker to avoid loading issues
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-        console.log('📄 DEBUG: Disabled PDF.js worker for browser compatibility');
-      }
+      // Completely disable worker to avoid loading issues
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      pdfjsLib.GlobalWorkerOptions.workerPort = null;
+      console.log('📄 DEBUG: Worker completely disabled for browser compatibility');
       
       const arrayBuffer = await file.arrayBuffer();
       console.log('📄 DEBUG: Array buffer created, size:', arrayBuffer.byteLength);
@@ -35,28 +33,15 @@ export class PDFProcessor {
         throw new Error('PDF file is empty or corrupted');
       }
       
-      // Load PDF with minimal configuration to avoid worker issues
-      let pdf;
-      try {
-        console.log('📄 DEBUG: Loading PDF with minimal config...');
-        pdf = await pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          verbosity: 0,
-          disableAutoFetch: false,
-          disableStream: false,
-          disableRange: false
-        }).promise;
-        console.log('📄 DEBUG: PDF loaded successfully');
-      } catch (loadError) {
-        console.log('📄 DEBUG: Standard loading failed, trying fallback...', loadError);
-        
-        // Fallback: even more minimal config
-        pdf = await pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          verbosity: 0
-        }).promise;
-        console.log('📄 DEBUG: PDF loaded with fallback config');
-      }
+      // Load PDF with minimal configuration
+      console.log('📄 DEBUG: Loading PDF with worker disabled...');
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true
+      }).promise;
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
       
@@ -75,7 +60,8 @@ export class PDFProcessor {
           
           // Get text content with simple extraction
           const textContent = await page.getTextContent({
-            normalizeWhitespace: true
+            normalizeWhitespace: true,
+            disableCombineTextItems: false
           });
           
           console.log(`📄 DEBUG: Page ${pageNum} - Text content extracted, items:`, textContent.items.length);
@@ -152,6 +138,8 @@ export class PDFProcessor {
         throw new Error(`The uploaded file is not a valid PDF or is corrupted. Please check the file and try again.`);
       } else if (error.message.includes('password')) {
         throw new Error(`This PDF is password-protected. Please provide an unprotected version.`);
+      } else if (error.message.includes('worker') || error.message.includes('fetch dynamically imported module')) {
+        throw new Error(`PDF processing failed due to browser limitations. Please try refreshing the page and try again.`);
       }
       
       // Re-throw with original error for debugging
