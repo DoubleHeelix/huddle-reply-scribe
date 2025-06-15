@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DocumentChunk {
@@ -22,9 +21,9 @@ export class PDFProcessor {
       const pdfjsLib = await import('pdfjs-dist');
       console.log('📄 DEBUG: PDF.js loaded, version:', pdfjsLib.version);
       
-      // Properly disable worker by setting to empty string
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-      console.log('📄 DEBUG: Worker properly disabled for browser compatibility');
+      // Disable worker completely - this is the key fix
+      pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+      console.log('📄 DEBUG: Worker disabled for browser compatibility');
       
       const arrayBuffer = await file.arrayBuffer();
       console.log('📄 DEBUG: Array buffer created, size:', arrayBuffer.byteLength);
@@ -33,7 +32,7 @@ export class PDFProcessor {
         throw new Error('PDF file is empty or corrupted');
       }
       
-      // Load PDF with worker explicitly disabled
+      // Load PDF with explicit worker disabling
       console.log('📄 DEBUG: Loading PDF with worker disabled...');
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
@@ -41,7 +40,9 @@ export class PDFProcessor {
         useWorkerFetch: false,
         useSystemFonts: true,
         disableFontFace: true,
-        isEvalSupported: false
+        isEvalSupported: false,
+        // Explicitly disable worker
+        worker: null
       }).promise;
       
       console.log('📄 DEBUG: PDF loaded successfully, total pages:', pdf.numPages);
