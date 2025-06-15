@@ -60,7 +60,6 @@ export class PDFProcessor {
           
           // Get text content with simple extraction
           const textContent = await page.getTextContent({
-            normalizeWhitespace: true,
             disableCombineTextItems: false
           });
           
