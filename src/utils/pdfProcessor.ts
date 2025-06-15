@@ -1,21 +1,12 @@
+
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure PDF.js worker - try different approaches for compatibility
-try {
-  // First try: Use a different CDN that supports ES modules better
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-} catch (error) {
-  console.warn('Failed to set worker from unpkg, trying jsDelivr:', error);
-  try {
-    // Second try: Use jsDelivr CDN
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-  } catch (fallbackError) {
-    console.warn('Failed to set worker from jsDelivr, using legacy approach:', fallbackError);
-    // Fallback: Use a stable version that we know works
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-  }
-}
+// Configure PDF.js worker with a local approach that's more reliable
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString();
 
 interface ProcessedDocument {
   name: string;
@@ -44,14 +35,10 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
+      // Simple configuration that should work reliably
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
-        useSystemFonts: true,
-        verbosity: 0,
-        // Add additional options for better compatibility
-        disableAutoFetch: true,
-        disableStream: true,
-        disableRange: true
+        verbosity: 0
       });
 
       const pdf = await loadingTask.promise;
@@ -164,16 +151,13 @@ class PDFProcessor {
         
         const embedding = await this.createEmbedding(chunk);
         
-        // Convert embedding array to JSON string for storage
-        const embeddingString = JSON.stringify(embedding);
-        
         const { error: insertError } = await supabase
           .from('document_knowledge')
           .insert({
             user_id: userId,
             document_name: docName,
             content_chunk: chunk,
-            embedding: embeddingString,
+            embedding: JSON.stringify(embedding),
             chunk_index: i,
             metadata: {
               chunk_index: i,
