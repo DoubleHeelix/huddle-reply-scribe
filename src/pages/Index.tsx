@@ -1,21 +1,18 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, MessageSquare, Bot, CheckCircle, Image as ImageIcon, Zap } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, FileText, Zap, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [extractedContent, setExtractedContent] = useState("");
-  const [context, setContext] = useState({ name: "", relationship: "", platform: "" });
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
@@ -27,50 +24,27 @@ const Index = () => {
         setUploadedImage(e.target?.result as string);
         toast({
           title: "Screenshot uploaded!",
-          description: "Now add context and extract the message content.",
+          description: "Ready to draft your message.",
         });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleExtractContent = () => {
-    if (!context.name || !context.relationship) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in the person's name and your relationship.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    // Simulate content extraction
-    setTimeout(() => {
-      setExtractedContent(`Hi! Hope you're doing well. I was just thinking about our time working on that project together at uni and wanted to catch up. How have you been? I remember you were really passionate about that startup idea you had - did you end up pursuing it?`);
-      setIsProcessing(false);
-      toast({
-        title: "Content extracted!",
-        description: "Message content has been analyzed from your screenshot.",
-      });
-    }, 2000);
-  };
-
   const handleGenerateReply = () => {
     if (!userDraft.trim()) {
       toast({
         title: "Draft required",
-        description: "Please write your draft response first.",
+        description: "Please write your draft message first.",
         variant: "destructive",
       });
       return;
     }
     
-    if (!extractedContent) {
+    if (!uploadedImage) {
       toast({
-        title: "Extract content first",
-        description: "Please extract the message content before generating a reply.",
+        title: "Screenshot required",
+        description: "Please upload a screenshot first.",
         variant: "destructive",
       });
       return;
@@ -80,7 +54,7 @@ const Index = () => {
     
     // Simulate AI generation
     setTimeout(() => {
-      setGeneratedReply(`Hey ${context.name}! Thanks for reaching out - it's so good to hear from you! 😊 
+      setGeneratedReply(`Hey! Thanks for reaching out - it's so good to hear from you! 😊 
 
 I've been doing really well, thanks for asking. Actually, I did end up pursuing that startup idea we talked about, and it's been quite the journey! We're now 8 months in and things are really picking up momentum.
 
@@ -90,231 +64,176 @@ How's everything going with you? Last I remember, you were considering that grad
       setIsGenerating(false);
       toast({
         title: "Perfect reply generated!",
-        description: "Your optimized response is ready based on communication best practices.",
+        description: "Your optimized response is ready.",
       });
     }, 3000);
   };
 
+  const handleRegenerate = () => {
+    if (!userDraft.trim() || !uploadedImage) return;
+    
+    setIsGenerating(true);
+    setTimeout(() => {
+      setGeneratedReply(`Hi there! So great to hear from you! 🌟
+
+Things have been amazing on my end - that startup we discussed is actually happening and gaining real traction now! It's been an incredible learning experience.
+
+I'd absolutely love to catch up and hear all about what you've been up to. Coffee this week? I'm curious to know if you ended up pursuing that graduate program you were considering!
+
+Looking forward to reconnecting properly! 😊`);
+      setIsGenerating(false);
+      toast({
+        title: "New reply generated!",
+        description: "Here's an alternative version for you.",
+      });
+    }, 2500);
+  };
+
   const resetHuddle = () => {
     setUploadedImage(null);
-    setExtractedContent("");
-    setContext({ name: "", relationship: "", platform: "" });
     setUserDraft("");
     setGeneratedReply("");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
-      <div className="gradient-purple-blue text-white py-8">
-        <div className="container mx-auto px-4">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold mb-2">🏈 Huddle Play Assistant</h1>
-            <p className="text-xl opacity-90">Master your communication skills with AI-powered coaching</p>
-          </div>
+      <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">🤝 Huddle Assistant</h1>
+          <p className="text-purple-100">Lead confident convos on the go</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 max-w-6xl mx-auto">
+      <div className="p-4 max-w-2xl mx-auto">
+        <Tabs defaultValue="huddle-play" className="w-full mt-6">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-800 border-gray-700">
+            <TabsTrigger value="huddle-play" className="text-white data-[state=active]:bg-purple-600">
+              Huddle Play
+            </TabsTrigger>
+            <TabsTrigger value="interruptions" className="text-white">
+              Interruptions
+            </TabsTrigger>
+            <TabsTrigger value="past-huddles" className="text-white">
+              📚 View Past Huddles
+            </TabsTrigger>
+          </TabsList>
           
-          {/* Upload Screenshot Section */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Upload className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>1. Upload Screenshot</CardTitle>
-                  <CardDescription>Upload a screenshot from Instagram, WhatsApp, Messenger, or any messaging platform</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="screenshot" className="cursor-pointer">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-colors">
-                      <ImageIcon className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">Click to upload screenshot</p>
-                      <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB</p>
-                    </div>
+          <TabsContent value="huddle-play" className="mt-6 space-y-6">
+            {/* File Upload Section */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6">
+                <div className="text-center space-y-4">
+                  <p className="text-gray-300 text-lg">Drag and drop file here</p>
+                  <p className="text-gray-500 text-sm">Limit 200MB per file • JPG, JPEG, PNG</p>
+                  
+                  <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
                     <Input
-                      id="screenshot"
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
+                      id="file-upload"
                     />
-                  </Label>
-                </div>
-                
-                {uploadedImage && (
-                  <div className="text-center">
-                    <img 
-                      src={uploadedImage} 
-                      alt="Uploaded screenshot" 
-                      className="max-w-full h-48 object-contain mx-auto rounded-lg shadow-md"
-                    />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Context & Extract Section */}
-          {uploadedImage && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle>2. Add Context & Extract Message</CardTitle>
-                    <CardDescription>Tell us about this conversation and extract the message content</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Person's Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="e.g., Ashley"
-                        value={context.name}
-                        onChange={(e) => setContext({ ...context, name: e.target.value })}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="relationship">Your Relationship</Label>
-                      <Textarea
-                        id="relationship"
-                        placeholder="e.g., University friends, worked on projects together..."
-                        value={context.relationship}
-                        onChange={(e) => setContext({ ...context, relationship: e.target.value })}
-                        rows={3}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="platform">Platform</Label>
-                      <Input
-                        id="platform"
-                        placeholder="e.g., Instagram, WhatsApp, Messenger"
-                        value={context.platform}
-                        onChange={(e) => setContext({ ...context, platform: e.target.value })}
-                      />
-                    </div>
-                    
-                    <Button 
-                      onClick={handleExtractContent} 
-                      className="w-full"
-                      disabled={isProcessing}
+                    <label 
+                      htmlFor="file-upload" 
+                      className="cursor-pointer flex flex-col items-center space-y-2"
                     >
-                      {isProcessing ? "Extracting..." : "Extract Message Content"}
-                    </Button>
+                      <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
+                        <span className="text-white">Choose file</span>
+                        <span className="text-gray-400 ml-4">No file chosen</span>
+                      </div>
+                    </label>
                   </div>
                   
-                  {extractedContent && (
-                    <div className="space-y-4">
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="font-medium mb-2">Extracted Message from {context.name}:</h4>
-                        <p className="text-gray-700 text-sm">{extractedContent}</p>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {context.platform && <Badge variant="secondary">Platform: {context.platform}</Badge>}
-                        <Badge variant="secondary">Relationship: University friend</Badge>
-                      </div>
+                  {uploadedImage && (
+                    <div className="mt-4">
+                      <img 
+                        src={uploadedImage} 
+                        alt="Uploaded screenshot" 
+                        className="max-w-full h-48 object-contain mx-auto rounded-lg"
+                      />
+                      <Badge variant="secondary" className="mt-2">Screenshot uploaded</Badge>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Draft & Generate Section */}
-          {extractedContent && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-green-600" />
+            {/* Draft Message Section */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6">
+                <h3 className="text-white text-lg font-medium mb-4">Your Draft Message</h3>
+                <Textarea
+                  placeholder="Type your draft message here..."
+                  value={userDraft}
+                  onChange={(e) => setUserDraft(e.target.value)}
+                  rows={8}
+                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Generate Button */}
+            <Button 
+              onClick={handleGenerateReply}
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
+            </Button>
+
+            {/* Generated Reply Section */}
+            {generatedReply && (
+              <Card className="bg-gray-800 border-gray-700">
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="text-white text-lg font-medium">Generated Reply</h3>
+                  <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
+                    <pre className="whitespace-pre-wrap text-white text-sm font-normal">
+                      {generatedReply}
+                    </pre>
                   </div>
-                  <div>
-                    <CardTitle>3. Draft Your Reply & Generate Perfect Response</CardTitle>
-                    <CardDescription>Write your draft, then let AI generate the optimized version</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="draft">Your Draft Response</Label>
-                      <Textarea
-                        id="draft"
-                        placeholder="Write how you would naturally respond to this message..."
-                        value={userDraft}
-                        onChange={(e) => setUserDraft(e.target.value)}
-                        rows={8}
-                        className="mt-2"
-                      />
-                    </div>
-                    
+                  
+                  <div className="flex gap-3">
                     <Button 
-                      onClick={handleGenerateReply} 
-                      className="w-full"
+                      onClick={handleRegenerate}
+                      variant="outline" 
+                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                       disabled={isGenerating}
                     >
-                      <Zap className="w-4 h-4 mr-2" />
-                      {isGenerating ? "Generating Perfect Reply..." : "Generate Perfect Reply"}
+                      <RefreshCcw className="w-4 h-4 mr-2" />
+                      Regenerate
+                    </Button>
+                    <Button 
+                      onClick={resetHuddle}
+                      variant="outline"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                    >
+                      New Huddle
                     </Button>
                   </div>
-                  
-                  {generatedReply && (
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="font-medium mb-2 text-green-600">✨ Optimized Reply:</h4>
-                        <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                          <pre className="whitespace-pre-wrap text-sm font-normal text-gray-800">
-                            {generatedReply}
-                          </pre>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-800 mb-2">🎯 Why this works:</h4>
-                        <ul className="text-sm text-blue-700 space-y-1">
-                          <li>• Acknowledges their message warmly</li>
-                          <li>• Shows genuine interest in their updates</li>
-                          <li>• Suggests a specific next step (meeting for coffee)</li>
-                          <li>• Reciprocates by asking about their goals</li>
-                          <li>• Maintains the friendly, personal tone</li>
-                        </ul>
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <Button className="flex-1">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Perfect! Copy Reply
-                        </Button>
-                        <Button variant="outline" onClick={resetHuddle}>
-                          Start New Huddle
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="interruptions" className="mt-6">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6">
+                <p className="text-gray-300">Interruptions feature coming soon...</p>
               </CardContent>
             </Card>
-          )}
-        </div>
+          </TabsContent>
+          
+          <TabsContent value="past-huddles" className="mt-6">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6">
+                <p className="text-gray-300">Past huddles will be displayed here...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
