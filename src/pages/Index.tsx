@@ -68,6 +68,15 @@ const Index = () => {
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
 
+  // Add the missing handleGetStarted function
+  const handleGetStarted = () => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setShowLanding(false);
+      setIsTransitioning(false);
+    }, 500);
+  };
+
   // Save Google Cloud API key to localStorage
   const handleGoogleCloudApiKeyChange = (key: string) => {
     setGoogleCloudApiKey(key);
