@@ -9,6 +9,7 @@ const configureWorker = () => {
   // Fallback CDNs, ensuring they use the same version as the library
   const fallbackWorkerSrcs = [
     `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
   ];
 
   console.log(`🔧 DEBUG: Configuring PDF.js worker with version ${pdfjsLib.version}`);
