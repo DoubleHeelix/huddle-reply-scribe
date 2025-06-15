@@ -1,12 +1,9 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure PDF.js worker with a local approach that's more reliable
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+// Configure PDF.js worker with a reliable CDN approach
+// Use unpkg CDN which is stable and reliable for PDF.js workers
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 interface ProcessedDocument {
   name: string;
@@ -35,10 +32,15 @@ class PDFProcessor {
       console.log(`📄 DEBUG: Starting PDF text extraction for: ${fileName}`);
       console.log(`📄 DEBUG: File size: ${arrayBuffer.byteLength} bytes`);
 
-      // Simple configuration that should work reliably
+      // Configure PDF.js with reliable settings
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
-        verbosity: 0
+        verbosity: 0,
+        // These options help with reliability
+        useSystemFonts: true,
+        disableAutoFetch: false,
+        disableStream: false,
+        disableRange: false
       });
 
       const pdf = await loadingTask.promise;
