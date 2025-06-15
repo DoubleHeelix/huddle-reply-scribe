@@ -19,8 +19,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = performance.now(); // Declare startTime at function scope
+  
   try {
-    const startTime = performance.now();
     console.log('OCR: Starting text extraction process');
 
     const { imageData, enableAutoCropping = true, margin = 12 }: OCRRequest = await req.json();
