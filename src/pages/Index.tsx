@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera } from "lucide-react";
+import { Upload, Zap, RefreshCcw, MessageSquare, History, Camera, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedAISuggestions } from "@/hooks/useEnhancedAISuggestions";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
@@ -283,6 +283,24 @@ const Index = () => {
     }
   };
 
+  const handleCopyReply = async () => {
+    if (!generatedReply) return;
+    
+    try {
+      await navigator.clipboard.writeText(generatedReply);
+      toast({
+        title: "Copied!",
+        description: "Reply copied to clipboard.",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetHuddle = () => {
     setUploadedImage(null);
     setUserDraft("");
@@ -454,7 +472,18 @@ const Index = () => {
               <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
                 <CardContent className="p-6 space-y-6">
                   <div className="flex flex-col space-y-4">
-                    <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
+                      <Button
+                        onClick={handleCopyReply}
+                        variant="outline"
+                        size="sm"
+                        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </Button>
+                    </div>
                     <ToneSelector
                       selectedTone={selectedTone}
                       onToneChange={setSelectedTone}
