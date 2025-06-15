@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -111,7 +112,7 @@ serve(async (req) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
 
-        // Store in database
+        // Store in database with proper structure
         const { error: insertError } = await supabase
           .from('document_knowledge')
           .insert({
@@ -119,8 +120,8 @@ serve(async (req) => {
             document_name,
             content_chunk: sanitizedChunk,
             embedding,
+            chunk_index: i,
             metadata: {
-              chunk_index: i,
               total_chunks: chunks.length,
               chunk_size: chunk.length
             }
