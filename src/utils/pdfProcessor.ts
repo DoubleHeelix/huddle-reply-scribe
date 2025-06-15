@@ -136,7 +136,6 @@ export class PDFProcessor {
       }
 
       // Process each chunk
-      let successCount = 0;
       for (const chunk of chunks) {
         const embedding = await this.createEmbedding(chunk.content);
         
@@ -154,13 +153,12 @@ export class PDFProcessor {
 
         if (error) {
           console.error('Error storing chunk:', error);
-        } else {
-          successCount++;
+          return false;
         }
       }
 
-      console.log(`Successfully processed ${successCount}/${chunks.length} chunks for ${documentName}`);
-      return successCount > 0;
+      console.log(`Successfully processed ${documentName}`);
+      return true;
     } catch (error) {
       console.error('Error processing document:', error);
       return false;
@@ -175,37 +173,17 @@ export class PDFProcessor {
       { path: '/src/Docs/OLB.pdf', name: 'OLB' }
     ];
 
-    console.log('Starting to process all documents...');
-    let processedCount = 0;
-
     for (const doc of documents) {
       try {
-        console.log(`Fetching document: ${doc.path}`);
         const response = await fetch(doc.path);
-        
-        if (!response.ok) {
-          console.error(`Failed to fetch ${doc.name}: ${response.status} ${response.statusText}`);
-          continue;
-        }
-        
         const blob = await response.blob();
         const file = new File([blob], `${doc.name}.pdf`, { type: 'application/pdf' });
         
-        console.log(`Processing ${doc.name}...`);
-        const success = await this.processDocument(file, doc.name);
-        
-        if (success) {
-          processedCount++;
-          console.log(`✓ Successfully processed ${doc.name}`);
-        } else {
-          console.error(`✗ Failed to process ${doc.name}`);
-        }
+        await this.processDocument(file, doc.name);
       } catch (error) {
         console.error(`Error processing ${doc.name}:`, error);
       }
     }
-
-    console.log(`Document processing complete: ${processedCount}/${documents.length} documents processed successfully`);
   }
 }
 
