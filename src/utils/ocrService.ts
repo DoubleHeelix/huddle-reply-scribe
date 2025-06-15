@@ -1,7 +1,6 @@
 
-// OCR Service using Google Cloud Vision API
-// Note: In a production environment, this should be handled server-side
-// For demo purposes, we'll create the structure and use a placeholder
+// OCR Service using Google Cloud Vision API via Supabase Edge Function
+import { supabase } from "@/integrations/supabase/client";
 
 export interface OCRResult {
   text: string;
@@ -11,7 +10,6 @@ export interface OCRResult {
 }
 
 interface OCRConfig {
-  googleCloudApiKey?: string;
   enableAutoCorpping?: boolean;
   margin?: number;
 }
@@ -32,53 +30,60 @@ export class OCRService {
     console.log(`OCR: Starting text extraction. Input type: ${typeof imageInput}`);
 
     try {
-      let imageBytes: Uint8Array;
+      let imageDataUrl: string;
       
       // Handle different input types
       if (typeof imageInput === 'string') {
-        // Base64 string or data URL
-        if (imageInput.startsWith('data:')) {
-          const base64Data = imageInput.split(',')[1];
-          imageBytes = this.base64ToUint8Array(base64Data);
-        } else {
-          throw new Error('String input must be a data URL');
-        }
-        console.log(`OCR: Successfully processed data URL, got ${imageBytes.length} bytes`);
+        // Already a data URL or base64
+        imageDataUrl = imageInput;
+        console.log(`OCR: Using string input as data URL`);
       } else if (imageInput instanceof File) {
-        imageBytes = new Uint8Array(await imageInput.arrayBuffer());
-        console.log(`OCR: Successfully read ${imageBytes.length} bytes from file: ${imageInput.name}`);
+        // Convert File to data URL
+        imageDataUrl = await this.fileToDataUrl(imageInput);
+        console.log(`OCR: Converted file ${imageInput.name} to data URL`);
       } else if (imageInput instanceof Uint8Array) {
-        imageBytes = imageInput;
-        console.log(`OCR: Received ${imageBytes.length} bytes directly.`);
+        // Convert Uint8Array to data URL
+        imageDataUrl = await this.uint8ArrayToDataUrl(imageInput);
+        console.log(`OCR: Converted Uint8Array to data URL`);
       } else {
         throw new Error(`Invalid input type for OCR. Expected data URL, File, or Uint8Array. Got ${typeof imageInput}.`);
-      }
-
-      if (!imageBytes || imageBytes.length === 0) {
-        throw new Error('Image content is empty or could not be loaded.');
       }
 
       // Auto-crop if enabled
       if (this.config.enableAutoCorpping) {
         try {
-          imageBytes = await this.autoCropChatArea(imageBytes, this.config.margin || 12);
+          imageDataUrl = await this.autoCropChatArea(imageDataUrl, this.config.margin || 12);
+          console.log('OCR: Auto-cropping completed');
         } catch (cropError) {
-          console.warn('Auto-crop failed, using original image:', cropError);
+          console.warn('OCR: Auto-crop failed, using original image:', cropError);
         }
       }
 
-      // In a real implementation, this would call Google Cloud Vision API
-      // For now, we'll simulate the OCR process
-      const extractedText = await this.performOCR(imageBytes);
+      // Call Supabase edge function for OCR processing
+      console.log('OCR: Calling Supabase edge function...');
+      const { data, error } = await supabase.functions.invoke('ocr-extract', {
+        body: {
+          imageData: imageDataUrl,
+          enableAutoCropping: this.config.enableAutoCorpping,
+          margin: this.config.margin
+        }
+      });
+
+      if (error) {
+        console.error('OCR: Supabase function error:', error);
+        throw new Error(`OCR processing failed: ${error.message}`);
+      }
 
       const endTime = performance.now();
-      const processingTime = (endTime - startTime) / 1000;
-      console.log(`OCR: Processing completed in ${processingTime.toFixed(2)} seconds.`);
+      const totalProcessingTime = (endTime - startTime) / 1000;
+      
+      console.log(`OCR: Total processing completed in ${totalProcessingTime.toFixed(2)} seconds.`);
 
       return {
-        text: extractedText.trim(),
-        processingTime,
-        success: true
+        text: data.text || '',
+        processingTime: totalProcessingTime,
+        success: data.success || false,
+        error: data.error
       };
 
     } catch (error) {
@@ -96,30 +101,23 @@ export class OCRService {
     }
   }
 
-  private async performOCR(imageBytes: Uint8Array): Promise<string> {
-    // In a real implementation, this would make an API call to Google Cloud Vision
-    // For demo purposes, we'll return a placeholder message
-    
-    if (!this.config.googleCloudApiKey) {
-      return "OCR functionality requires Google Cloud Vision API key. Please configure your API credentials.";
-    }
-
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // TODO: Implement actual Google Cloud Vision API call
-    // This would involve:
-    // 1. Converting imageBytes to base64
-    // 2. Making POST request to Google Cloud Vision API
-    // 3. Parsing the response and extracting text
-    
-    return "Please describe what you see in the screenshot or the conversation context that's relevant to your draft message.";
+  private async fileToDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
-  private async autoCropChatArea(imageBytes: Uint8Array, margin: number = 12): Promise<Uint8Array> {
+  private async uint8ArrayToDataUrl(uint8Array: Uint8Array): Promise<string> {
+    const blob = new Blob([uint8Array]);
+    return this.fileToDataUrl(new File([blob], 'image.jpg', { type: 'image/jpeg' }));
+  }
+
+  private async autoCropChatArea(imageDataUrl: string, margin: number = 12): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
-        // Create canvas and load image
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -127,9 +125,7 @@ export class OCRService {
         }
 
         const img = new Image();
-        const blob = new Blob([imageBytes]);
-        const url = URL.createObjectURL(blob);
-
+        
         img.onload = () => {
           try {
             canvas.width = img.width;
@@ -184,8 +180,7 @@ export class OCRService {
             // Check for invalid crop box
             if (top >= bottom || left >= right) {
               console.warn('Auto-crop Warning: Invalid crop box calculated, returning original image.');
-              URL.revokeObjectURL(url);
-              resolve(imageBytes);
+              resolve(imageDataUrl);
               return;
             }
 
@@ -203,31 +198,20 @@ export class OCRService {
 
             croppedCtx.drawImage(img, left, top, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
 
-            // Convert back to bytes
-            croppedCanvas.toBlob((blob) => {
-              if (!blob) {
-                reject(new Error('Failed to create blob from cropped canvas'));
-                return;
-              }
-              
-              blob.arrayBuffer().then(buffer => {
-                URL.revokeObjectURL(url);
-                resolve(new Uint8Array(buffer));
-              }).catch(reject);
-            }, 'image/jpeg', 0.9);
+            // Convert back to data URL
+            const croppedDataUrl = croppedCanvas.toDataURL('image/jpeg', 0.9);
+            resolve(croppedDataUrl);
 
           } catch (error) {
-            URL.revokeObjectURL(url);
             reject(error);
           }
         };
 
         img.onerror = () => {
-          URL.revokeObjectURL(url);
           reject(new Error('Failed to load image for auto-cropping'));
         };
 
-        img.src = url;
+        img.src = imageDataUrl;
 
       } catch (error) {
         reject(error);
@@ -235,18 +219,10 @@ export class OCRService {
     });
   }
 
-  private base64ToUint8Array(base64: string): Uint8Array {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  }
-
   // Configuration methods
   setGoogleCloudApiKey(apiKey: string) {
-    this.config.googleCloudApiKey = apiKey;
+    // No longer needed as we use Supabase secrets
+    console.log('OCR: Google Cloud API key is now managed via Supabase secrets');
   }
 
   setAutoCroppingEnabled(enabled: boolean) {
