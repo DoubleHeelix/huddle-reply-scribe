@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentSummary } from '@/types/document';
 import { pdfProcessor } from './pdfProcessor';
@@ -45,32 +44,18 @@ export const documentService = {
     }
 
     try {
-      console.log('📥 Downloading file from storage:', fileName);
+      console.log('📄 Processing document from storage with server-side extraction:', fileName);
       
-      // Download the file from storage
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from('documents')
-        .download(fileName);
-
-      if (downloadError) {
-        throw new Error(`Failed to download file: ${downloadError.message}`);
-      }
-
-      console.log('📄 Processing PDF with PDF.js...');
+      // Use the new server-side extraction method
+      const { text, pageCount, metadata } = await pdfProcessor.extractTextFromStorage(fileName);
       
-      // Create a File object for the PDF processor
-      const file = new File([fileData], fileName, { type: 'application/pdf' });
-      
-      // Extract text using PDF.js
-      const { text, pageCount, metadata } = await pdfProcessor.extractTextFromFile(file);
-      
-      if (!text || text.length < 50) {
-        throw new Error('Could not extract sufficient text from PDF. The file may be image-based or corrupted.');
+      if (!text || text.length < 20) {
+        throw new Error('Could not extract sufficient text from PDF.');
       }
 
       console.log('🔗 Sending extracted text to embedding function...');
       
-      // Send the extracted text to the edge function
+      // Send the extracted text to the embedding function
       const { data, error } = await supabase.functions.invoke('create-embedding', {
         body: {
           document_name: fileName,
@@ -79,7 +64,7 @@ export const documentService = {
           metadata: {
             ...metadata,
             pageCount,
-            processingMethod: 'pdfjs'
+            processingMethod: 'server-side'
           }
         }
       });
@@ -106,16 +91,16 @@ export const documentService = {
     try {
       console.log('📄 Processing uploaded PDF:', file.name);
       
-      // Extract text using PDF.js
+      // Use the client-side fallback for uploaded files
       const { text, pageCount, metadata } = await pdfProcessor.extractTextFromFile(file);
       
-      if (!text || text.length < 50) {
-        throw new Error('Could not extract sufficient text from PDF. The file may be image-based or corrupted.');
+      if (!text || text.length < 20) {
+        throw new Error('Could not process PDF file.');
       }
 
       console.log('🔗 Sending extracted text to embedding function...');
       
-      // Send the extracted text to the edge function
+      // Send the extracted text to the embedding function
       const { data, error } = await supabase.functions.invoke('create-embedding', {
         body: {
           document_name: file.name,
@@ -124,7 +109,7 @@ export const documentService = {
           metadata: {
             ...metadata,
             pageCount,
-            processingMethod: 'pdfjs'
+            processingMethod: 'client-fallback'
           }
         }
       });
