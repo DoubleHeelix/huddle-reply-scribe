@@ -27,7 +27,9 @@ async function getAccessToken() {
   console.log('OCR: Project ID:', projectId);
   console.log('OCR: Service account email:', serviceAccountEmail);
 
-  // Create JWT for Google Cloud authentication
+  // Import crypto for JWT signing
+  const crypto = await import("https://deno.land/std@0.168.0/crypto/mod.ts");
+  
   const now = Math.floor(Date.now() / 1000);
   const jwtHeader = {
     alg: 'RS256',
@@ -42,12 +44,43 @@ async function getAccessToken() {
     iat: now
   };
 
-  // Base64 encode header and payload
-  const encodedHeader = btoa(JSON.stringify(jwtHeader));
-  const encodedPayload = btoa(JSON.stringify(jwtPayload));
+  // Create the JWT
+  const encoder = new TextEncoder();
+  const headerB64 = btoa(JSON.stringify(jwtHeader)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payloadB64 = btoa(JSON.stringify(jwtPayload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   
-  // Create signature (simplified - in production you'd use proper crypto)
-  const assertion = `${encodedHeader}.${encodedPayload}`;
+  const signingInput = `${headerB64}.${payloadB64}`;
+  
+  // Clean and format the private key
+  const cleanPrivateKey = privateKey
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN PRIVATE KEY-----\n?/, '')
+    .replace(/\n?-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  
+  // Import the private key for signing
+  const binaryKey = Uint8Array.from(atob(cleanPrivateKey), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.importKey(
+    'pkcs8',
+    binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  // Sign the JWT
+  const signature = await crypto.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    encoder.encode(signingInput)
+  );
+  
+  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  
+  const jwt = `${signingInput}.${signatureB64}`;
   
   // Request access token
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -57,7 +90,7 @@ async function getAccessToken() {
     },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: assertion
+      assertion: jwt
     })
   });
 
@@ -68,6 +101,7 @@ async function getAccessToken() {
   }
 
   const tokenData = await tokenResponse.json();
+  console.log('OCR: Successfully obtained access token');
   return tokenData.access_token;
 }
 
@@ -88,23 +122,9 @@ serve(async (req) => {
       throw new Error('Image data is required');
     }
 
-    // Try to get access token using service account first, fallback to API key
-    let authHeader = '';
-    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-    
-    try {
-      const accessToken = await getAccessToken();
-      authHeader = `Bearer ${accessToken}`;
-      console.log('OCR: Using service account authentication');
-    } catch (authError) {
-      console.log('OCR: Service account auth failed, trying API key fallback:', authError.message);
-      
-      if (!googleApiKey) {
-        throw new Error('No Google Cloud authentication available. Please set either service account credentials (GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_PROJECT_ID) or GOOGLE_API_KEY in Supabase secrets.');
-      }
-      
-      console.log('OCR: Using API key authentication');
-    }
+    // Get access token using service account
+    const accessToken = await getAccessToken();
+    const authHeader = `Bearer ${accessToken}`;
 
     // Remove data URL prefix if present
     const base64Data = imageData.startsWith('data:') 
@@ -113,10 +133,8 @@ serve(async (req) => {
 
     console.log(`OCR: Processing image (${base64Data.length} characters of base64)`);
 
-    // Construct the API URL
-    const apiUrl = googleApiKey 
-      ? `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`
-      : `https://vision.googleapis.com/v1/images:annotate`;
+    // Construct the API URL (no API key needed with service account)
+    const apiUrl = `https://vision.googleapis.com/v1/images:annotate`;
 
     console.log('OCR: API URL constructed');
 
@@ -139,17 +157,12 @@ serve(async (req) => {
 
     console.log('OCR: Making request to Google Cloud Vision API...');
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
     const visionResponse = await fetch(apiUrl, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
       body: JSON.stringify(requestBody),
     });
 
@@ -174,7 +187,7 @@ serve(async (req) => {
       if (errorMessage.includes('billing') || errorMessage.includes('BILLING_DISABLED')) {
         throw new Error(`Billing issue detected. Please verify billing is enabled for your Google Cloud project and the credentials have the correct permissions. Full error: ${errorMessage}`);
       } else if (errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT')) {
-        throw new Error(`Invalid Google Cloud credentials. Please check your service account or API key configuration. Full error: ${errorMessage}`);
+        throw new Error(`Invalid Google Cloud credentials. Please check your service account configuration. Full error: ${errorMessage}`);
       } else if (errorMessage.includes('not been used') || errorMessage.includes('disabled') || errorMessage.includes('PERMISSION_DENIED')) {
         throw new Error(`Google Cloud Vision API access issue. Please ensure the API is enabled and has proper permissions. Full error: ${errorMessage}`);
       } else {
@@ -222,6 +235,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
     console.error('OCR: Error during processing:', error);
+    console.error('OCR: Error stack trace:', error.stack);
 
     return new Response(
       JSON.stringify({
