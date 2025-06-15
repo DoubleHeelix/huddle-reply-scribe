@@ -2,8 +2,11 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { supabase } from '@/integrations/supabase/client';
 
-// Configure worker using the installed package version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Configure worker to use local worker instead of CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString();
 
 interface ProcessedDocument {
   name: string;
@@ -35,8 +38,7 @@ class PDFProcessor {
       // Load PDF with minimal configuration
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
-        verbosity: 0,
-        disableWorker: false
+        verbosity: 0
       });
 
       const pdf = await loadingTask.promise;
