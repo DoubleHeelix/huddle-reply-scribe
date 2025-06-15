@@ -27,9 +27,6 @@ async function getAccessToken() {
   console.log('OCR: Project ID:', projectId);
   console.log('OCR: Service account email:', serviceAccountEmail);
 
-  // Import crypto for JWT signing
-  const crypto = await import("https://deno.land/std@0.168.0/crypto/mod.ts");
-  
   const now = Math.floor(Date.now() / 1000);
   const jwtHeader = {
     alg: 'RS256',
@@ -84,9 +81,9 @@ async function getAccessToken() {
     const testDecode = atob(keyContent);
     console.log('OCR: Base64 decode test successful, decoded length:', testDecode.length);
     
-    // Import the private key for signing
+    // Import the private key for signing using Deno's crypto API
     const binaryKey = Uint8Array.from(testDecode, c => c.charCodeAt(0));
-    const cryptoKey = await crypto.importKey(
+    const cryptoKey = await crypto.subtle.importKey(
       'pkcs8',
       binaryKey,
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
@@ -94,8 +91,8 @@ async function getAccessToken() {
       ['sign']
     );
     
-    // Sign the JWT
-    const signature = await crypto.sign(
+    // Sign the JWT using Deno's crypto API
+    const signature = await crypto.subtle.sign(
       'RSASSA-PKCS1-v1_5',
       cryptoKey,
       encoder.encode(signingInput)
