@@ -125,6 +125,14 @@ const Index = () => {
             ? `OCR completed in ${ocrResult.processingTime.toFixed(2)}s. Text extracted successfully.`
             : "Image uploaded. OCR processing may have encountered issues.",
         });
+
+        // Auto-scroll to draft section after upload
+        setTimeout(() => {
+          const draftSection = document.querySelector('[data-section="draft"]');
+          if (draftSection) {
+            draftSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 500);
       };
       reader.readAsDataURL(file);
     }
@@ -187,6 +195,14 @@ const Index = () => {
         title: "Perfect reply generated!",
         description: "Your optimized response is ready.",
       });
+
+      // Auto-scroll to generated reply section
+      setTimeout(() => {
+        const replySection = document.querySelector('[data-section="generated-reply"]');
+        if (replySection) {
+          replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
     }
   };
 
@@ -369,7 +385,7 @@ const Index = () => {
             </Card>
 
             {/* Draft Message Section */}
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-gray-800 border-gray-700" data-section="draft">
               <CardContent className="p-6">
                 <h3 className="text-white text-lg font-medium mb-4">Your Draft Message</h3>
                 <Textarea
@@ -377,7 +393,7 @@ const Index = () => {
                   value={userDraft}
                   onChange={(e) => setUserDraft(e.target.value)}
                   rows={6}
-                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none"
+                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none font-sans"
                 />
               </CardContent>
             </Card>
@@ -386,7 +402,7 @@ const Index = () => {
             <Button 
               onClick={handleGenerateReply}
               disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans"
             >
               <Zap className="w-5 h-5 mr-2" />
               {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
@@ -397,17 +413,17 @@ const Index = () => {
               <div className="text-center py-8">
                 <div className="inline-flex items-center gap-2 text-purple-400">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-                  <span>AI is crafting your perfect reply...</span>
+                  <span className="font-sans">AI is crafting your perfect reply...</span>
                 </div>
               </div>
             )}
 
             {/* Generated Reply Section */}
             {generatedReply && (
-              <Card className="bg-gray-800 border-gray-700">
+              <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
                 <CardContent className="p-4 md:p-6 space-y-4">
                   <div className="flex flex-col space-y-3 md:flex-row md:items-center md:justify-between md:space-y-0">
-                    <h3 className="text-white text-lg font-medium">Generated Reply</h3>
+                    <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
                     <ToneSelector
                       selectedTone={selectedTone}
                       onToneChange={setSelectedTone}
@@ -428,7 +444,7 @@ const Index = () => {
                     <div className="text-center py-4">
                       <div className="inline-flex items-center gap-2 text-purple-400">
                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
-                        <span className="text-sm">Adjusting tone...</span>
+                        <span className="text-sm font-sans">Adjusting tone...</span>
                       </div>
                     </div>
                   )}
@@ -437,7 +453,7 @@ const Index = () => {
                     <Button 
                       onClick={handleRegenerate}
                       variant="outline" 
-                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12"
+                      className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
                       disabled={isGenerating}
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
@@ -446,7 +462,7 @@ const Index = () => {
                     <Button 
                       onClick={resetHuddle}
                       variant="outline"
-                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 md:w-auto"
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 md:w-auto font-sans"
                     >
                       New Huddle
                     </Button>
@@ -463,7 +479,7 @@ const Index = () => {
           <TabsContent value="past-huddles" className="mt-6">
             <Card className="bg-gray-800 border-gray-700">
               <CardContent className="p-6">
-                <p className="text-gray-300">Past huddles will be displayed here...</p>
+                <p className="text-gray-300 font-sans">Past huddles will be displayed here...</p>
               </CardContent>
             </Card>
           </TabsContent>

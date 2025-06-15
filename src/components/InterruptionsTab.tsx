@@ -79,6 +79,14 @@ export const InterruptionsTab = () => {
         title: "Conversation starters generated!",
         description: `Generated ${starters.length} creative options.`,
       });
+
+      // Auto-scroll to generated conversation starters section
+      setTimeout(() => {
+        const startersSection = document.querySelector('[data-section="conversation-starters"]');
+        if (startersSection) {
+          startersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
     }
   };
 
@@ -106,19 +114,19 @@ export const InterruptionsTab = () => {
     <Card key={index} className="bg-gray-800 border-gray-700">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-white text-sm font-medium">{title}</h4>
+          <h4 className="text-white text-sm font-medium font-sans">{title}</h4>
           <Button
             variant="outline"
             size="sm"
             onClick={() => handleCopyToClipboard(message)}
-            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
           >
             <Copy className="w-3 h-3 mr-1" />
             Copy
           </Button>
         </div>
         <div className="bg-gray-900 p-3 rounded-lg border border-gray-600">
-          <p className="text-white text-sm">{message}</p>
+          <p className="text-white text-sm font-sans">{message}</p>
         </div>
       </CardContent>
     </Card>
@@ -128,8 +136,8 @@ export const InterruptionsTab = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center space-y-2">
-        <h3 className="text-white text-xl font-semibold">📸 Story Interruption Generator</h3>
-        <p className="text-gray-400 text-sm">
+        <h3 className="text-white text-xl font-semibold font-sans">📸 Story Interruption Generator</h3>
+        <p className="text-gray-400 text-sm font-sans">
           Upload an Instagram story. The Huddle bot will suggest 3 warm, curious, and authentic replies based on the content.
         </p>
       </div>
@@ -139,14 +147,14 @@ export const InterruptionsTab = () => {
         <CardContent className="p-6">
           <div className="text-center space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-gray-300 text-lg">Upload Story Screenshot</p>
+              <p className="text-gray-300 text-lg font-sans">Upload Story Screenshot</p>
               {isOCRProcessing && (
-                <Badge variant="secondary" className="bg-blue-600">
+                <Badge variant="secondary" className="bg-blue-600 font-sans">
                   Processing...
                 </Badge>
               )}
             </div>
-            <p className="text-gray-500 text-sm">JPG, JPEG, PNG • Max 10MB</p>
+            <p className="text-gray-500 text-sm font-sans">JPG, JPEG, PNG • Max 10MB</p>
             
             <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
               <Input
@@ -164,7 +172,7 @@ export const InterruptionsTab = () => {
               >
                 <Upload className="w-8 h-8 text-purple-400" />
                 <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
-                  <span className="text-white">
+                  <span className="text-white font-sans">
                     {isOCRProcessing || isGenerating ? "Processing..." : "Choose story image"}
                   </span>
                 </div>
@@ -178,7 +186,7 @@ export const InterruptionsTab = () => {
                   alt="Uploaded story" 
                   className="w-full max-w-md mx-auto rounded-lg border border-gray-600 shadow-lg"
                 />
-                <Badge variant="secondary">Story uploaded</Badge>
+                <Badge variant="secondary" className="font-sans">Story uploaded</Badge>
               </div>
             )}
           </div>
@@ -187,8 +195,8 @@ export const InterruptionsTab = () => {
 
       {/* Generated Conversation Starters */}
       {conversationStarters.length > 0 && (
-        <div className="space-y-4">
-          <h4 className="text-white text-lg font-medium">💬 AI Generated Conversation Starters</h4>
+        <div className="space-y-4" data-section="conversation-starters">
+          <h4 className="text-white text-lg font-medium font-sans">💬 AI Generated Conversation Starters</h4>
           
           <div className="grid gap-4">
             {conversationStarters.map((starter, index) => 
@@ -199,20 +207,20 @@ export const InterruptionsTab = () => {
           {/* User Edit Section */}
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
-              <h4 className="text-white text-lg font-medium mb-4">✏️ Your Adjusted Message</h4>
+              <h4 className="text-white text-lg font-medium mb-4 font-sans">✏️ Your Adjusted Message</h4>
               <Textarea
                 placeholder="Edit the message to your liking..."
                 value={userEdit}
                 onChange={(e) => setUserEdit(e.target.value)}
                 rows={4}
-                className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none mb-4"
+                className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none mb-4 font-sans"
               />
               
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 md:flex-row">
                 <Button
                   onClick={() => handleCopyToClipboard(userEdit)}
                   variant="outline"
-                  className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
                 >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy My Version
@@ -220,7 +228,7 @@ export const InterruptionsTab = () => {
                 <Button 
                   onClick={handleRegenerateAll}
                   variant="outline" 
-                  className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
                   disabled={isGenerating || !uploadedStoryImage}
                 >
                   <RefreshCcw className="w-4 h-4 mr-2" />
@@ -233,7 +241,7 @@ export const InterruptionsTab = () => {
           {/* Start New Button */}
           <Button 
             onClick={handleStartNew}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-3 text-lg font-medium rounded-xl"
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-3 text-lg font-medium rounded-xl font-sans"
           >
             ➕ Start New Interruption
           </Button>
@@ -244,7 +252,7 @@ export const InterruptionsTab = () => {
       {uploadedStoryImage && conversationStarters.length === 0 && !isGenerating && (
         <Button 
           onClick={() => handleGenerateStarters()}
-          className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl"
+          className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl font-sans"
           disabled={!uploadedStoryImage}
         >
           🪄 Generate Conversation Starters
@@ -256,7 +264,7 @@ export const InterruptionsTab = () => {
         <div className="text-center py-8">
           <div className="inline-flex items-center gap-2 text-purple-400">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-            <span>Generating creative conversation starters...</span>
+            <span className="font-sans">Generating creative conversation starters...</span>
           </div>
         </div>
       )}
@@ -265,7 +273,7 @@ export const InterruptionsTab = () => {
       {interruptionsError && (
         <Card className="bg-red-900/20 border-red-700">
           <CardContent className="p-4">
-            <p className="text-red-400">Error: {interruptionsError}</p>
+            <p className="text-red-400 font-sans">Error: {interruptionsError}</p>
           </CardContent>
         </Card>
       )}
