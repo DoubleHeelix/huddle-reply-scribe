@@ -8,6 +8,7 @@ import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
+import { useInterruptions } from "@/hooks/useInterruptions";
 
 interface MainAppProps {
   user: User | null;
@@ -18,6 +19,7 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState("huddle-play");
   const [direction, setDirection] = useState(0);
   const huddleState = useHuddleState();
+  const interruptionsState = useInterruptions();
   const {
     googleCloudApiKey,
     setGoogleCloudApiKey,
@@ -158,7 +160,11 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
                 <HuddlePlayTab huddleState={huddleState} />
               </TabsContent>
               <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
-                <InterruptionsTab huddleState={huddleState} />
+                <InterruptionsTab
+                  stories={interruptionsState.stories}
+                  processStories={interruptionsState.processStories}
+                  clearStories={interruptionsState.clearStories}
+                />
               </TabsContent>
               <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
                 <PastHuddlesTab />

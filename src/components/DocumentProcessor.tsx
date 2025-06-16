@@ -27,24 +27,19 @@ export const DocumentProcessor: React.FC = () => {
       setIsLoadingStorage(true);
       setStorageError(null);
       
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .list('', {
-          limit: 100,
-          offset: 0,
-        });
+      const { data, error } = await supabase.storage.from('documents').list();
 
       if (error) throw error;
 
-      const pdfFiles = data?.filter(file => 
-        file.name.toLowerCase().endsWith('.pdf') && 
+      const pdfFiles = data?.filter(file =>
+        file.name.toLowerCase().endsWith('.pdf') &&
         file.name !== '.emptyFolderPlaceholder'
       ) || [];
       
       setStorageFiles(pdfFiles);
     } catch (err) {
       console.error('Error fetching storage files:', err);
-      setStorageError('Failed to load files from storage');
+      setStorageError('Failed to load files from storage. Is the bucket public?');
     } finally {
       setIsLoadingStorage(false);
     }
