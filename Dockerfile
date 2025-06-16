@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM oven/bun:20 AS builder
+FROM oven/bun:1 AS builder
 WORKDIR /app
 
 # Copy package files and install dependencies
@@ -28,5 +28,3 @@ COPY default.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
 HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD curl --fail http://localhost:80 || exit 1
 CMD ["nginx", "-g", "daemon off;"]
-
-
