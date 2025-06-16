@@ -15,6 +15,7 @@ RUN npm run build
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80 and start nginx
 EXPOSE 80
