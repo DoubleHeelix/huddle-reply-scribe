@@ -19,7 +19,8 @@ export const useEnhancedAISuggestions = () => {
   const generateReply = async (
     screenshotText: string,
     userDraft: string,
-    isRegeneration: boolean = false
+    isRegeneration: boolean = false,
+    existingDocumentKnowledge: any[] = []
   ): Promise<GenerateReplyResult | null> => {
     try {
       setIsGenerating(true);
@@ -31,7 +32,10 @@ export const useEnhancedAISuggestions = () => {
 
       // Search for relevant documents based on screenshot + draft content
       let documentKnowledge: any[] = [];
-      if (!isRegeneration) {
+      if (isRegeneration) {
+        documentKnowledge = existingDocumentKnowledge;
+        console.log(`📚 DEBUG: Re-using ${documentKnowledge.length} document chunks for regeneration`);
+      } else {
         console.log('📚 DEBUG: Searching for relevant documents...');
         const searchQuery = `${screenshotText} ${userDraft}`;
         documentKnowledge = await searchDocuments(searchQuery, 3);
@@ -46,7 +50,7 @@ export const useEnhancedAISuggestions = () => {
           screenshotText,
           userDraft,
           isRegeneration,
-          documentKnowledge
+          documentKnowledge,
         },
       });
 

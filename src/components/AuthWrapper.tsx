@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Mail, Lock, UserPlus, LogIn } from 'lucide-react';
 
 interface AuthWrapperProps {
-  children: React.ReactNode;
+  children: (user: User | null, onSignOut: () => void) => React.ReactNode;
 }
 
 export const AuthWrapper = ({ children }: AuthWrapperProps) => {
@@ -202,22 +202,7 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
 
   return (
     <div>
-      {/* Simple user indicator in top right */}
-      <div className="fixed top-4 right-4 z-50">
-        <div className="flex items-center gap-2 bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
-          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-          <span className="text-white text-sm font-sans">{user.email}</span>
-          <Button
-            onClick={handleSignOut}
-            variant="ghost"
-            size="sm"
-            className="text-gray-400 hover:text-white font-sans h-6 px-2"
-          >
-            Sign Out
-          </Button>
-        </div>
-      </div>
-      {children}
+      {children(user, handleSignOut)}
     </div>
   );
 };

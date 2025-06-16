@@ -18,13 +18,15 @@ const Index = () => {
 
   return (
     <AuthWrapper>
-      {showLanding ? (
-        <div className={`transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
-          <LandingPage onGetStarted={handleGetStarted} />
-        </div>
-      ) : (
-        <MainApp />
-      )}
+      {(user, onSignOut) =>
+        showLanding ? (
+          <div className={`transition-opacity duration-500 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+            <LandingPage onGetStarted={handleGetStarted} />
+          </div>
+        ) : (
+          <MainApp user={user} onSignOut={onSignOut} />
+        )
+      }
     </AuthWrapper>
   );
 };

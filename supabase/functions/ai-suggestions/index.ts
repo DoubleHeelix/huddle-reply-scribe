@@ -1,4 +1,6 @@
 
+/// <reference types="https://deno.land/x/deno/runtime.d.ts" />
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -32,7 +34,7 @@ const cleanReply = (reply: string): string => {
     .trim();
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -112,7 +114,7 @@ ${truncatedOriginalReply}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o',
         messages,
         temperature,
         max_tokens: 400
@@ -133,7 +135,8 @@ ${truncatedOriginalReply}
     });
   } catch (error) {
     console.error('Error in ai-suggestions function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

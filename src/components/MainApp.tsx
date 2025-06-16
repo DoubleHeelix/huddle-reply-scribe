@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, History, Camera } from "lucide-react";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
@@ -8,8 +9,14 @@ import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
 
-export const MainApp = () => {
+interface MainAppProps {
+  user: User | null;
+  onSignOut: () => void;
+}
+
+export const MainApp = ({ user, onSignOut }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState("huddle-play");
+  const [direction, setDirection] = useState(0);
   const huddleState = useHuddleState();
   const {
     googleCloudApiKey,
@@ -63,9 +70,28 @@ export const MainApp = () => {
   };
 
   const tabContentVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.3 } },
+    hidden: (direction: number) => ({
+      x: direction > 0 ? '100%' : '-100%',
+      opacity: 0,
+    }),
+    visible: {
+      x: 0,
+      opacity: 1,
+      transition: { type: 'spring' as const, stiffness: 260, damping: 30 },
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? '100%' : '-100%',
+      opacity: 0,
+      transition: { type: 'spring' as const, stiffness: 260, damping: 30 },
+    }),
+  };
+
+  const handleTabChange = (newTab: string) => {
+    const tabs = ["huddle-play", "interruptions", "past-huddles"];
+    const oldIndex = tabs.indexOf(activeTab);
+    const newIndex = tabs.indexOf(newTab);
+    setDirection(newIndex - oldIndex);
+    setActiveTab(newTab);
   };
 
   return (
@@ -81,6 +107,8 @@ export const MainApp = () => {
         onTestOCR={uploadedImage ? handleTestOCR : undefined}
         isTestingOCR={isOCRProcessing}
         uploadedImage={uploadedImage}
+        user={user}
+        onSignOut={onSignOut}
       />
 
       {/* Header */}
@@ -92,7 +120,7 @@ export const MainApp = () => {
       </div>
 
       <div className="p-4 max-w-2xl mx-auto">
-        <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full mt-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mt-6">
           <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger
               value="huddle-play"
@@ -124,6 +152,7 @@ export const MainApp = () => {
               animate="visible"
               exit="exit"
               variants={tabContentVariants}
+              custom={direction}
             >
               <TabsContent value="huddle-play" forceMount className={activeTab === 'huddle-play' ? 'block' : 'hidden'}>
                 <HuddlePlayTab huddleState={huddleState} />

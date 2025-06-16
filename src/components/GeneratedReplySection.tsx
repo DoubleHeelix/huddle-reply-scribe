@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Copy } from "lucide-react";
 import { ToneSelector } from "@/components/ToneSelector";
+import { useTypingEffect } from '@/hooks/useTypingEffect';
 
 interface GeneratedReplySectionProps {
   generatedReply: string;
@@ -28,6 +29,8 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   onRegenerate,
   onReset
 }) => {
+  const displayedReply = useTypingEffect(generatedReply, 20);
+
   if (!generatedReply) return null;
 
   return (
@@ -55,9 +58,10 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
           />
         </div>
         
-        <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
+        <div className="bg-gray-900 p-4 rounded-lg border border-gray-600 min-h-[100px]">
           <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed">
-            {generatedReply}
+            {displayedReply}
+            <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1"></span>
           </pre>
         </div>
         
