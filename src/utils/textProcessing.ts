@@ -1,38 +1,28 @@
+export const formatExtractedText = (text: string): string => {
+  if (!text) return "";
 
-export const cleanReply = (text: string): string => {
-  if (!text || typeof text !== 'string') {
-    return '';
+  let cleanedText = text;
+
+  // 1. Replace common typographic ligatures
+  const ligatures: { [key: string]: string } = {
+    'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬀ': 'ff', 'ﬃ': 'ffi', 'ﬄ': 'ffl',
+    'ﬅ': 'ft', 'ﬆ': 'st'
+  };
+  for (const ligature in ligatures) {
+    cleanedText = cleanedText.replace(new RegExp(ligature, 'g'), ligatures[ligature]);
   }
 
-  let cleanedText = text.trim();
-  
-  // Remove excessive newlines
-  cleanedText = cleanedText.replace(/\n{3,}/g, '\n\n');
-  
-  // Remove leading whitespace from each line
-  cleanedText = cleanedText.replace(/^[ \t]+/gm, '');
-  
-  // Phrases to remove from the beginning
-  const phrasesToRemove = [
-    'This is a draft', 'Draft:', 'Suggested reply:', 
-    'Here is your response:', 'Rewritten Message:', 'Okay, here\'s a draft:',
-    'Here\'s a revised version:', 'Here\'s a suggestion for your reply:',
-    'Sure, here\'s a reply you could use:', 'Here\'s a possible response:',
-    'Here is a draft for your reply:', 'Response:', 'Message:',
-    'Reply:'
-  ];
-  
-  for (const phrase of phrasesToRemove) {
-    if (cleanedText.toLowerCase().startsWith(phrase.toLowerCase())) {
-      cleanedText = cleanedText.slice(phrase.length).replace(/^[:\s]+/, '');
-      break;
-    }
-  }
-  
-  return cleanedText.trim();
-};
+  // 2. Remove a wide range of symbols, emojis, and non-standard characters
+  // This regex targets many common visual artifacts from PDFs and unicode symbols.
+  cleanedText = cleanedText.replace(/[\u25A0-\u25FF\u2022\u2013\uFFFD\uD83C-\uDBFF\uDC00-\uDFFF]/g, ' ');
 
-export const truncateText = (text: string, maxLength: number): string => {
-  if (!text || text.length <= maxLength) return text;
-  return text.slice(0, maxLength).trim();
+  // 3. Normalize whitespace and remove leading/trailing whitespace from lines
+  cleanedText = cleanedText.split('\n').map(line => line.trim()).join('\n');
+  cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+
+  // 4. Add proper line breaks for paragraph structure
+  // This regex adds a newline after a sentence-ending punctuation mark followed by a space and an uppercase letter.
+  cleanedText = cleanedText.replace(/([.?!])\s+(?=[A-Z])/g, '$1\n\n');
+
+  return cleanedText;
 };

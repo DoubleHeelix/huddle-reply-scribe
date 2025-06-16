@@ -25,10 +25,17 @@ export const useDocumentSearch = () => {
       }
 
       // Search for similar documents using the generated embedding
+      console.log('🔍 Calling search_document_knowledge with:', {
+        target_user_id: user.id,
+        match_threshold: 0.7,
+        match_count: maxResults,
+        query_embedding_length: embeddingData.embedding.length
+      });
+
       const { data, error } = await supabase.rpc('search_document_knowledge', {
         query_embedding: embeddingData.embedding,
         target_user_id: user.id,
-        match_threshold: 0.7,
+        match_threshold: 0.1,
         match_count: maxResults
       });
 
@@ -36,6 +43,8 @@ export const useDocumentSearch = () => {
         console.error('Error searching documents:', error);
         return [];
       }
+
+      console.log('✅ search_document_knowledge returned:', data);
 
       console.log(`📚 Found ${data?.length || 0} relevant document chunks`);
       return data || [];

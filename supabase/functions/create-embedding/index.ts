@@ -114,10 +114,9 @@ serve(async (req) => {
       }
 
       try {
-        // Process the text as a single chunk since our simplified approach creates shorter content
         const textToProcess = extracted_text.trim();
         
-        console.log('🔄 Processing single text chunk');
+        console.log('🔄 Processing single text chunk from client');
 
         // Generate embedding
         const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -144,7 +143,7 @@ serve(async (req) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
 
-        console.log('💾 Storing document in database');
+        console.log('💾 Storing document chunk in database');
 
         // Store in database
         const { error: insertError } = await supabase
@@ -154,10 +153,10 @@ serve(async (req) => {
             document_name,
             content_chunk: textToProcess,
             embedding,
-            chunk_index: 0,
+            chunk_index: requestBody.chunk_index || 0,
             metadata: {
               ...metadata,
-              total_chunks: 1,
+              total_chunks: requestBody.total_chunks || 1,
               chunk_size: textToProcess.length,
               created_at: new Date().toISOString()
             }
@@ -171,7 +170,7 @@ serve(async (req) => {
           );
         }
 
-        console.log('🎉 Document processed successfully');
+        console.log('🎉 Document chunk processed successfully');
 
         return new Response(
           JSON.stringify({
@@ -211,3 +210,5 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to split text into chunks
