@@ -10,7 +10,7 @@ RUN npm install
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN echo "--- Checking Environment Variables ---" && printenv && echo "--- Starting Build ---" && npm run build
 
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
