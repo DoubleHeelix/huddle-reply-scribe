@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,30 +8,40 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, RefreshCcw, Copy, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useInterruptions } from "@/hooks/useInterruptions";
-import { useOCR } from "@/hooks/useOCR";
+import { useHuddleState } from "@/hooks/useHuddleState";
 
-export const InterruptionsTab = () => {
-  const [uploadedStoryImage, setUploadedStoryImage] = useState<string | null>(null);
-  const [storyText, setStoryText] = useState("");
-  const [conversationStarters, setConversationStarters] = useState<string[]>([]);
-  const [userEdit, setUserEdit] = useState("");
+type InterruptionsTabProps = {
+  huddleState: ReturnType<typeof useHuddleState>;
+};
+
+export const InterruptionsTab = ({ huddleState }: InterruptionsTabProps) => {
+  const {
+    interruptionImage,
+    setInterruptionImage,
+    interruptionText,
+    setInterruptionText,
+    conversationStarters,
+    setConversationStarters,
+    editedStarter,
+    setEditedStarter,
+    extractText,
+    isOCRProcessing,
+    toast,
+  } = huddleState;
+
   const [uploaderKey, setUploaderKey] = useState(0);
   
-  const { toast } = useToast();
-  
-  const { 
-    generateConversationStarters, 
-    isGenerating, 
-    error: interruptionsError 
+  const {
+    generateConversationStarters,
+    isGenerating,
+    error: interruptionsError
   } = useInterruptions();
-  
-  const { 
-    extractText, 
-    isProcessing: isOCRProcessing 
-  } = useOCR({
-    enableAutoCropping: true,
-    autoCropMargin: 12
-  });
+
+  useEffect(() => {
+    if (conversationStarters.length > 0 && !editedStarter) {
+      setEditedStarter(conversationStarters[0]);
+    }
+  }, [conversationStarters, editedStarter, setEditedStarter]);
 
   const handleStoryImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,14 +49,12 @@ export const InterruptionsTab = () => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const imageDataUrl = e.target?.result as string;
-        setUploadedStoryImage(imageDataUrl);
+        setInterruptionImage(imageDataUrl);
         
-        // Extract text from the story image
         console.log('OCR: Starting text extraction from story image...');
         const text = await extractText(file);
-        setStoryText(text);
+        setInterruptionText(text);
         
-        // Auto-generate conversation starters
         await handleGenerateStarters(text, imageDataUrl);
         
         toast({
@@ -59,8 +67,8 @@ export const InterruptionsTab = () => {
   };
 
   const handleGenerateStarters = async (text?: string, imageUrl?: string) => {
-    const textToUse = text || storyText;
-    const imageToUse = imageUrl || uploadedStoryImage;
+    const textToUse = text || interruptionText;
+    const imageToUse = imageUrl || interruptionImage;
     
     if (!imageToUse) {
       toast({
@@ -74,13 +82,12 @@ export const InterruptionsTab = () => {
     const starters = await generateConversationStarters(textToUse, imageToUse);
     if (starters && starters.length > 0) {
       setConversationStarters(starters);
-      setUserEdit(starters[0]);
+      setEditedStarter(starters[0]);
       toast({
         title: "Conversation starters generated!",
         description: `Generated ${starters.length} creative options.`,
       });
 
-      // Auto-scroll to generated conversation starters section
       setTimeout(() => {
         const startersSection = document.querySelector('[data-section="conversation-starters"]');
         if (startersSection) {
@@ -103,10 +110,10 @@ export const InterruptionsTab = () => {
   };
 
   const handleStartNew = () => {
-    setUploadedStoryImage(null);
-    setStoryText("");
+    setInterruptionImage(null);
+    setInterruptionText("");
     setConversationStarters([]);
-    setUserEdit("");
+    setEditedStarter("");
     setUploaderKey(prev => prev + 1);
   };
 
@@ -179,11 +186,11 @@ export const InterruptionsTab = () => {
               </label>
             </div>
             
-            {uploadedStoryImage && (
+            {interruptionImage && (
               <div className="mt-4 space-y-3">
-                <img 
-                  src={uploadedStoryImage} 
-                  alt="Uploaded story" 
+                <img
+                  src={interruptionImage}
+                  alt="Uploaded story"
                   className="w-full max-w-md mx-auto rounded-lg border border-gray-600 shadow-lg"
                 />
                 <Badge variant="secondary" className="font-sans">Story uploaded</Badge>
@@ -210,15 +217,15 @@ export const InterruptionsTab = () => {
               <h4 className="text-white text-lg font-medium mb-4 font-sans">✏️ Your Adjusted Message</h4>
               <Textarea
                 placeholder="Edit the message to your liking..."
-                value={userEdit}
-                onChange={(e) => setUserEdit(e.target.value)}
+                value={editedStarter}
+                onChange={(e) => setEditedStarter(e.target.value)}
                 rows={4}
                 className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 resize-none mb-4 font-sans"
               />
               
               <div className="flex flex-col gap-3 md:flex-row">
                 <Button
-                  onClick={() => handleCopyToClipboard(userEdit)}
+                  onClick={() => handleCopyToClipboard(editedStarter)}
                   variant="outline"
                   className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
                 >
@@ -229,7 +236,7 @@ export const InterruptionsTab = () => {
                   onClick={handleRegenerateAll}
                   variant="outline" 
                   className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
-                  disabled={isGenerating || !uploadedStoryImage}
+                  disabled={isGenerating || !interruptionImage}
                 >
                   <RefreshCcw className="w-4 h-4 mr-2" />
                   Regenerate All
@@ -249,11 +256,11 @@ export const InterruptionsTab = () => {
       )}
 
       {/* Generate Button (when no starters yet) */}
-      {uploadedStoryImage && conversationStarters.length === 0 && !isGenerating && (
-        <Button 
+      {interruptionImage && conversationStarters.length === 0 && !isGenerating && (
+        <Button
           onClick={() => handleGenerateStarters()}
           className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl font-sans"
-          disabled={!uploadedStoryImage}
+          disabled={!interruptionImage}
         >
           🪄 Generate Conversation Starters
         </Button>

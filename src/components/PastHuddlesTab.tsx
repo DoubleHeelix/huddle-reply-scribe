@@ -130,29 +130,31 @@ export const PastHuddlesTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center gap-4">
-        <h3 className="text-white text-lg font-medium font-sans">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <h3 className="text-white text-lg font-medium font-sans shrink-0">
           Past Huddles ({filteredHuddles.length})
         </h3>
-        <div className="flex-grow max-w-xs relative">
-          <Input
-            type="text"
-            placeholder="Filter huddles..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-gray-800 border-gray-600 text-white pl-10"
-          />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-grow">
+            <Input
+              type="text"
+              placeholder="Filter huddles..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-gray-800 border-gray-600 text-white pl-10 w-full"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          </div>
+          <Button
+            onClick={refetch}
+            variant="outline"
+            size="sm"
+            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans shrink-0"
+          >
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        <Button
-          onClick={refetch}
-          variant="outline"
-          size="sm"
-          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
-        >
-          <RefreshCcw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
       </div>
 
       <div className="space-y-4 pb-4">
