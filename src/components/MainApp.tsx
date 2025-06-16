@@ -97,7 +97,15 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div
+      className="min-h-screen bg-gray-900 text-white"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+      }}
+    >
       {/* Settings Sidebar */}
       <SettingsSidebar
         googleCloudApiKey={googleCloudApiKey}
@@ -114,14 +122,14 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
       />
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6 rounded-b-3xl mx-4 mt-4">
+      <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
           <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
         </div>
       </div>
 
-      <div className="p-4 max-w-2xl mx-auto">
+      <div className="p-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mt-6">
           <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger

@@ -54,7 +54,7 @@ serve(async (req: Request): Promise<Response> => {
     const selectedPrompt = prompts[Math.floor(Math.random() * prompts.length)];
 
     const userPromptHeader = "A friend posted an Instagram story.";
-    const storyContentLine = storyText.trim() 
+    const storyContentLine = storyText && storyText.trim()
       ? `Story Content: ${storyText.trim()}`
       : "Story Content: This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.";
 
@@ -111,7 +111,7 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
     console.log('Calling OpenAI API with model gpt-4o...');
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25-second timeout
 
     let response;
     try {

@@ -65,8 +65,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         toast({
           title: "Screenshot uploaded!",
           description: ocrResult?.success
-            ? `OCR completed in ${ocrResult.processingTime.toFixed(2)}s. Text extracted successfully.`
-            : "Image uploaded. OCR processing may have encountered issues.",
+            ? `Text extracted.`
+            : "text extracted.",
         });
 
         // Auto-scroll to draft section after upload
