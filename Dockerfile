@@ -19,4 +19,5 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80 and start nginx
 EXPOSE 80
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD curl --fail http://localhost:80 || exit 1
 CMD ["nginx", "-g", "daemon off;"]
