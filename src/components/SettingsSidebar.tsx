@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Settings } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentProcessor } from "./DocumentProcessor";
 
@@ -16,9 +17,11 @@ interface SettingsSidebarProps {
   onTestOCR?: () => void;
   isTestingOCR: boolean;
   uploadedImage: string | null;
+  user: User | null;
+  onSignOut: () => void;
 }
 
-export const SettingsSidebar = ({}: SettingsSidebarProps) => {
+export const SettingsSidebar = ({ user, onSignOut }: SettingsSidebarProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -34,14 +37,36 @@ export const SettingsSidebar = ({}: SettingsSidebarProps) => {
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="w-[400px] sm:w-[540px] bg-gray-800 border-gray-700 text-white overflow-y-auto"
+        className="w-[400px] sm:w-[540px] bg-gray-800 border-gray-700 text-white overflow-y-auto flex flex-col"
       >
-        <SheetHeader>
-          <SheetTitle className="text-white">Settings</SheetTitle>
-        </SheetHeader>
-        
-        <div className="border-t border-gray-700 pt-4 mt-4">
-          <DocumentProcessor />
+        <div>
+          <SheetHeader>
+            <SheetTitle className="text-white">Settings</SheetTitle>
+          </SheetHeader>
+          
+          <div className="border-t border-gray-700 pt-4 mt-4">
+            <DocumentProcessor />
+          </div>
+        </div>
+
+        <div className="mt-auto border-t border-gray-700 pt-4">
+          {user && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-white text-sm font-sans">{user.email}</span>
+              </div>
+              <Button
+                onClick={onSignOut}
+                variant="ghost"
+                size="sm"
+                className="text-gray-400 hover:text-white font-sans h-8 px-2"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

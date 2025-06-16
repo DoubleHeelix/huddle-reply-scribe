@@ -158,7 +158,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
-    const result = await generateReply(screenshotText, userDraft, true);
+    const result = await generateReply(screenshotText, userDraft, true, lastUsedDocuments);
     
     if (result) {
       setGeneratedReply(result.reply);
