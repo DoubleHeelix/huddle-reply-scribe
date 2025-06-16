@@ -54,7 +54,6 @@ export type Database = {
           final_reply: string | null
           generated_reply: string
           id: string
-          principles: string | null
           screenshot_text: string
           selected_tone: string | null
           updated_at: string
@@ -66,7 +65,6 @@ export type Database = {
           final_reply?: string | null
           generated_reply: string
           id?: string
-          principles?: string | null
           screenshot_text: string
           selected_tone?: string | null
           updated_at?: string
@@ -78,7 +76,6 @@ export type Database = {
           final_reply?: string | null
           generated_reply?: string
           id?: string
-          principles?: string | null
           screenshot_text?: string
           selected_tone?: string | null
           updated_at?: string

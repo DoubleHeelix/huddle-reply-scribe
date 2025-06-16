@@ -9,7 +9,9 @@
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true,
-    "types": ["https://deno.land/x/service_worker@0.1.0/lib.d.ts"]
+    "types": [
+      "https://deno.land/x/deno/runtime.d.ts"
+    ]
   },
   "include": ["**/*.ts"]
 }

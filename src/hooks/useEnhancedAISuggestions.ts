@@ -19,7 +19,6 @@ export const useEnhancedAISuggestions = () => {
   const generateReply = async (
     screenshotText: string,
     userDraft: string,
-    principles: string,
     isRegeneration: boolean = false
   ): Promise<GenerateReplyResult | null> => {
     try {
@@ -46,7 +45,6 @@ export const useEnhancedAISuggestions = () => {
           action: 'generateReply',
           screenshotText,
           userDraft,
-          principles,
           isRegeneration,
           documentKnowledge
         },

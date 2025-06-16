@@ -32,7 +32,6 @@ export const useHuddlePlays = () => {
     screenshotText: string,
     userDraft: string,
     generatedReply: string,
-    principles?: string,
     selectedTone?: string
   ) => {
     try {
@@ -40,7 +39,6 @@ export const useHuddlePlays = () => {
         screenshot_text: screenshotText,
         user_draft: userDraft,
         generated_reply: generatedReply,
-        principles,
         selected_tone: selectedTone,
       });
 

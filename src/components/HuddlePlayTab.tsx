@@ -7,7 +7,13 @@ import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
 
-export const HuddlePlayTab: React.FC = () => {
+type HuddleState = ReturnType<typeof useHuddleState>;
+
+interface HuddlePlayTabProps {
+  huddleState: HuddleState;
+}
+
+export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => {
   const {
     uploadedImage,
     setUploadedImage,
@@ -17,7 +23,6 @@ export const HuddlePlayTab: React.FC = () => {
     setGeneratedReply,
     selectedTone,
     setSelectedTone,
-    principles,
     lastUsedHuddles,
     setLastUsedHuddles,
     showKnowledgeSources,
@@ -39,11 +44,14 @@ export const HuddlePlayTab: React.FC = () => {
     toast,
     lastUsedDocuments,
     setLastUsedDocuments
-  } = useHuddleState();
+  } = huddleState;
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Reset the state for a new huddle before processing the new image
+      resetHuddle();
+
       const reader = new FileReader();
       reader.onload = async (e) => {
         const imageDataUrl = e.target?.result as string;
@@ -56,7 +64,7 @@ export const HuddlePlayTab: React.FC = () => {
         
         toast({
           title: "Screenshot uploaded!",
-          description: ocrResult?.success 
+          description: ocrResult?.success
             ? `OCR completed in ${ocrResult.processingTime.toFixed(2)}s. Text extracted successfully.`
             : "Image uploaded. OCR processing may have encountered issues.",
         });
@@ -70,6 +78,9 @@ export const HuddlePlayTab: React.FC = () => {
         }, 500);
       };
       reader.readAsDataURL(file);
+
+      // Clear the input value to allow re-uploading the same file
+      event.target.value = '';
     }
   };
 
@@ -100,7 +111,7 @@ export const HuddlePlayTab: React.FC = () => {
     
     const screenshotText = getScreenshotText();
     
-    const result = await generateReply(screenshotText, userDraft, principles, false);
+    const result = await generateReply(screenshotText, userDraft, false);
     
     if (result) {
       setGeneratedReply(result.reply);
@@ -121,7 +132,6 @@ export const HuddlePlayTab: React.FC = () => {
         screenshotText,
         userDraft,
         result.reply,
-        principles,
         selectedTone
       );
       setCurrentHuddleId(huddleId);
@@ -148,7 +158,7 @@ export const HuddlePlayTab: React.FC = () => {
     if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
-    const result = await generateReply(screenshotText, userDraft, principles, true);
+    const result = await generateReply(screenshotText, userDraft, true);
     
     if (result) {
       setGeneratedReply(result.reply);
