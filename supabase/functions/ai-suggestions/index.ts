@@ -13,9 +13,9 @@ const SYSTEM_PROMPT = `You are a warm, emotionally intelligent, and concise assi
 
 KEY GUIDELINES:
 1. CONTEXT-FIRST: Carefully read both the screenshot and user's draft. Your message should naturally continue the conversation, not just rephrase the draft—refine it with clarity and direction.
-2. KEEP CONVO GOING: If the draft lacks a question or forward motion, add a natural, open-ended question based on the flow or recipient's situation to invite response.
-3. TONE MATCHING: Reflect the recipient's tone—casual, curious, upbeat, etc.—while staying warm, curious, and non-salesy.
-4. SOFT OPPORTUNITY FRAMING: The goal is to gently explore if they're open to new ideas or income streams. Don't pitch. Focus on curiosity, values, or current priorities.
+2. KEEP CONVO GOING: If the draft lacks a question or forward motion, add a natural, open-ended question based on the flow or recipient’s situation to invite response.
+3. TONE MATCHING: Reflect the recipient’s tone—casual, curious, upbeat, etc.—while staying warm, curious, and non-salesy.
+4. SOFT OPPORTUNITY FRAMING: The goal is to gently explore if they’re open to new ideas or income streams. Don’t pitch. Focus on curiosity, values, or current priorities.
 5. AVOID CLICHÉS: Never use terms like 'financial freedom,' 'passive income,' 'amazing opportunity,' or 'mentorship.' Use grounded, relatable language.
 6. FOLLOW HUDDLE PRINCIPLES: Clarity, Connection, Brevity, Flow, Empathy.
 7. NO PREFACES: Never start with 'Draft:' or 'Here's a suggestion.' Just write the reply as if you're sending it directly.`;
@@ -42,9 +42,8 @@ serve(async (req) => {
       action, 
       screenshotText, 
       userDraft, 
-      principles, 
-      isRegeneration, 
-      originalReply, 
+      isRegeneration,
+      originalReply,
       selectedTone 
     } = await req.json();
 
@@ -59,10 +58,7 @@ serve(async (req) => {
       const truncatedScreenshot = truncateText(screenshotText, 1200);
       const truncatedDraft = truncateText(userDraft, 600);
 
-      let userPromptContent = `KEY PRINCIPLES FOR YOUR REPLY (Strictly Follow These):
-${principles}
-
-CURRENT CONVERSATION (FROM SCREENSHOT):
+      let userPromptContent = `CURRENT CONVERSATION (FROM SCREENSHOT):
 ${truncatedScreenshot}
 
 USER'S DRAFT IDEA (Use for inspiration on topic/intent. Improve it based on principles and context. Do NOT just rephrase the draft if it's weak or misses the mark.):

@@ -72,16 +72,16 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
         )}
         
         <div className="flex flex-col gap-4 sm:flex-row">
-          <Button 
+          <Button
             onClick={onRegenerate}
-            variant="outline" 
+            variant="outline"
             className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
             disabled={isGenerating}
           >
             <RefreshCcw className="w-4 h-4 mr-2" />
             {isGenerating ? "Regenerating..." : "Regenerate"}
           </Button>
-          <Button 
+          <Button
             onClick={onReset}
             variant="outline"
             className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 sm:w-auto font-sans"

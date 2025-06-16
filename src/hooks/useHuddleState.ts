@@ -9,7 +9,6 @@ export const useHuddleState = () => {
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
   const [selectedTone, setSelectedTone] = useState("none");
-  const [principles, setPrinciples] = useState("Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.");
   const [lastUsedHuddles, setLastUsedHuddles] = useState<any[]>([]);
   const [showKnowledgeSources, setShowKnowledgeSources] = useState(false);
   const [googleCloudApiKey, setGoogleCloudApiKey] = useState("");
@@ -95,8 +94,6 @@ export const useHuddleState = () => {
     setGeneratedReply,
     selectedTone,
     setSelectedTone,
-    principles,
-    setPrinciples,
     lastUsedHuddles,
     setLastUsedHuddles,
     showKnowledgeSources,
