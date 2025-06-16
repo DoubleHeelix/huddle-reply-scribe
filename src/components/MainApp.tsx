@@ -158,7 +158,7 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
                 <HuddlePlayTab huddleState={huddleState} />
               </TabsContent>
               <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
-                <InterruptionsTab />
+                <InterruptionsTab huddleState={huddleState} />
               </TabsContent>
               <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
                 <PastHuddlesTab />

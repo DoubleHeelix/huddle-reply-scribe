@@ -18,6 +18,10 @@ export const useHuddleState = () => {
   const [showExtractedText, setShowExtractedText] = useState(false);
   const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
   const [lastUsedDocuments, setLastUsedDocuments] = useState<any[]>([]);
+  const [interruptionImage, setInterruptionImage] = useState<string | null>(null);
+  const [interruptionText, setInterruptionText] = useState("");
+  const [conversationStarters, setConversationStarters] = useState<string[]>([]);
+  const [editedStarter, setEditedStarter] = useState("");
 
   const { toast } = useToast();
 
@@ -82,6 +86,10 @@ export const useHuddleState = () => {
     setShowKnowledgeSources(false);
     setLastUsedHuddles([]);
     setLastUsedDocuments([]);
+    setInterruptionImage(null);
+    setInterruptionText("");
+    setConversationStarters([]);
+    setEditedStarter("");
   };
 
   return {
@@ -110,6 +118,14 @@ export const useHuddleState = () => {
     setShowExtractedText,
     currentHuddleId,
     setCurrentHuddleId,
+    interruptionImage,
+    setInterruptionImage,
+    interruptionText,
+    setInterruptionText,
+    conversationStarters,
+    setConversationStarters,
+    editedStarter,
+    setEditedStarter,
     
     // Hooks
     generateReply,
