@@ -4,12 +4,20 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const allowedOrigins = [
+  'http://localhost:8080',
+  'https://localhost:8080',
+  // Add your mobile device's local IP if needed, e.g., 'http://192.168.1.100:8080'
+];
 
-serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
+  const origin = req.headers.get('Origin') || '';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -75,7 +83,12 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
 `;
 
     // Prepare messages for API
-    const messages = [
+    type Message = {
+      role: "system" | "user";
+      content: string | { type: string; text?: string; image_url?: { url: string } }[];
+    };
+
+    const messages: Message[] = [
       { role: "system", content: selectedPrompt.system }
     ];
 
@@ -90,27 +103,36 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
       });
     } else {
       messages.push({
-        role: "user", 
+        role: "user",
         content: userPrompt.trim()
       });
     }
 
     console.log('Calling OpenAI API with model gpt-4o...');
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages,
-        max_tokens: 150,
-        n: count,
-        temperature: 1.0
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+
+    let response;
+    try {
+      response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages,
+          max_tokens: 150,
+          n: count,
+          temperature: 1.0
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -136,11 +158,24 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
 
   } catch (error) {
     console.error('Error in generate-story-interruptions function:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    
+    let errorMessage = 'An unknown error occurred.';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorMessage = 'The request to the AI service timed out. Please try again.';
+        statusCode = 504; // Gateway Timeout
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    return new Response(JSON.stringify({
+      error: errorMessage,
       conversationStarters: []
     }), {
-      status: 500,
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
