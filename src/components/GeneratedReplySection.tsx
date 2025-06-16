@@ -35,20 +35,28 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
 
   return (
     <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
-      <CardContent className="p-6 space-y-6">
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
-            <Button
-              onClick={onCopyReply}
-              variant="outline"
-              size="sm"
-              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy
-            </Button>
-          </div>
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
+          <Button
+            onClick={onCopyReply}
+            variant="outline"
+            size="sm"
+            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            Copy
+          </Button>
+        </div>
+
+        <div className="bg-gray-900 p-4 rounded-lg border border-gray-600 min-h-[120px] flex items-center justify-center">
+          <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed text-center">
+            {displayedReply}
+            <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1"></span>
+          </pre>
+        </div>
+
+        <div className="flex items-center gap-2">
           <ToneSelector
             selectedTone={selectedTone}
             onToneChange={onToneChange}
@@ -57,29 +65,21 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
             disabled={!generatedReply || isGenerating}
           />
         </div>
-        
-        <div className="bg-gray-900 p-4 rounded-lg border border-gray-600 min-h-[100px]">
-          <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed">
-            {displayedReply}
-            <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1"></span>
-          </pre>
-        </div>
-        
-        {/* Loading state for tone adjustment */}
+
         {isAdjustingTone && (
-          <div className="text-center py-4">
+          <div className="text-center py-2">
             <div className="inline-flex items-center gap-2 text-purple-400">
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
               <span className="text-sm font-sans">Adjusting tone...</span>
             </div>
           </div>
         )}
-        
-        <div className="flex flex-col gap-4 sm:flex-row">
+
+        <div className="grid grid-cols-2 gap-4">
           <Button
             onClick={onRegenerate}
             variant="outline"
-            className="flex-1 bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
+            className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
             disabled={isGenerating}
           >
             <RefreshCcw className="w-4 h-4 mr-2" />
@@ -88,7 +88,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
           <Button
             onClick={onReset}
             variant="outline"
-            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 sm:w-auto font-sans"
+            className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
           >
             New Huddle
           </Button>
