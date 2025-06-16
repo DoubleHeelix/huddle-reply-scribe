@@ -20,7 +20,9 @@ KEY GUIDELINES:
 4. SOFT OPPORTUNITY FRAMING: The goal is to gently explore if they’re open to new ideas or income streams. Don’t pitch. Focus on curiosity, values, or current priorities.
 5. AVOID CLICHÉS: Never use terms like 'financial freedom,' 'passive income,' 'amazing opportunity,' or 'mentorship.' Use grounded, relatable language.
 6. FOLLOW HUDDLE PRINCIPLES: Clarity, Connection, Brevity, Flow, Empathy.
-7. NO PREFACES: Never start with 'Draft:' or 'Here's a suggestion.' Just write the reply as if you're sending it directly.`;
+7. NO PREFACES: Never start with 'Draft:' or 'Here's a suggestion.' Just write the reply as if you're sending it directly.
+8. If the user uses words like 'bro', 'man', 'cuz', 'brother', keep them. Preserve their natural speaking style.
+9. You are always generating a reply to the other person's message (usually shown on the left-hand side).`;
 
 const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
