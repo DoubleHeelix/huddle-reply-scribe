@@ -20,7 +20,7 @@ export const useInterruptions = () => {
 
     setStories(newStories);
 
-    for (const story of newStories) {
+    const processStory = async (story: Story) => {
       try {
         // 1. Upload to Storage
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'uploading' } : s));
@@ -55,7 +55,9 @@ export const useInterruptions = () => {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'error', error: errorMessage } : s));
       }
-    }
+    };
+
+    await Promise.all(newStories.map(processStory));
   };
 
   const clearStories = () => {
