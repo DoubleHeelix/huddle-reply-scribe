@@ -10,7 +10,14 @@ RUN npm install
 COPY . .
 
 # Build the application
-RUN echo "--- Checking Environment Variables ---" && printenv && echo "--- Starting Build ---" && npm run build
+# Set build-time arguments
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
+
+# Build the application
+RUN npm run build
 
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
