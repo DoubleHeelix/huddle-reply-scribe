@@ -10,7 +10,8 @@ RUN npm install
 COPY . .
 
 # Build the application
-RUN npm run build
+# Cache buster: 16/06/2025, 1:51:52 pm
+RUN echo "Starting build at $(date)" && npm run build && echo "Finished build at $(date)"
 
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
