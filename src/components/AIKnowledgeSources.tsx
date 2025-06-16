@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { formatExtractedText } from '@/utils/textProcessing';
 
 interface PastHuddle {
   id: string;
@@ -53,6 +54,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
     setExpandedDocuments(newExpanded);
   };
 
+
   return (
     <div className="space-y-4">
       {/* Document Knowledge Sources */}
@@ -69,31 +71,41 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
               {documentKnowledge.map((doc, index) => {
                 const isExpanded = expandedDocuments.has(doc.id);
                 return (
-                  <div key={doc.id} className="bg-gray-900 p-3 rounded-lg border border-gray-600">
-                    <div 
+                  <div key={doc.id || index} className="bg-gray-900 p-3 rounded-lg border border-gray-600">
+                    <div
                       className="flex items-center justify-between mb-2 cursor-pointer"
-                      onClick={() => toggleDocumentExpansion(doc.id)}
+                      onClick={() => toggleDocumentExpansion(doc.id || `doc-${index}`)}
                     >
-                      <div className="flex items-center gap-2 flex-1">
-                        {isExpanded ? 
-                          <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {isExpanded ?
+                          <ChevronDown className="w-4 h-4 text-gray-400" /> :
                           <ChevronRight className="w-4 h-4 text-gray-400" />
                         }
-                        <FileText className="w-4 h-4 text-green-400" />
-                        <span className="text-gray-300 text-sm font-medium font-sans">
+                        <FileText className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300 text-sm font-medium font-sans truncate">
                           {doc.document_name}
                         </span>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {Math.round(doc.similarity * 100)}% match
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-gray-400">Relevance:</span>
+                        <div className="w-16 bg-gray-700 rounded-full h-2.5">
+                          <div
+                            className="bg-green-500 h-2.5 rounded-full"
+                            style={{ width: `${Math.round(doc.similarity * 100)}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-semibold text-white">
+                          {Math.round(doc.similarity * 100)}%
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-gray-400 text-xs font-sans">Relevant content:</p>
-                      <p className="text-white text-xs font-sans line-clamp-3">
-                        {isExpanded ? doc.content_chunk : `${doc.content_chunk.substring(0, 150)}...`}
-                      </p>
-                    </div>
+                    {isExpanded && (
+                      <div className="mt-2 pl-6 border-l-2 border-gray-700">
+                        <p className="text-gray-300 text-xs font-sans whitespace-pre-wrap">
+                          {formatExtractedText(doc.content_chunk)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })}

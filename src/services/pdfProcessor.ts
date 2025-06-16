@@ -1,4 +1,10 @@
 
+import * as pdfjs from 'pdfjs-dist';
+import { supabase } from '@/integrations/supabase/client';
+
+// Set workerSrc to avoid issues with Vite
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+
 export interface PDFProcessingResult {
   text: string;
   pageCount: number;
@@ -8,24 +14,26 @@ export interface PDFProcessingResult {
 export const pdfProcessor = {
   async extractTextFromFile(file: File): Promise<PDFProcessingResult> {
     try {
-      console.log('🔄 Starting simple PDF text extraction...');
-      
-      // Simple approach: treat PDF as a document and provide a meaningful response
-      const text = `Document: ${file.name}\n\nThis PDF document has been uploaded and is ready for AI processing. The AI can answer questions about this document based on its content and filename.`;
-      
+      console.log('🔄 Starting PDF text extraction from file...');
+      const arrayBuffer = await file.arrayBuffer();
+      const doc = await pdfjs.getDocument(arrayBuffer).promise;
+      let text = '';
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(' ');
+      }
       console.log(`✅ PDF processing complete: ${text.length} characters`);
-      
       return {
         text,
-        pageCount: 1,
+        pageCount: doc.numPages,
         metadata: {
           extractedAt: new Date().toISOString(),
           originalFileName: file.name,
           fileSize: file.size,
-          processingMethod: 'simple-processing'
+          processingMethod: 'pdfjs-dist'
         }
       };
-      
     } catch (error) {
       console.error('❌ PDF text extraction failed:', error);
       throw new Error(`Failed to extract text from PDF: ${error.message}`);
@@ -34,25 +42,29 @@ export const pdfProcessor = {
 
   async extractTextFromStorage(fileName: string): Promise<PDFProcessingResult> {
     try {
-      console.log('🔄 Starting simple PDF extraction from storage...');
-      
-      // Simple approach for storage files: provide a meaningful response
-      const text = `Document: ${fileName}\n\nThis PDF document from storage is ready for AI processing. The AI can provide responses based on the document name and context.`;
-      
-      console.log(`✅ Simple PDF extraction complete: ${text.length} characters`);
-      
+      console.log('🔄 Starting PDF extraction from storage...');
+      const { data, error } = await supabase.storage.from('documents').download(fileName);
+      if (error) throw error;
+      const arrayBuffer = await data.arrayBuffer();
+      const doc = await pdfjs.getDocument(arrayBuffer).promise;
+      let text = '';
+      for (let i = 1; i <= doc.numPages; i++) {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(' ');
+      }
+      console.log(`✅ PDF extraction complete: ${text.length} characters`);
       return {
         text,
-        pageCount: 1,
+        pageCount: doc.numPages,
         metadata: {
           extractedAt: new Date().toISOString(),
           originalFileName: fileName,
-          processingMethod: 'simple-storage-processing'
+          processingMethod: 'pdfjs-dist'
         }
       };
-      
     } catch (error) {
-      console.error('❌ Simple PDF extraction failed:', error);
+      console.error('❌ PDF extraction failed:', error);
       throw new Error(`Failed to extract text from PDF: ${error.message}`);
     }
   }

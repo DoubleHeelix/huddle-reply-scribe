@@ -273,17 +273,19 @@ Please provide an improved version of this message:`;
 
       console.log('🎯 DEBUG: Returning response with:', {
         replyLength: reply.length,
-        pastHuddlesCount: pastHuddlesForDisplay.length
+        pastHuddlesCount: pastHuddlesForDisplay.length,
+        documentKnowledgeCount: documentKnowledge?.length || 0
       });
 
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           reply,
-          pastHuddles: pastHuddlesForDisplay
+          pastHuddles: pastHuddlesForDisplay,
+          documentKnowledge: documentKnowledge || []
         }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+          status: 200
         }
       );
 

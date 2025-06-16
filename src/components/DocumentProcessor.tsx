@@ -52,6 +52,14 @@ export const DocumentProcessor: React.FC = () => {
 
   useEffect(() => {
     fetchStorageFiles();
+    const checkData = async () => {
+      const { data, error } = await supabase.from('document_knowledge').select('*').limit(5);
+      console.log('DATABASE CHECK: document_knowledge table sample:', data);
+      if (error) {
+        console.error('DATABASE CHECK ERROR:', error);
+      }
+    };
+    checkData();
   }, []);
 
   const handleProcessDocument = async (fileName: string) => {
@@ -94,6 +102,17 @@ export const DocumentProcessor: React.FC = () => {
     }
   };
 
+  const handleProcessAll = async () => {
+    const unprocessedFiles = storageFiles.filter(file => !isDocumentProcessed(file.name));
+    if (unprocessedFiles.length === 0) {
+      return;
+    }
+
+    for (const file of unprocessedFiles) {
+      await handleProcessDocument(file.name);
+    }
+  };
+
   return (
     <Card className="bg-gray-800 border-gray-700">
       <CardContent className="p-4 space-y-4">
@@ -104,15 +123,26 @@ export const DocumentProcessor: React.FC = () => {
               Process PDF documents from Supabase storage to enhance AI responses.
             </p>
           </div>
-          <Button
-            onClick={fetchStorageFiles}
-            variant="outline"
-            size="sm"
-            disabled={isLoadingStorage}
-            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoadingStorage ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={fetchStorageFiles}
+              variant="outline"
+              size="sm"
+              disabled={isLoadingStorage}
+              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoadingStorage ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              onClick={handleProcessAll}
+              variant="outline"
+              size="sm"
+              disabled={isProcessing || storageFiles.every(file => isDocumentProcessed(file.name))}
+              className="bg-blue-600 border-blue-500 text-white hover:bg-blue-500"
+            >
+              Process All
+            </Button>
+          </div>
         </div>
 
         {/* Error Display */}

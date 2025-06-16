@@ -73,7 +73,7 @@ export const useEnhancedAISuggestions = () => {
       return {
         reply: data.reply || '',
         pastHuddles,
-        documentKnowledge
+        documentKnowledge: data.documentKnowledge || []
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
