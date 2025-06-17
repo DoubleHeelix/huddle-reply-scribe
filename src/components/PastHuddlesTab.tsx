@@ -6,15 +6,51 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { RefreshCcw, MessageSquare, Calendar, Search } from 'lucide-react';
+import { RefreshCcw, MessageSquare, Calendar, Search, Bot } from 'lucide-react';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
 import { getCategory } from '@/utils/huddleCategorization';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const PastHuddlesTab = () => {
   const { huddlePlays, isLoading, error, refetch } = useHuddlePlays();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { toast } = useToast();
+
+  const handleAnalyzeStyle = async () => {
+    setIsAnalyzing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
+        body: { action: 'analyzeStyle', userId: session.user.id },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: 'Analysis Complete',
+        description: `Analyzed ${data.huddle_count} huddles. Your style profile has been updated.`,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to analyze style';
+      toast({
+        title: 'Analysis Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const toggleHuddleExpansion = (id: string) => {
     setExpandedHuddles(prev =>
@@ -162,6 +198,16 @@ export const PastHuddlesTab = () => {
           >
             <RefreshCcw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+          <Button
+            onClick={handleAnalyzeStyle}
+            variant="outline"
+            size="sm"
+            className="bg-purple-600 border-purple-500 text-white hover:bg-purple-500 font-sans shrink-0"
+            disabled={isAnalyzing}
+          >
+            <Bot className="w-4 h-4 mr-2" />
+            {isAnalyzing ? 'Analyzing...' : 'Analyze My Style'}
           </Button>
         </div>
       </div>

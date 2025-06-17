@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { saveHuddlePlay, getUserHuddlePlays, updateHuddlePlayFinalReply, type HuddlePlay } from '@/utils/huddlePlayService';
+import { useAuth } from './useAuth';
 
 export const useHuddlePlays = () => {
+  const { user } = useAuth();
   const [huddlePlays, setHuddlePlays] = useState<HuddlePlay[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -79,8 +81,13 @@ export const useHuddlePlays = () => {
   };
 
   useEffect(() => {
-    fetchHuddlePlays();
-  }, []);
+    if (user) {
+      fetchHuddlePlays();
+    } else {
+      setIsLoading(false);
+      setHuddlePlays([]);
+    }
+  }, [user]);
 
   return {
     huddlePlays,
