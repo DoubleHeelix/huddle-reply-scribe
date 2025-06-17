@@ -52,8 +52,8 @@ export const useInterruptions = () => {
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, interruptions, status: 'completed' } : s));
 
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-        setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'error', error: errorMessage } : s));
+        console.error("Error processing story:", err);
+        setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'error', error: "Error: Please upload again" } : s));
       }
     };
 

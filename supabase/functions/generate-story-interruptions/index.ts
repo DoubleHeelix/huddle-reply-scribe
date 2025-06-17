@@ -48,8 +48,12 @@ serve(async (req: Request): Promise<Response> => {
       {
         system: "You are a friendly and engaging buddy replying to Instagram stories. Your aim is to spark a fun and lighthearted chat by noticing something specific in the story. Be curious and ask a simple question about what you see. Keep it casual and use a single emoji to add a bit of personality.",
         version: "B"
-      }
-    ];
+      },
+     {
+       system: "You are a down-to-earth and relatable friend replying to Instagram stories. Your goal is to be observant and genuine, making simple, curious comments about what you see. Keep your tone grounded and avoid overly enthusiastic or generic phrases. A single, well-placed emoji is okay, but not required.",
+       version: "C"
+     }
+   ];
 
     const selectedPrompt = prompts[Math.floor(Math.random() * prompts.length)];
 
@@ -71,6 +75,7 @@ Instructions:
 - If text: Respond thoughtfully to the text.
 - Where possible, include a question at the end to prompt conversation.
 - Be authentic and simple. Avoid being overly clever, eccentric, or bubbly.
+- For pets, use neutral terms like "your dog" or "your cat." Avoid "pet-speak" like "furry friend" or "pupper."
 - Use at most one emoji, only if it fits.
 - Do **not** use quotation marks in your draft.
 - Do **not** use any preamble—just write the message directly.
@@ -79,6 +84,7 @@ Instructions:
 Examples:
 Good: "That breakfast looks amazing! Enjoy!"
 Good: "Looks like a fun night out! How was the concert?"
+Good: "Cute dog! What's their name?"
 Bad: "Cool project! What are you building?" (when nothing suggests a project)
 `;
 

@@ -19,9 +19,10 @@ interface SettingsSidebarProps {
   uploadedImage: string | null;
   user: User | null;
   onSignOut: () => void;
+  isAdmin: boolean;
 }
 
-export const SettingsSidebar = ({ user, onSignOut }: SettingsSidebarProps) => {
+export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -44,9 +45,11 @@ export const SettingsSidebar = ({ user, onSignOut }: SettingsSidebarProps) => {
             <SheetTitle className="text-white">Settings</SheetTitle>
           </SheetHeader>
           
-          <div className="border-t border-gray-700 pt-4 mt-4">
-            <DocumentProcessor />
-          </div>
+          {isAdmin && (
+            <div className="border-t border-gray-700 pt-4 mt-4">
+              <DocumentProcessor />
+            </div>
+          )}
         </div>
 
         <div className="mt-auto border-t border-gray-700 pt-4">

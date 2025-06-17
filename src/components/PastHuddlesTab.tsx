@@ -14,6 +14,15 @@ import { getCategory } from '@/utils/huddleCategorization';
 export const PastHuddlesTab = () => {
   const { huddlePlays, isLoading, error, refetch } = useHuddlePlays();
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
+
+  const toggleHuddleExpansion = (id: string) => {
+    setExpandedHuddles(prev =>
+      prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
+    );
+  };
+
+  const isHuddleExpanded = (id: string) => expandedHuddles.includes(id);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -199,9 +208,18 @@ export const PastHuddlesTab = () => {
                           <div className="space-y-3">
                             <div>
                               <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
-                              <p className="text-gray-400 text-sm font-sans line-clamp-2">
-                                {huddle.screenshot_text.substring(0, 150)}...
+                              <p className={`text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
+                                {huddle.screenshot_text}
                               </p>
+                              {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto text-xs text-blue-400 hover:no-underline"
+                                  onClick={() => toggleHuddleExpansion(huddle.id)}
+                                >
+                                  {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
+                                </Button>
+                              )}
                             </div>
 
                             <div>

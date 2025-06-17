@@ -1,13 +1,73 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight, Sparkles, Mail, Lock, UserPlus, LogIn } from "lucide-react";
 
-interface LandingPageProps {
-  onGetStarted: () => void;
-}
+const LandingPage = () => {
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
-const LandingPage = ({ onGetStarted }: LandingPageProps) => {
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast({
+        title: "Sign In Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully signed in.",
+      });
+    }
+
+    setIsSubmitting(false);
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const redirectUrl = `${window.location.origin}/`;
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Sign Up Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Please check your email to verify your account.",
+      });
+    }
+
+    setIsSubmitting(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center relative overflow-hidden">
       {/* Animated background elements */}
@@ -38,45 +98,75 @@ const LandingPage = ({ onGetStarted }: LandingPageProps) => {
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            AI-powered conversation suggestions that help you communicate with 
+            AI-powered conversation suggestions that help you communicate with
             <span className="text-purple-400 font-semibold"> clarity</span>,
             <span className="text-blue-400 font-semibold"> connection</span>, and
             <span className="text-pink-400 font-semibold"> empathy</span>
           </p>
         </div>
 
-        {/* Features list */}
-        <div className="mb-12 grid md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto bg-purple-500/20 rounded-lg flex items-center justify-center mb-3">
-              <span className="text-2xl">📸</span>
-            </div>
-            <h3 className="text-white font-semibold mb-2">Upload Screenshot</h3>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto bg-blue-500/20 rounded-lg flex items-center justify-center mb-3">
-              <span className="text-2xl">🤖</span>
-            </div>
-            <h3 className="text-white font-semibold mb-2">AI Suggestions</h3>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto bg-pink-500/20 rounded-lg flex items-center justify-center mb-3">
-              <span className="text-2xl">⚡</span>
-            </div>
-            <h3 className="text-white font-semibold mb-2">Instant Results</h3>
-          </div>
-        </div>
+        {/* Auth Form */}
+        <div className="mt-8 animate-fade-in" style={{ animationDelay: '1s' }}>
+          <div className="max-w-md mx-auto bg-gray-800/50 backdrop-blur-sm p-8 rounded-2xl shadow-2xl">
+            <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
+              <div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 bg-gray-900/70 border-gray-600 text-white font-sans"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 bg-gray-900/70 border-gray-600 text-white font-sans"
+                    required
+                  />
+                </div>
+              </div>
 
-        {/* Get Started Button */}
-        <div className="animate-fade-in" style={{ animationDelay: '1s' }}>
-          <Button
-            onClick={onGetStarted}
-            size="lg"
-            className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-105 group"
-          >
-            Get Started
-            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
-          </Button>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 font-sans"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    {authMode === 'signin' ? 'Signing in...' : 'Creating account...'}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 justify-center">
+                    {authMode === 'signin' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                    {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                  </div>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                className="text-purple-400 hover:text-purple-300 font-sans text-sm"
+              >
+                {authMode === 'signin'
+                  ? "Don't have an account? Sign up"
+                  : "Already have an account? Sign in"
+                }
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
