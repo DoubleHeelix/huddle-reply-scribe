@@ -2,25 +2,18 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Lock, UserPlus, LogIn } from 'lucide-react';
 
 interface AuthWrapperProps {
-  children: (user: User | null, onSignOut: () => void) => React.ReactNode;
+  children: (user: User | null, onSignOut: () => void, isAdmin: boolean) => React.ReactNode;
 }
 
 export const AuthWrapper = ({ children }: AuthWrapperProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener
@@ -28,7 +21,10 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
       (event, session) => {
         console.log('🔐 AUTH: Auth state changed:', event, session?.user?.email);
         setSession(session);
-        setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        const userRole = currentUser?.user_metadata?.role;
+        setIsAdmin(userRole === 'admin');
         setLoading(false);
       }
     );
@@ -37,67 +33,15 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('🔐 AUTH: Initial session check:', session?.user?.email);
       setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      const userRole = currentUser?.user_metadata?.role;
+      setIsAdmin(userRole === 'admin');
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      toast({
-        title: "Sign In Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
-    }
-
-    setIsSubmitting(false);
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const redirectUrl = `${window.location.origin}/`;
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-
-    if (error) {
-      toast({
-        title: "Sign Up Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Account created!",
-        description: "Please check your email to verify your account.",
-      });
-    }
-
-    setIsSubmitting(false);
-  };
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -121,88 +65,9 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-gray-800 border-gray-700">
-          <CardContent className="p-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-white font-sans mb-2">
-                🤝 Huddle Assistant
-              </h1>
-              <p className="text-gray-400 font-sans">
-                {authMode === 'signin' ? 'Sign in to continue' : 'Create your account'}
-              </p>
-            </div>
-
-            <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
-              <div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-gray-900 border-gray-600 text-white font-sans"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 bg-gray-900 border-gray-600 text-white font-sans"
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 font-sans"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    {authMode === 'signin' ? 'Signing in...' : 'Creating account...'}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {authMode === 'signin' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                    {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                  </div>
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                className="text-purple-400 hover:text-purple-300 font-sans text-sm"
-              >
-                {authMode === 'signin' 
-                  ? "Don't have an account? Sign up" 
-                  : "Already have an account? Sign in"
-                }
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div>
-      {children(user, handleSignOut)}
+      {children(user, handleSignOut, isAdmin)}
     </div>
   );
 };

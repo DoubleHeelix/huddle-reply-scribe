@@ -13,9 +13,10 @@ import { useInterruptions } from "@/hooks/useInterruptions";
 interface MainAppProps {
   user: User | null;
   onSignOut: () => void;
+  isAdmin: boolean;
 }
 
-export const MainApp = ({ user, onSignOut }: MainAppProps) => {
+export const MainApp = ({ user, onSignOut, isAdmin }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState("huddle-play");
   const [direction, setDirection] = useState(0);
   const huddleState = useHuddleState();
@@ -119,6 +120,7 @@ export const MainApp = ({ user, onSignOut }: MainAppProps) => {
         uploadedImage={uploadedImage}
         user={user}
         onSignOut={onSignOut}
+        isAdmin={isAdmin}
       />
 
       {/* Header */}
