@@ -3,14 +3,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
+import { AuthContext } from '@/hooks/useAuth';
 
 interface AuthWrapperProps {
-  children: (user: User | null, onSignOut: () => void, isAdmin: boolean) => React.ReactNode;
+  children: React.ReactNode;
 }
 
 export const AuthWrapper = ({ children }: AuthWrapperProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -20,7 +20,6 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('🔐 AUTH: Auth state changed:', event, session?.user?.email);
-        setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         const userRole = currentUser?.user_metadata?.role;
@@ -32,7 +31,6 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('🔐 AUTH: Initial session check:', session?.user?.email);
-      setSession(session);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       const userRole = currentUser?.user_metadata?.role;
@@ -66,8 +64,8 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
   }
 
   return (
-    <div>
-      {children(user, handleSignOut, isAdmin)}
-    </div>
+    <AuthContext.Provider value={{ user, isAdmin, onSignOut: handleSignOut }}>
+      {children}
+    </AuthContext.Provider>
   );
 };

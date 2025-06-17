@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  action: 'generateReply' | 'adjustTone';
+  action: 'generateReply' | 'adjustTone' | 'analyzeStyle';
   screenshotText?: string;
   userDraft?: string;
   principles?: string;
@@ -19,6 +19,7 @@ interface RequestBody {
     content_chunk: string;
     similarity: number;
   }>;
+  userId?: string;
 }
 
 serve(async (req) => {
@@ -36,20 +37,22 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { 
-      action, 
-      screenshotText, 
-      userDraft, 
-      principles, 
-      isRegeneration, 
-      originalReply, 
+    const {
+      action,
+      screenshotText,
+      userDraft,
+      principles,
+      isRegeneration,
+      originalReply,
       selectedTone,
-      documentKnowledge 
+      documentKnowledge,
+      userId
     }: RequestBody = await req.json();
 
-    console.log('🤖 DEBUG: Enhanced AI Suggestions - Action:', action);
+    const cleanAction = action?.trim();
+    console.log('🤖 DEBUG: Enhanced AI Suggestions - Action:', cleanAction);
 
-    if (action === 'generateReply') {
+    if (cleanAction === 'generateReply') {
       console.log('📊 DEBUG: Generate reply request details:', {
         screenshotTextLength: screenshotText?.length || 0,
         userDraftLength: userDraft?.length || 0,
@@ -67,6 +70,21 @@ serve(async (req) => {
         const { data: { user } } = await supabase.auth.getUser(token);
         userId = user?.id;
         console.log('👤 DEBUG: User ID from token:', userId);
+      }
+
+      // Fetch user's style profile
+      let contextFromStyleProfile = '';
+      if (userId) {
+        const { data: profile, error: profileError } = await supabase
+          .from('user_style_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (profile) {
+          console.log('🎨 DEBUG: Found user style profile:', profile);
+          contextFromStyleProfile = `\n\nUser's typical writing style (for reference):\n- Average sentence length: ~${profile.avg_sentence_length} words.\n- Formality: ${profile.formality || 'not set'}\n- Common topics: ${profile.common_topics?.join(', ') || 'not set'}\n`;
+        }
       }
 
       // Fetch similar past huddles from Qdrant if available
@@ -158,6 +176,8 @@ serve(async (req) => {
       const systemPrompt = `You are an expert communication assistant that helps people craft perfect responses for conversations. Your goal is to help improve their draft messages to be more effective, clear, and engaging.
 
 ${principles || 'Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural.'}
+
+${contextFromStyleProfile}
 
 ${contextFromPastHuddles}
 
@@ -289,7 +309,112 @@ Please provide an improved version of this message:`;
         }
       );
 
-    } else if (action === 'adjustTone') {
+    } else if (cleanAction === 'analyzeStyle') {
+      if (!userId) {
+        console.error('❌ DEBUG: analyzeStyle called without userId.');
+        throw new Error('userId is required for style analysis');
+      }
+
+      console.log('🔬 DEBUG: [1/5] Starting style analysis for user:', userId);
+
+      const { data: huddlePlays, error } = await supabase
+        .from('huddle_plays')
+        .select('user_draft')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('❌ DEBUG: [2/5] Error fetching huddle plays:', error);
+        throw error;
+      }
+      console.log(`✅ DEBUG: [2/5] Found ${huddlePlays?.length || 0} huddle plays.`);
+
+      if (!huddlePlays || huddlePlays.length === 0) {
+        return new Response(JSON.stringify({ message: "No huddle plays found to analyze." }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const allDrafts = huddlePlays.map(p => p.user_draft).join(' ');
+      const sentences = allDrafts.match(/[^.!?]+[.!?]+/g) || [];
+      const words = allDrafts.split(/\s+/).filter(Boolean);
+      const totalWords = words.length;
+      const totalSentences = sentences.length;
+      const avgSentenceLength = totalSentences > 0 ? Math.round(totalWords / totalSentences) : 0;
+
+      console.log('📊 DEBUG: [3/5] Calculated metrics:', { totalWords, totalSentences, avgSentenceLength });
+
+      const stopWords = new Set(['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now']);
+      const wordFrequencies: { [key: string]: number } = {};
+      words.forEach(word => {
+        const lowerWord = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (lowerWord && !stopWords.has(lowerWord)) {
+          wordFrequencies[lowerWord] = (wordFrequencies[lowerWord] || 0) + 1;
+        }
+      });
+      const commonTopics = Object.entries(wordFrequencies)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([text]) => text);
+      
+      console.log('✅ DEBUG: [4/5] Extracted common topics:', commonTopics);
+
+      const profileData = {
+        user_id: userId,
+        huddle_count: huddlePlays.length,
+        avg_sentence_length: avgSentenceLength,
+        common_topics: commonTopics,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log('💾 DEBUG: [5/5] Attempting to save profile data:', profileData);
+
+      // Two-step upsert to avoid RLS issues with onConflict
+      const { data: existingProfile, error: selectError } = await supabase
+        .from('user_style_profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') { // Ignore 'not found' error
+        console.error('❌ DEBUG: [5/5] Error checking for existing profile:', selectError);
+        throw selectError;
+      }
+
+      let updatedProfile;
+      if (existingProfile) {
+        // Update existing profile
+        const { data, error: updateError } = await supabase
+          .from('user_style_profiles')
+          .update(profileData)
+          .eq('user_id', userId)
+          .select()
+          .single();
+        if (updateError) {
+          console.error('❌ DEBUG: [5/5] Error updating profile:', updateError);
+          throw updateError;
+        }
+        updatedProfile = data;
+      } else {
+        // Insert new profile
+        const { data, error: insertError } = await supabase
+          .from('user_style_profiles')
+          .insert(profileData)
+          .select()
+          .single();
+        if (insertError) {
+          console.error('❌ DEBUG: [5/5] Error inserting profile:', insertError);
+          throw insertError;
+        }
+        updatedProfile = data;
+      }
+
+      console.log('✅ DEBUG: Style analysis complete and profile updated.');
+
+      return new Response(JSON.stringify(updatedProfile), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
+    } else if (cleanAction === 'adjustTone') {
       // Tone adjustment logic (same as before)
       const toneInstructions = {
         casual: 'Make this more casual and relaxed in tone',
@@ -344,7 +469,7 @@ Please provide an improved version of this message:`;
       );
     }
 
-    throw new Error('Invalid action');
+    throw new Error(`Invalid action received: '${cleanAction}'. Check for deployment issues.`);
 
   } catch (error) {
     console.error('❌ DEBUG: Error in enhanced-ai-suggestions function:', error);

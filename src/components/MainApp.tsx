@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, History, Camera } from "lucide-react";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
@@ -9,14 +8,10 @@ import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
 import { useInterruptions } from "@/hooks/useInterruptions";
+import { useAuth } from '@/hooks/useAuth';
 
-interface MainAppProps {
-  user: User | null;
-  onSignOut: () => void;
-  isAdmin: boolean;
-}
-
-export const MainApp = ({ user, onSignOut, isAdmin }: MainAppProps) => {
+export const MainApp = () => {
+  const { user, onSignOut, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("huddle-play");
   const [direction, setDirection] = useState(0);
   const huddleState = useHuddleState();

@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Create a table to store huddle plays
 CREATE TABLE public.huddle_plays (
