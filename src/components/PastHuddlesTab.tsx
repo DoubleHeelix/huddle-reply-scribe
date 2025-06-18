@@ -14,8 +14,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const PastHuddlesTab = () => {
-  const { huddlePlays, isLoading, error, refetch } = useHuddlePlays();
+  const { huddlePlays: initialHuddlePlays, isLoading, error, refetch } = useHuddlePlays();
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
@@ -49,6 +51,36 @@ export const PastHuddlesTab = () => {
       });
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke('search-past-huddles', {
+        body: { query: searchTerm, userId: session.user.id },
+      });
+
+      if (error) throw error;
+
+      setSearchResults(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to search';
+      toast({
+        title: 'Search Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -121,7 +153,7 @@ export const PastHuddlesTab = () => {
     );
   }
 
-  if (huddlePlays.length === 0) {
+  if (initialHuddlePlays.length === 0 && !searchResults) {
     return (
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-6 text-center">
@@ -135,7 +167,10 @@ export const PastHuddlesTab = () => {
     );
   }
 
-  const filteredHuddles = huddlePlays.filter(huddle => {
+  const huddlesToDisplay = searchResults !== null ? searchResults : initialHuddlePlays;
+
+  const filteredHuddles = huddlesToDisplay.filter(huddle => {
+    if (!searchTerm.trim() || searchResults !== null) return true; // If searching, backend handles filtering
     const searchTermLower = searchTerm.toLowerCase();
     return (
       huddle.screenshot_text?.toLowerCase().includes(searchTermLower) ||
@@ -152,7 +187,7 @@ export const PastHuddlesTab = () => {
     }
     acc[category].push(huddle);
     return acc;
-  }, {} as Record<string, typeof huddlePlays>);
+  }, {} as Record<string, typeof initialHuddlePlays>);
 
   const categoryOrder = [
     "💼 What's the business?",
@@ -186,18 +221,14 @@ export const PastHuddlesTab = () => {
               placeholder="Filter huddles..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="bg-gray-800 border-gray-600 text-white pl-10 w-full"
             />
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           </div>
-          <Button
-            onClick={refetch}
-            variant="outline"
-            size="sm"
-            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans shrink-0"
-          >
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Refresh
+          <Button onClick={handleSearch} disabled={isSearching || !searchTerm.trim()}>
+            <Search className="w-4 h-4 mr-2" />
+            {isSearching ? 'Searching...' : 'Search'}
           </Button>
           <Button
             onClick={handleAnalyzeStyle}

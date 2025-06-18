@@ -35,7 +35,6 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     adjustTone,
     isGenerating,
     isAdjustingTone,
-    saveCurrentHuddle,
     updateFinalReply,
     extractText,
     isOCRProcessing,
@@ -127,14 +126,6 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         (result.documentKnowledge && result.documentKnowledge.length > 0)
       );
       
-      // Save the huddle play to database for future learning
-      const huddleId = await saveCurrentHuddle(
-        screenshotText,
-        userDraft,
-        result.reply,
-        selectedTone
-      );
-      setCurrentHuddleId(huddleId);
       
       const huddleCount = result.pastHuddles?.length || 0;
       const documentCount = result.documentKnowledge?.length || 0;
