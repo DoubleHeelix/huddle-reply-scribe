@@ -23,31 +23,43 @@ export const useInterruptions = () => {
     const processStory = async (story: Story) => {
       try {
         // 1. Upload to Storage
+        console.log(`[${story.id}] Starting upload...`);
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'uploading' } : s));
         const filePath = `public/${story.id}`;
         const { error: uploadError } = await supabase.storage
           .from('story_images')
           .upload(filePath, story.file);
 
-        if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
+        if (uploadError) {
+          console.error(`[${story.id}] Supabase Storage upload error:`, uploadError);
+          throw new Error(`Storage Error: ${uploadError.message}`);
+        }
+        console.log(`[${story.id}] Upload complete. Getting public URL...`);
 
         const { data: { publicUrl } } = supabase.storage
           .from('story_images')
           .getPublicUrl(filePath);
 
-        if (!publicUrl) throw new Error('Could not get public URL for the image.');
+        if (!publicUrl) {
+          console.error(`[${story.id}] Failed to get public URL.`);
+          throw new Error('Could not get public URL for the image.');
+        }
+        console.log(`[${story.id}] Public URL received. Starting OCR...`);
 
         // 2. OCR Step
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'ocr' } : s));
         const ocrText = await extractText(story.file);
+        console.log(`[${story.id}] OCR complete. Text length: ${ocrText?.length || 0}`);
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, ocrText } : s));
 
         // 3. Generation Step
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'generating' } : s));
+        console.log(`[${story.id}] Generating interruptions...`);
         const interruptions = await generateStoryResponse({
           storyText: ocrText,
           imageUrl: publicUrl,
         });
+        console.log(`[${story.id}] Interruptions received.`);
         
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, interruptions, status: 'completed' } : s));
 
