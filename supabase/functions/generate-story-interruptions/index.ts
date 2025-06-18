@@ -7,6 +7,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const allowedOrigins = [
   'http://localhost:8080',
   'https://localhost:8080',
+  'https://huddle-reply-scribe-production.up.railway.app',
   // Add your mobile device's local IP if needed, e.g., 'http://192.168.1.100:8080'
 ];
 
