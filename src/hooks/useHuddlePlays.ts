@@ -30,38 +30,6 @@ export const useHuddlePlays = () => {
     }
   };
 
-  const saveCurrentHuddle = async (
-    screenshotText: string,
-    userDraft: string,
-    generatedReply: string,
-    selectedTone?: string
-  ) => {
-    try {
-      const savedPlay = await saveHuddlePlay({
-        screenshot_text: screenshotText,
-        user_draft: userDraft,
-        generated_reply: generatedReply,
-        selected_tone: selectedTone,
-      });
-
-      if (savedPlay) {
-        setHuddlePlays(prev => [savedPlay, ...prev]);
-        toast({
-          title: 'Huddle Saved',
-          description: 'Your huddle play has been saved for future learning.',
-        });
-        return savedPlay.id;
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save huddle play';
-      toast({
-        title: 'Save Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    }
-    return null;
-  };
 
   const updateFinalReply = async (id: string, finalReply: string) => {
     try {
@@ -94,7 +62,6 @@ export const useHuddlePlays = () => {
     isLoading,
     error,
     refetch: fetchHuddlePlays,
-    saveCurrentHuddle,
     updateFinalReply,
   };
 };

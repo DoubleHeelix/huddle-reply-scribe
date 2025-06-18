@@ -12,6 +12,7 @@ interface PastHuddle {
   generated_reply: string;
   final_reply?: string;
   created_at: string;
+  similarity: number;
 }
 
 interface DocumentKnowledge {
@@ -129,47 +130,55 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
                 const isExpanded = expandedHuddles.has(huddle.id);
                 return (
                   <div key={huddle.id} className="bg-gray-900 p-3 rounded-lg border border-gray-600">
-                    <div 
+                    <div
                       className="flex items-center justify-between mb-2 cursor-pointer"
                       onClick={() => toggleHuddleExpansion(huddle.id)}
                     >
-                      <div className="flex items-center gap-2 flex-1">
-                        {isExpanded ? 
-                          <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {isExpanded ?
+                          <ChevronDown className="w-4 h-4 text-gray-400" /> :
                           <ChevronRight className="w-4 h-4 text-gray-400" />
                         }
-                        <MessageSquare className="w-4 h-4 text-yellow-400" />
-                        <span className="text-gray-300 text-sm font-medium font-sans">
-                          Past Huddle {index + 1}
+                        <MessageSquare className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                        <span className="text-gray-300 text-sm font-medium font-sans truncate">
+                          Past Huddle from {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <span className="text-gray-400 text-xs font-sans">
-                        {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-gray-400 text-xs font-sans">Context:</p>
-                        <p className="text-gray-300 text-xs font-sans line-clamp-2">
-                          {isExpanded ? huddle.screenshot_text : `${huddle.screenshot_text.substring(0, 100)}...`}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-xs font-sans">Draft:</p>
-                        <p className="text-gray-300 text-xs font-sans line-clamp-1">
-                          {isExpanded ? huddle.user_draft : `${huddle.user_draft.substring(0, 80)}...`}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-xs font-sans">Reply:</p>
-                        <p className="text-white text-xs font-sans line-clamp-2">
-                          {isExpanded ? 
-                            (huddle.final_reply || huddle.generated_reply) : 
-                            `${(huddle.final_reply || huddle.generated_reply).substring(0, 120)}...`
-                          }
-                        </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-gray-400">Relevance:</span>
+                        <div className="w-16 bg-gray-700 rounded-full h-2.5">
+                          <div
+                            className="bg-yellow-500 h-2.5 rounded-full"
+                            style={{ width: `${Math.round(huddle.similarity * 100)}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-semibold text-white">
+                          {Math.round(huddle.similarity * 100)}%
+                        </span>
                       </div>
                     </div>
+                    {isExpanded && (
+                      <div className="mt-2 pl-6 border-l-2 border-gray-700 space-y-3">
+                        <div>
+                          <p className="text-gray-400 text-xs font-sans mb-1">Context:</p>
+                          <p className="text-gray-300 text-xs font-sans whitespace-pre-wrap">
+                            {formatExtractedText(huddle.screenshot_text)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs font-sans mb-1">Your Draft:</p>
+                          <p className="text-gray-300 text-xs font-sans whitespace-pre-wrap">
+                            {huddle.user_draft}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-xs font-sans mb-1">Final Reply:</p>
+                          <p className="text-white text-xs font-sans whitespace-pre-wrap">
+                            {huddle.final_reply || huddle.generated_reply}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
