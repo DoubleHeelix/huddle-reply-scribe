@@ -6,6 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { RefreshCcw, MessageSquare, Calendar, Search, Bot } from 'lucide-react';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,28 +30,26 @@ export const PastHuddlesTab = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+  const [editableKeywords, setEditableKeywords] = useState<string[]>([]);
+  const [isConfirmingAnalysis, setIsConfirmingAnalysis] = useState(false);
   const { toast } = useToast();
 
   const handleAnalyzeStyle = async () => {
     setIsAnalyzing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
+      if (!session) throw new Error('Not authenticated');
 
       const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
         body: { action: 'analyzeStyle', userId: session.user.id },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      toast({
-        title: 'Analysis Complete',
-        description: `Analyzed ${data.huddle_count} huddles. Your style profile has been updated.`,
-      });
+      setAnalysisResult(data);
+      setEditableKeywords(data.common_topics || []);
+      setIsConfirmingAnalysis(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to analyze style';
       toast({
@@ -52,6 +60,54 @@ export const PastHuddlesTab = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleConfirmAnalysis = async () => {
+    if (!analysisResult) return;
+
+    const updatedAnalysisData = {
+      ...analysisResult,
+      common_topics: editableKeywords,
+    };
+
+    setIsAnalyzing(true); // Reuse the analyzing state for the save operation
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
+        body: {
+          action: 'confirmAndSaveStyle',
+          userId: session.user.id,
+          analysisData: updatedAnalysisData,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Analysis Complete',
+        description: `Analyzed ${data.huddle_count} huddles. Your style profile has been updated.`,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save style';
+      toast({
+        title: 'Save Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnalyzing(false);
+      setIsConfirmingAnalysis(false);
+      setAnalysisResult(null);
+      setEditableKeywords([]);
+    }
+  };
+
+  const handleKeywordChange = (index: number, value: string) => {
+    const newKeywords = [...editableKeywords];
+    newKeywords[index] = value;
+    setEditableKeywords(newKeywords);
   };
 
   const handleSearch = async () => {
@@ -210,6 +266,33 @@ export const PastHuddlesTab = () => {
 
   return (
     <div className="space-y-4">
+      <AlertDialog open={isConfirmingAnalysis} onOpenChange={setIsConfirmingAnalysis}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Your Style Keywords</AlertDialogTitle>
+            <AlertDialogDescription>
+              We've analyzed your past huddles and identified these common keywords. Feel free to edit them before saving.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+           {editableKeywords.map((keyword, index) => (
+             <Input
+               key={index}
+               value={keyword}
+               onChange={(e) => handleKeywordChange(index, e.target.value)}
+               className="bg-gray-700 border-gray-600 text-white"
+             />
+           ))}
+         </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+             setAnalysisResult(null);
+             setEditableKeywords([]);
+           }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAnalysis}>Confirm & Save</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h3 className="text-white text-lg font-medium font-sans shrink-0">
           Past Huddles ({filteredHuddles.length})

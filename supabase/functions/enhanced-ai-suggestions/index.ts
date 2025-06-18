@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  action: "generateReply" | "adjustTone" | "analyzeStyle";
+  action: "generateReply" | "adjustTone" | "analyzeStyle" | "confirmAndSaveStyle";
   screenshotText?: string;
   userDraft?: string;
   principles?: string;
@@ -21,6 +21,7 @@ interface RequestBody {
     similarity: number;
   }>;
   userId?: string;
+  analysisData?: any;
 }
 
 serve(async (req) => {
@@ -46,6 +47,7 @@ serve(async (req) => {
       selectedTone,
       documentKnowledge,
       userId,
+      analysisData,
     }: RequestBody = await req.json();
 
     const cleanAction = action?.trim();
@@ -196,18 +198,19 @@ serve(async (req) => {
       }
 
       // Generate AI response with enhanced context
-      const systemPrompt = `You are an expert communication assistant that helps people craft perfect responses for conversations. Your goal is to help improve their draft messages to be more effective, clear, and engaging.
+      const systemPrompt = `You are an expert writing partner. Your goal is to help the user sound like the best version of themselves by refining their draft messages.
 
-${
-  principles ||
-  "Follow huddle principles: Clarity, Connection, Brevity, Flow, Empathy. Be warm and natural."
-}
+**Your Primary Directive:**
+Emulate the user's unique writing style. The user's style profile is your most important guide.
 
+**User's Writing Style:**
 ${contextFromStyleProfile}
 
-${contextFromPastHuddles}
-
-${contextFromDocuments}
+**Secondary Guidance:**
+1.  **Past Successes**: Learn from these examples of the user's past conversations that worked well.
+    ${contextFromPastHuddles}
+2.  **Knowledge Base**: Incorporate this information from the user's documents where relevant.
+    ${contextFromDocuments}
 
 Given the conversation context and the user's draft, provide an improved version that:
 1. Maintains the user's authentic voice and intent
@@ -545,69 +548,44 @@ Please provide an improved version of this message:`;
 
       console.log("✅ DEBUG: [4/5] Extracted common topics:", commonTopics);
 
-      const profileData = {
-        user_id: userId,
+      const analysisResult = {
         huddle_count: huddlePlays.length,
         avg_sentence_length: avgSentenceLength,
         common_topics: commonTopics,
+      };
+
+      console.log("✅ DEBUG: [5/5] Style analysis complete.");
+
+      return new Response(JSON.stringify(analysisResult), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } else if (cleanAction === "confirmAndSaveStyle") {
+      console.log("💾 DEBUG: Starting confirmAndSaveStyle for user:", userId);
+      if (!userId || !analysisData) {
+        throw new Error("userId and analysisData are required for saving style");
+      }
+
+      const profileData = {
+        ...analysisData,
+        user_id: userId,
         updated_at: new Date().toISOString(),
       };
 
-      console.log(
-        "💾 DEBUG: [5/5] Attempting to save profile data:",
-        profileData
-      );
+      console.log("💾 DEBUG: Upserting profile data:", profileData);
 
-      // Two-step upsert to avoid RLS issues with onConflict
-      const { data: existingProfile, error: selectError } = await supabase
+      const { data, error } = await supabase
         .from("user_style_profiles")
-        .select("id")
-        .eq("user_id", userId)
+        .upsert(profileData, { onConflict: 'user_id' })
+        .select()
         .single();
 
-      if (selectError && selectError.code !== "PGRST116") {
-        // Ignore 'not found' error
-        console.error(
-          "❌ DEBUG: [5/5] Error checking for existing profile:",
-          selectError
-        );
-        throw selectError;
+      if (error) {
+        console.error("❌ DEBUG: Error upserting profile:", error);
+        throw error;
       }
 
-      let updatedProfile;
-      if (existingProfile) {
-        // Update existing profile
-        const { data, error: updateError } = await supabase
-          .from("user_style_profiles")
-          .update(profileData)
-          .eq("user_id", userId)
-          .select()
-          .single();
-        if (updateError) {
-          console.error("❌ DEBUG: [5/5] Error updating profile:", updateError);
-          throw updateError;
-        }
-        updatedProfile = data;
-      } else {
-        // Insert new profile
-        const { data, error: insertError } = await supabase
-          .from("user_style_profiles")
-          .insert(profileData)
-          .select()
-          .single();
-        if (insertError) {
-          console.error(
-            "❌ DEBUG: [5/5] Error inserting profile:",
-            insertError
-          );
-          throw insertError;
-        }
-        updatedProfile = data;
-      }
-
-      console.log("✅ DEBUG: Style analysis complete and profile updated.");
-
-      return new Response(JSON.stringify(updatedProfile), {
+      console.log("✅ DEBUG: Profile saved successfully.");
+      return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } else if (cleanAction === "adjustTone") {
@@ -679,3 +657,4 @@ Please provide an improved version of this message:`;
     });
   }
 });
+
