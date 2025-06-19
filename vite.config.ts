@@ -7,8 +7,8 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Only require environment variables for production builds
+  const env = loadEnv(mode, process.cwd(), '');
   if (mode === 'production') {
-    const env = loadEnv(mode, process.cwd(), '');
     if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_PUBLISHABLE_KEY) {
       throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be defined in your .env file for production builds');
     }
@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 8080,
+      proxy: {
+        '/functions/v1': {
+          target: env.VITE_SUPABASE_URL,
+          changeOrigin: true,
+        },
+      },
     },
     plugins: [
       react(),

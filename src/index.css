@@ -99,3 +99,14 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scaleY(0.2);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
