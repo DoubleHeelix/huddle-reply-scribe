@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { RefreshCcw, MessageSquare, Calendar, Search, Bot } from 'lucide-react';
+import { RefreshCcw, MessageSquare, Calendar, Search, Bot, ChevronDown } from 'lucide-react';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
 import { getCategory } from '@/utils/huddleCategorization';
@@ -30,6 +30,7 @@ export const PastHuddlesTab = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<any | null>(null);
   const [editableKeywords, setEditableKeywords] = useState<string[]>([]);
   const [isConfirmingAnalysis, setIsConfirmingAnalysis] = useState(false);
@@ -143,6 +144,12 @@ export const PastHuddlesTab = () => {
   const toggleHuddleExpansion = (id: string) => {
     setExpandedHuddles(prev =>
       prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleCategoryExpansion = (category: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
     );
   };
 
@@ -294,30 +301,26 @@ export const PastHuddlesTab = () => {
         </AlertDialogContent>
       </AlertDialog>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <h3 className="text-white text-lg font-medium font-sans shrink-0">
+        <h3 className="text-white text-xl font-bold font-sans shrink-0">
           Past Huddles ({filteredHuddles.length})
         </h3>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <Input
               type="text"
-              placeholder="Filter huddles..."
+              placeholder="Search huddles..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="bg-gray-800 border-gray-600 text-white pl-10 w-full"
+              className="bg-gray-800 border-gray-700 text-white pl-10 w-full rounded-full focus:ring-2 focus:ring-purple-500"
             />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           </div>
-          <Button onClick={handleSearch} disabled={isSearching || !searchTerm.trim()}>
-            <Search className="w-4 h-4 mr-2" />
-            {isSearching ? 'Searching...' : 'Search'}
-          </Button>
           <Button
             onClick={handleAnalyzeStyle}
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="bg-purple-600 border-purple-500 text-white hover:bg-purple-500 font-sans shrink-0"
+            className="bg-purple-600 text-white hover:bg-purple-700 font-sans shrink-0 rounded-full"
             disabled={isAnalyzing}
           >
             <Bot className="w-4 h-4 mr-2" />
@@ -326,89 +329,110 @@ export const PastHuddlesTab = () => {
         </div>
       </div>
 
-      <div className="space-y-4 pb-4">
-        <Accordion type="multiple" className="w-full">
-          {sortedCategories.map((category) => (
-            <AccordionItem value={category} key={category}>
-              <AccordionTrigger className="text-white hover:no-underline">
+      <div className="space-y-3 pb-4">
+        {sortedCategories.map((category) => (
+          <Card key={category} className="bg-gray-800/50 border-gray-700/50 overflow-hidden rounded-lg">
+            <div
+              className="p-4 cursor-pointer flex justify-between items-center hover:bg-gray-700/30 transition-colors"
+              onClick={() => toggleCategoryExpansion(category)}
+            >
+              <h4 className="text-white font-semibold text-md">
                 {category} ({categorizedHuddles[category].length})
-              </AccordionTrigger>
-              <AccordionContent>
+              </h4>
+              <motion.div
+                animate={{ rotate: expandedCategories.includes(category) ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown className="w-5 h-5 text-gray-400" />
+              </motion.div>
+            </div>
+            <AnimatePresence>
+              {expandedCategories.includes(category) && (
                 <motion.div
-                  className="space-y-4 pt-2"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="overflow-hidden"
                 >
-                  {categorizedHuddles[category].map((huddle) => (
-                    <motion.div key={huddle.id} variants={itemVariants}>
-                      <Card className="bg-gray-800 border-gray-700">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-400 text-sm font-sans">
-                                {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              {huddle.selected_tone && huddle.selected_tone !== 'none' && (
-                                <Badge variant="secondary" className="font-sans">
-                                  {huddle.selected_tone}
-                                </Badge>
-                              )}
-                              {huddle.final_reply && (
-                                <Badge variant="outline" className="text-green-400 border-green-400 font-sans">
-                                  Tone Adjusted
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
-                              <p className={`text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
-                                {huddle.screenshot_text}
-                              </p>
-                              {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
-                                <Button
-                                  variant="link"
-                                  className="p-0 h-auto text-xs text-blue-400 hover:no-underline"
-                                  onClick={() => toggleHuddleExpansion(huddle.id)}
-                                >
-                                  {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
-                                </Button>
-                              )}
-                            </div>
-
-                            <div>
-                              <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Your Draft:</p>
-                              <p className="text-gray-200 text-sm font-sans line-clamp-2">
-                                {huddle.user_draft}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-gray-300 text-sm font-medium mb-1 font-sans">
-                                {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
-                              </p>
-                              <div className="bg-gray-900 p-3 rounded-lg border border-gray-600">
-                                <p className="text-white text-sm font-sans">
-                                  {huddle.final_reply || huddle.generated_reply}
-                                </p>
+                  <CardContent className="p-4 pt-0">
+                    <motion.div
+                      className="space-y-4"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {categorizedHuddles[category].map((huddle) => (
+                        <motion.div key={huddle.id} variants={itemVariants}>
+                          <Card className="bg-gray-800/90 rounded-lg border border-gray-700">
+                            <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-400 text-sm font-sans">
+                                  {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                {huddle.selected_tone && huddle.selected_tone !== 'none' && (
+                                  <Badge variant="secondary" className="font-sans">
+                                    {huddle.selected_tone}
+                                  </Badge>
+                                )}
+                                {huddle.final_reply && (
+                                  <Badge variant="outline" className="text-green-400 border-green-400 font-sans">
+                                    Tone Adjusted
+                                  </Badge>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+
+                            <div className="space-y-4">
+                              <div>
+                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
+                                <p className={`text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
+                                  {huddle.screenshot_text}
+                                </p>
+                                {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-xs text-blue-400 hover:no-underline"
+                                    onClick={() => toggleHuddleExpansion(huddle.id)}
+                                  >
+                                    {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div>
+                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Your Draft:</p>
+                                <p className="text-gray-200 text-sm font-sans line-clamp-2">
+                                  {huddle.user_draft}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">
+                                  {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
+                                </p>
+                                <div className="bg-gray-900 p-3 rounded-lg border border-gray-700">
+                                  <p className="text-white text-sm font-sans">
+                                    {huddle.final_reply || huddle.generated_reply}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                      ))}
                     </motion.div>
-                  ))}
+                  </CardContent>
                 </motion.div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+              )}
+            </AnimatePresence>
+          </Card>
+        ))}
       </div>
     </div>
   );
