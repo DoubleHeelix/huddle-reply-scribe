@@ -8,7 +8,11 @@ const corsHeaders = {
 };
 
 interface RequestBody {
-  action: "generateReply" | "adjustTone" | "analyzeStyle" | "confirmAndSaveStyle";
+  action:
+    | "generateReply"
+    | "adjustTone"
+    | "analyzeStyle"
+    | "confirmAndSaveStyle";
   screenshotText?: string;
   userDraft?: string;
   principles?: string;
@@ -126,9 +130,15 @@ serve(async (req) => {
             match_count: 3,
             p_user_id: userId,
           };
-          console.log("🔍 DEBUG: Calling match_huddle_plays with params:", rpcParams);
+          console.log(
+            "🔍 DEBUG: Calling match_huddle_plays with params:",
+            rpcParams
+          );
 
-          const { data, error } = await supabase.rpc('match_huddle_plays', rpcParams);
+          const { data, error } = await supabase.rpc(
+            "match_huddle_plays",
+            rpcParams
+          );
 
           if (error) {
             console.error("❌ DEBUG: RPC match_huddle_plays FAILED:", error);
@@ -138,7 +148,10 @@ serve(async (req) => {
               `✅ DEBUG: RPC match_huddle_plays SUCCEEDED. Found ${similarHuddles.length} huddles.`
             );
             if (similarHuddles.length > 0) {
-              console.log("✅ DEBUG: Similar huddles found:", JSON.stringify(similarHuddles, null, 2));
+              console.log(
+                "✅ DEBUG: Similar huddles found:",
+                JSON.stringify(similarHuddles, null, 2)
+              );
             }
           }
         } catch (error) {
@@ -207,20 +220,25 @@ Emulate the user's unique writing style. The user's style profile is your most i
 ${contextFromStyleProfile}
 
 **Secondary Guidance:**
-1.  **Past Successes**: Learn from these examples of the user's past conversations that worked well.
+1. **Document Intelligence:**  
+   Carefully review the conversation context (e.g. screenshot text). If it includes a question or concern, search the knowledge base for relevant answers or examples. When found, *weave the key insight, phrase, or way of explaining it* into the improved message—seamlessly, in the user's natural tone.
+
+   → Prioritize using knowledge that directly answers the recipient’s question or aligns with their concern.
+
+2.  **Past Successes**: Learn from these examples of the user's past conversations that worked well.
     ${contextFromPastHuddles}
-2.  **Knowledge Base**: Incorporate this information from the user's documents where relevant.
+3.  **Knowledge Base**: Incorporate this information from the user's documents where relevant.
     ${contextFromDocuments}
 
 Given the conversation context and the user's draft, provide an improved version that:
-1. Maintains the user's authentic voice and intent
-2. Improves clarity and engagement
-3. Follows the communication principles
-4. Is appropriate for the conversation context
-5. Incorporates relevant knowledge from documents when applicable
-6. Feels natural and not over-engineered
+* Maintains the user's authentic voice and intent.
+* Enhances clarity and engagement.
+* Adheres to effective communication principles.
+* Is appropriate for the specific conversation.
+* Incorporates relevant knowledge naturally.
+* Feels organic and not over-engineered.
 
-Always respond with ONLY the improved message text, no explanations or additional commentary.`;
+Always respond with ONLY the improved message text, with no additional commentary or explanations.`;
 
       const userPrompt = `Conversation context: ${screenshotText}
 
@@ -321,15 +339,23 @@ Please provide an improved version of this message:`;
               screenshot_text: screenshotText,
               user_draft: userDraft,
               generated_reply: reply,
-              principles: principles || '',
+              principles: principles || "",
               embedding: embedding,
             };
-            console.log("💾 DEBUG: Attempting to insert huddle with embedding length:", embedding.length);
+            console.log(
+              "💾 DEBUG: Attempting to insert huddle with embedding length:",
+              embedding.length
+            );
 
-            const { error } = await supabase.from('huddle_plays').insert(huddleToInsert);
+            const { error } = await supabase
+              .from("huddle_plays")
+              .insert(huddleToInsert);
 
             if (error) {
-              console.error("❌ DEBUG: INSERT into huddle_plays FAILED:", error);
+              console.error(
+                "❌ DEBUG: INSERT into huddle_plays FAILED:",
+                error
+              );
             } else {
               console.log("✅ DEBUG: INSERT into huddle_plays SUCCEEDED.");
             }
@@ -562,7 +588,9 @@ Please provide an improved version of this message:`;
     } else if (cleanAction === "confirmAndSaveStyle") {
       console.log("💾 DEBUG: Starting confirmAndSaveStyle for user:", userId);
       if (!userId || !analysisData) {
-        throw new Error("userId and analysisData are required for saving style");
+        throw new Error(
+          "userId and analysisData are required for saving style"
+        );
       }
 
       const profileData = {
@@ -575,7 +603,7 @@ Please provide an improved version of this message:`;
 
       const { data, error } = await supabase
         .from("user_style_profiles")
-        .upsert(profileData, { onConflict: 'user_id' })
+        .upsert(profileData, { onConflict: "user_id" })
         .select()
         .single();
 
@@ -657,4 +685,3 @@ Please provide an improved version of this message:`;
     });
   }
 });
-
