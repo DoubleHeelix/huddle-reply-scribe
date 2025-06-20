@@ -6,6 +6,20 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentProcessor } from "./DocumentProcessor";
+import { documentService } from "@/services/documentService";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 interface SettingsSidebarProps {
   googleCloudApiKey: string;
@@ -24,6 +38,28 @@ interface SettingsSidebarProps {
 
 export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarProps) => {
   const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      await documentService.deleteAllDocuments();
+      toast({
+        title: "Success",
+        description: "All documents have been deleted. You can now re-upload them.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete documents. Please check the console for details.",
+        variant: "destructive",
+      });
+      console.error("Failed to delete all documents:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -48,6 +84,33 @@ export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarPro
           {isAdmin && (
             <div className="border-t border-gray-700 pt-4 mt-4">
               <DocumentProcessor />
+               <div className="mt-4">
+                <h3 className="text-lg font-semibold mb-2">Danger Zone</h3>
+                 <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={isDeleting}>
+                      {isDeleting ? "Deleting..." : "Delete All Documents"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete all document knowledge from the database and all associated files from storage.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteAll}>
+                        Continue
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <p className="text-xs text-gray-400 mt-2">
+                  This will delete all processed documents and their embeddings. Use this before re-uploading documents after a chunking strategy change.
+                </p>
+              </div>
             </div>
           )}
         </div>
