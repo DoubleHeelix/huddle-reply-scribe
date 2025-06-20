@@ -90,21 +90,80 @@ serve(async (req) => {
 
     console.log(`✅ Text extraction completed: ${extractedText.length} characters`);
 
+    // --- Recursive Character Text Splitting ---
+    const splitTextRecursive = (
+      text: string,
+      chunkSize: number,
+      chunkOverlap: number,
+      separators: string[] = ["\n\n", "\n", ". ", " ", ""]
+    ): string[] => {
+      if (text.length <= chunkSize) {
+        return [text];
+      }
+
+      const separator = separators.find(s => text.includes(s)) || "";
+      
+      const parts = text.split(separator);
+      const chunks: string[] = [];
+      let currentChunk = "";
+
+      for (const part of parts) {
+        const potentialChunk = currentChunk + (currentChunk ? separator : "") + part;
+        if (potentialChunk.length > chunkSize) {
+          if (currentChunk) {
+            chunks.push(currentChunk);
+          }
+          // Recursively split the part that is too large
+          const subChunks = splitTextRecursive(part, chunkSize, chunkOverlap, separators.slice(1));
+          chunks.push(...subChunks);
+          currentChunk = "";
+        } else {
+          currentChunk = potentialChunk;
+        }
+      }
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+      
+      // Add overlap
+      const finalChunks: string[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        if (i > 0 && chunkOverlap > 0) {
+          const prevChunk = finalChunks[finalChunks.length - 1];
+          const overlap = prevChunk.slice(-chunkOverlap);
+          finalChunks.push(overlap + chunks[i]);
+        } else {
+          finalChunks.push(chunks[i]);
+        }
+      }
+
+      return finalChunks;
+    };
+
+    const chunkSize = 500;
+    const chunkOverlap = 50;
+    const textChunks = splitTextRecursive(extractedText, chunkSize, chunkOverlap);
+
+    console.log(`✅ Text successfully split into ${textChunks.length} chunks.`);
+
     return new Response(
       JSON.stringify({
         success: true,
-        text: extractedText,
-        pageCount: 1,
+        chunks: textChunks, // Return chunks instead of a single text block
+        pageCount: 1, // This is a simplification
         metadata: {
           extractedAt: new Date().toISOString(),
           originalFileName: fileName,
-          processingMethod: 'server-side-basic'
+          processingMethod: 'server-side-recursive-chunking',
+          chunkSize,
+          chunkOverlap,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
-  } catch (error) {
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
     console.error('❌ PDF extraction error:', error);
     return new Response(
       JSON.stringify({ error: `PDF extraction failed: ${error.message}` }),

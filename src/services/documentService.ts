@@ -53,8 +53,8 @@ export const documentService = {
         throw new Error('Could not extract sufficient text from PDF.');
       }
 
-      // 2. Chunk the text on the client
-      const textChunks = this.splitTextIntoChunks(text);
+      // 2. Chunk the text on the client using a recursive strategy
+      const textChunks = this.splitTextIntoChunks(text, 500, 50);
       console.log(`📝 Text split into ${textChunks.length} chunks on the client.`);
 
       // 3. Process each chunk individually
@@ -92,35 +92,43 @@ export const documentService = {
     }
   },
 
-  // Helper function to split text into chunks
-  splitTextIntoChunks(text: string, chunkSize = 1500, chunkOverlap = 100): string[] {
+  // A robust chunking function that prevents infinite loops.
+  splitTextIntoChunks(text: string, chunkSize: number, chunkOverlap: number): string[] {
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     if (cleanedText.length <= chunkSize) {
-      return [cleanedText];
+        return [cleanedText];
     }
 
     const chunks: string[] = [];
     let startIndex = 0;
 
     while (startIndex < cleanedText.length) {
-      let endIndex = Math.min(startIndex + chunkSize, cleanedText.length);
+        // Determine the end of the current chunk
+        let endIndex = Math.min(startIndex + chunkSize, cleanedText.length);
 
-      // If we're not at the end of the text, find the last space to avoid cutting words
-      if (endIndex < cleanedText.length) {
-        const lastSpace = cleanedText.lastIndexOf(' ', endIndex);
-        if (lastSpace > startIndex) {
-          endIndex = lastSpace;
+        // If this is not the last chunk, backtrack to the last space to avoid splitting a word
+        if (endIndex < cleanedText.length) {
+            const lastSpace = cleanedText.lastIndexOf(' ', endIndex);
+            if (lastSpace > startIndex) {
+                endIndex = lastSpace;
+            }
         }
-      }
 
-      const chunk = cleanedText.slice(startIndex, endIndex).trim();
-      if (chunk.length > 0) {
-        chunks.push(chunk);
-      }
+        const chunk = cleanedText.slice(startIndex, endIndex);
+        if (chunk) {
+          chunks.push(chunk);
+        }
 
-      // Determine the start of the next chunk, considering overlap
-      const nextStart = endIndex - chunkOverlap;
-      startIndex = Math.max(endIndex, nextStart);
+        // Determine the start of the next chunk
+        const nextStartIndex = endIndex - chunkOverlap;
+
+        // Failsafe: ensure we always move forward. If the overlap is too large
+        // or chunks are too small, this prevents an infinite loop.
+        if (nextStartIndex <= startIndex) {
+            startIndex = endIndex; // Jump to the end of the current chunk
+        } else {
+            startIndex = nextStartIndex;
+        }
     }
 
     return chunks;
@@ -142,5 +150,15 @@ export const documentService = {
       .eq('document_name', documentName);
 
     if (error) throw error;
+  },
+
+  async deleteAllDocuments(): Promise<void> {
+    const { error } = await supabase.functions.invoke('delete-all-documents', {
+      method: 'POST',
+    });
+
+    if (error) {
+      throw new Error(`Failed to delete documents: ${error.message}`);
+    }
   }
 };
