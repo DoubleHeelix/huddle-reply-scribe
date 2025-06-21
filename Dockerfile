@@ -1,10 +1,11 @@
 # Stage 1: Build the application
-FROM oven/bun:1 AS builder
+FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package.json ./
-RUN bun install
+COPY package-lock.json ./
+RUN npm install
 
 # Copy the rest of the application source code
 COPY . .
@@ -17,7 +18,7 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 
 # Build the application
-RUN bun run build
+RUN npm run build
 
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
