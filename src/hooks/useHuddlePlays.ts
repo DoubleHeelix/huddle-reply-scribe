@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { saveHuddlePlay, getUserHuddlePlays, updateHuddlePlayFinalReply, type HuddlePlay } from '@/utils/huddlePlayService';
@@ -30,6 +29,22 @@ export const useHuddlePlays = () => {
     }
   };
 
+  const saveCurrentHuddle = async (huddlePlay: Omit<HuddlePlay, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    try {
+      const newPlay = await saveHuddlePlay(huddlePlay);
+      setHuddlePlays(prev => [newPlay, ...prev]);
+      return newPlay;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save huddle play';
+      setError(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
 
   const updateFinalReply = async (id: string, finalReply: string) => {
     try {
@@ -62,6 +77,7 @@ export const useHuddlePlays = () => {
     isLoading,
     error,
     refetch: fetchHuddlePlays,
+    saveCurrentHuddle,
     updateFinalReply,
   };
 };

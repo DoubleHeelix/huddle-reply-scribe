@@ -33,7 +33,8 @@ export const useHuddleState = () => {
     isProcessing: isOCRProcessing, 
     lastResult: ocrResult, 
     error: ocrError, 
-    clearError: clearOCRError 
+    clearError: clearOCRError,
+    setAutoCroppingEnabled: setAutoCrop,
   } = useOCR({
     googleCloudApiKey,
     enableAutoCropping,
@@ -141,6 +142,7 @@ export const useHuddleState = () => {
     ocrResult,
     ocrError,
     clearOCRError,
+    setAutoCroppingEnabled: setAutoCrop,
     
     // Functions
     resetHuddle,

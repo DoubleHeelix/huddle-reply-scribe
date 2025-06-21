@@ -1,4 +1,3 @@
-
 // OCR Service using Google Cloud Vision API via Supabase Edge Function
 import { supabase } from "@/integrations/supabase/client";
 
@@ -49,8 +48,9 @@ export class OCRService {
         throw new Error(`Invalid input type for OCR. Expected data URL, File, or Uint8Array. Got ${typeof imageInput}.`);
       }
 
-      // Auto-crop if enabled
-      if (this.config.enableAutoCorpping) {
+      // Auto-crop if enabled and not on mobile
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      if (this.config.enableAutoCorpping && !isMobile) {
         try {
           imageDataUrl = await this.autoCropChatArea(imageDataUrl, this.config.margin || 12);
           console.log('OCR: Auto-cropping completed');
@@ -59,11 +59,14 @@ export class OCRService {
         }
       }
 
+      // Convert to base64
+      const base64Image = imageDataUrl.split(',')[1];
+
       // Call Supabase edge function for OCR processing
       console.log('OCR: Calling Supabase edge function...');
       const { data, error } = await supabase.functions.invoke('ocr-extract', {
         body: {
-          imageData: imageDataUrl,
+          imageData: base64Image,
           enableAutoCropping: this.config.enableAutoCorpping,
           margin: this.config.margin
         }
