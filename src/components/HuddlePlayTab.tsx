@@ -42,7 +42,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     resetHuddle,
     toast,
     lastUsedDocuments,
-    setLastUsedDocuments
+    setLastUsedDocuments,
+    setAutoCroppingEnabled,
   } = huddleState;
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,17 +57,40 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         const imageDataUrl = e.target?.result as string;
         setUploadedImage(imageDataUrl);
         
-        // Immediately start OCR processing
-        console.log('OCR: Starting text extraction from uploaded image...');
-        const text = await extractText(file);
-        setExtractedText(text);
-        
-        toast({
-          title: "Screenshot uploaded!",
-          description: ocrResult?.success
-            ? `Text extracted.`
-            : "text extracted.",
-        });
+        try {
+          // Immediately start OCR processing
+          console.log('OCR: Starting text extraction from uploaded image...');
+          const text = await extractText(file);
+          setExtractedText(text);
+          
+          toast({
+            title: "Screenshot uploaded!",
+            description: ocrResult?.success
+              ? `Text extracted.`
+              : "text extracted.",
+          });
+
+        } catch (error) {
+          console.error("Error during OCR, retrying without auto-cropping:", error);
+          setAutoCroppingEnabled(false);
+          try {
+            const text = await extractText(file);
+            setExtractedText(text);
+            toast({
+              title: "Screenshot uploaded!",
+              description: "Text extracted without auto-cropping.",
+            });
+          } catch (retryError) {
+            console.error("Error during OCR retry:", retryError);
+            toast({
+              title: "Error",
+              description: "Please upload again",
+              variant: "destructive",
+            });
+          } finally {
+            setAutoCroppingEnabled(true);
+          }
+        }
 
         // Auto-scroll to draft section after upload
         setTimeout(() => {

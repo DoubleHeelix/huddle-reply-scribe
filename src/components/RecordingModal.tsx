@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,6 +34,10 @@ const MicrophoneIcon = () => (
   </svg>
 );
 
+const AnimatedEllipsis = () => (
+  <span className="animate-pulse">...</span>
+);
+
 interface RecordingModalProps {
   isOpen: boolean;
   transcript: string;
@@ -46,28 +51,37 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 }) => {
   const isMobile = useIsMobile();
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onComplete();
+    }
+  };
+
   if (isMobile) {
     // Render a more compact version for mobile screens
     return (
-      <Dialog open={isOpen}>
-        <DialogContent className="bg-gray-900 bg-opacity-80 backdrop-blur-lg border-gray-700 text-white flex flex-col items-center p-4 rounded-lg shadow-2xl w-[90vw] max-w-md">
-          <div className="flex items-center w-full">
-            <div className="relative mr-4">
-              <div className="absolute h-10 w-10 bg-blue-500 rounded-full animate-ping opacity-50"></div>
-              <MicrophoneIcon />
-            </div>
-            <div className="flex-grow text-center text-lg font-semibold">
-              Recording...
-            </div>
-            <Button
-              onClick={onComplete}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
-            >
-              Stop
-            </Button>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="bg-gray-900 bg-opacity-80 backdrop-blur-lg border-gray-700 text-white flex flex-col items-center p-2 rounded-lg shadow-2xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Recording in progress</DialogTitle>
+            <DialogDescription className="sr-only">A modal to show the status of the recording and the transcribed text.</DialogDescription>
+          </DialogHeader>
+          <div className="my-2 flex items-center justify-center space-x-4 h-12">
+              <AudioVisualizer />
+              <div className="relative">
+                  <div className="absolute h-10 w-10 bg-blue-500 rounded-full animate-ping opacity-50"></div>
+                  <MicrophoneIcon />
+              </div>
+              <AudioVisualizer />
           </div>
-          <div className="w-full mt-3 p-2 bg-black bg-opacity-25 rounded-md min-h-[60px] text-base">
-            {transcript || <span className="text-gray-400">Listening...</span>}
+          <Button
+            onClick={onComplete}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-md"
+          >
+            Stop Recording
+          </Button>
+          <div className="w-full mt-2 p-2 bg-black bg-opacity-20 rounded-md min-h-[80px] text-md">
+              {transcript || <span className="text-gray-400">Starting to listen<AnimatedEllipsis /></span>}
           </div>
         </DialogContent>
       </Dialog>
@@ -76,24 +90,24 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
 
   // Render the full version for desktop screens
   return (
-    <Dialog open={isOpen}>
-      <DialogContent className="bg-gray-900 bg-opacity-70 backdrop-blur-md border-gray-700 text-white flex flex-col items-center justify-center p-6 rounded-lg shadow-2xl">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="bg-gray-900 bg-opacity-70 backdrop-blur-md border-gray-700 text-white flex flex-col items-center justify-center p-4 rounded-lg shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="text-center text-xl font-semibold mb-2">
-            Recording...
-          </DialogTitle>
+          <DialogTitle className="sr-only">Recording...</DialogTitle>
+          <DialogDescription className="sr-only">A modal to show the status of the recording and the transcribed text.</DialogDescription>
         </DialogHeader>
-        <div className="my-4 flex items-center justify-center space-x-6 h-16">
+        <div className="my-2 flex items-center justify-center space-x-6 h-16">
             <AudioVisualizer />
             <div className="relative">
+                <div className="absolute h-12 w-12 bg-blue-500 rounded-full animate-ping opacity-50"></div>
                 <MicrophoneIcon />
             </div>
             <AudioVisualizer />
         </div>
         <div className="w-full p-4 bg-black bg-opacity-20 rounded-md min-h-[100px] text-lg">
-            {transcript || <span className="text-gray-400">Starting to listen...</span>}
+            {transcript || <span className="text-gray-400">Starting to listen<AnimatedEllipsis /></span>}
         </div>
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-2">
           <Button
             onClick={onComplete}
             className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg"
