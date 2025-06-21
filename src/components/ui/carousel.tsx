@@ -3,6 +3,8 @@ import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react"
 import { ArrowLeft, ArrowRight } from "lucide-react"
+import Autoplay from "embla-carousel-autoplay"
+import Fade from "embla-carousel-fade"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -17,6 +19,8 @@ type CarouselProps = {
   plugins?: CarouselPlugin
   orientation?: "horizontal" | "vertical"
   setApi?: (api: CarouselApi) => void
+  effect?: "slide" | "fade"
+  transitionSpeed?: number
 }
 
 type CarouselContextProps = {
@@ -52,6 +56,8 @@ const Carousel = React.forwardRef<
       plugins,
       className,
       children,
+      effect = "slide",
+      transitionSpeed = 10,
       ...props
     },
     ref
@@ -61,7 +67,7 @@ const Carousel = React.forwardRef<
         ...opts,
         axis: orientation === "horizontal" ? "x" : "y",
       },
-      plugins
+      [effect === "fade" ? Fade() : undefined, ...(plugins || [])].filter(Boolean)
     )
     const [canScrollPrev, setCanScrollPrev] = React.useState(false)
     const [canScrollNext, setCanScrollNext] = React.useState(false)
@@ -257,4 +263,3 @@ export {
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
-}
