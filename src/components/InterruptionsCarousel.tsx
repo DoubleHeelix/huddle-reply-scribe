@@ -47,7 +47,7 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
   };
 
   return (
-    <Carousel className="w-full max-w-lg mx-auto">
+    <Carousel className="w-full max-w-lg mx-auto" effect="fade" transitionSpeed={10}>
       <CarouselContent className="bg-gray-800 rounded-lg">
         {stories.map((story) => (
           <CarouselItem key={story.id}>

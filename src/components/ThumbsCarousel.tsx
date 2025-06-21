@@ -15,7 +15,7 @@ export function ThumbsCarousel({ files }: ThumbsCarouselProps) {
   return (
     <div className="py-4">
       <p className="text-center text-sm text-gray-400 mb-2">Selected Stories ({files.length}/5)</p>
-      <Carousel opts={{ align: "start", loop: false }} className="w-full max-w-md mx-auto">
+      <Carousel opts={{ align: "start", loop: false }} className="w-full max-w-md mx-auto" effect="fade" transitionSpeed={10}>
         <CarouselContent className="-ml-2">
           {files.map((file, index) => (
             <CarouselItem key={index} className="pl-2 basis-1/3 md:basis-1/4 lg:basis-1/5">
