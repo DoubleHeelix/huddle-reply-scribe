@@ -55,9 +55,15 @@ export const useInterruptions = () => {
         // 3. Generation Step
         setStories(prev => prev.map(s => s.id === story.id ? { ...s, status: 'generating' } : s));
         console.log(`[${story.id}] Generating interruptions...`);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+
         const interruptions = await generateStoryResponse({
           storyText: ocrText,
           imageUrl: publicUrl,
+          userId: user.id,
         });
         console.log(`[${story.id}] Interruptions received.`);
         
