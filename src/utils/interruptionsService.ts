@@ -4,21 +4,24 @@ import { supabase } from '@/integrations/supabase/client';
 interface StoryResponseOptions {
   storyText: string;
   imageUrl: string;
+  userId: string;
   count?: number;
 }
 
 export const generateStoryResponse = async ({
   storyText,
   imageUrl,
+  userId,
   count = 3,
 }: StoryResponseOptions): Promise<string[]> => {
   try {
-    console.log('Calling generate-story-interruptions function...');
+    console.log('Calling generate-story-interruptions function with userId:', userId);
     
     const { data, error } = await supabase.functions.invoke('generate-story-interruptions', {
       body: {
         storyText,
         imageUrl,
+        userId,
         count
       },
     });

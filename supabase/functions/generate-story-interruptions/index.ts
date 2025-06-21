@@ -1,8 +1,11 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
 const allowedOrigins = [
   'http://localhost:8080',
@@ -32,7 +35,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error('OpenAI API key not configured');
     }
 
-    const { storyText, imageUrl, count = 3 } = await req.json();
+    const { storyText, imageUrl, userId, count = 3 } = await req.json();
 
     console.log('Generating story interruptions for:', { 
       hasText: !!storyText, 
@@ -40,23 +43,27 @@ serve(async (req: Request): Promise<Response> => {
       count 
     });
 
-    // Get random prompt variation
-    const prompts = [
-      {
-        system: "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.",
-        version: "A"
-      },
-      {
-        system: "You are a friendly and engaging buddy replying to Instagram stories. Your aim is to spark a fun and lighthearted chat by noticing something specific in the story. Be curious and ask a simple question about what you see. Keep it casual and use a single emoji to add a bit of personality.",
-        version: "B"
-      },
-     {
-       system: "You are a down-to-earth and relatable friend replying to Instagram stories. Your goal is to be observant and genuine, making simple, curious comments about what you see. Keep your tone grounded and avoid overly enthusiastic or generic phrases. A single, well-placed emoji is okay, but not required.",
-       version: "C"
-     }
-   ];
+    // Fetch user's style profile from Supabase
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: styleProfile, error: styleError } = await supabase
+      .from('user_style_profiles')
+      .select('style_description')
+      .eq('user_id', userId)
+      .single();
 
-    const selectedPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+    if (styleError) {
+      console.error('Error fetching user style profile:', styleError);
+      // Continue without style profile for now, or handle error as needed
+    }
+
+    const styleInstruction = styleProfile?.style_description
+      ? `Your writing style should be: ${styleProfile.style_description}.`
+      : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
+
+    const systemPrompt = {
+      system: styleInstruction,
+      version: styleProfile ? "Custom" : "Default"
+    };
 
     const userPromptHeader = "A friend posted an Instagram story.";
     const storyContentLine = storyText && storyText.trim()
@@ -96,7 +103,7 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
     };
 
     const messages: Message[] = [
-      { role: "system", content: selectedPrompt.system }
+      { role: "system", content: systemPrompt.system }
     ];
 
     // Add user message with image if provided
@@ -158,7 +165,7 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
 
     return new Response(JSON.stringify({ 
       conversationStarters,
-      promptVersion: selectedPrompt.version 
+      promptVersion: systemPrompt.version
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
