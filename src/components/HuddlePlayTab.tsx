@@ -173,7 +173,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
-    const result = await generateReply(screenshotText, userDraft, true, lastUsedDocuments);
+    const result = await generateReply(screenshotText, userDraft, true, lastUsedDocuments, lastUsedHuddles);
     
     if (result) {
       setGeneratedReply(result.reply);
@@ -181,6 +181,11 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       
       setLastUsedHuddles(result.pastHuddles || []);
       setLastUsedDocuments(result.documentKnowledge || []);
+
+      setShowKnowledgeSources(
+        (result.pastHuddles && result.pastHuddles.length > 0) ||
+        (result.documentKnowledge && result.documentKnowledge.length > 0)
+      );
       
       if (currentHuddleId) {
         await updateFinalReply(currentHuddleId, result.reply);

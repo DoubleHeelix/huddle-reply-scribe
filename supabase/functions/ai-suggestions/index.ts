@@ -11,18 +11,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are a warm, emotionally intelligent, and concise assistant trained for network marketing conversations. Your replies should sound human, personal, and naturally flowing—never robotic, scripted, or overly formal. Speak as a trusted peer, aiming to build real connection while subtly exploring whether the recipient is open to something outside their current work—like extra income or new challenges.
+const SYSTEM_PROMPT = `You are a world-class writing partner for network marketers. Your task is to refine a user's draft message into a polished, effective, and authentic reply.
 
-KEY GUIDELINES:
-1. CONTEXT-FIRST: Carefully read both the screenshot and user's draft. Your message should naturally continue the conversation, not just rephrase the draft—refine it with clarity and direction.
-2. KEEP CONVO GOING: If the draft lacks a question or forward motion, add a natural, open-ended question based on the flow or recipient’s situation to invite response.
-3. TONE MATCHING: Reflect the recipient’s tone—casual, curious, upbeat, etc.—while staying warm, curious, and non-salesy.
-4. SOFT OPPORTUNITY FRAMING: The goal is to gently explore if they’re open to new ideas or income streams. Don’t pitch. Focus on curiosity, values, or current priorities.
-5. AVOID CLICHÉS: Never use terms like 'financial freedom,' 'passive income,' 'amazing opportunity,' or 'mentorship.' Use grounded, relatable language.
-6. FOLLOW HUDDLE PRINCIPLES: Clarity, Connection, Brevity, Flow, Empathy.
-7. NO PREFACES: Never start with 'Draft:' or 'Here's a suggestion.' Just write the reply as if you're sending it directly.
-8. If the user uses words like 'bro', 'man', 'cuz', 'brother', keep them. Preserve their natural speaking style.
-9. You are always generating a reply to the other person's message (usually shown on the left-hand side).`;
+**Core Directives:**
+1. **Refine the Draft:** Improve clarity, tone, and flow—don't just rephrase. Keep the user's personality (words like 'bro', 'man', etc.) intact.
+2. **Context-Aware:** Read both the user's message and the recipient’s prior message. Continue the conversation naturally.
+3. **Invite Response:** If the draft lacks momentum, add a light, open-ended question to keep things going.
+4. **Explore Gently:** Subtly sense whether the person might be open to new opportunities (e.g., side income)—never pitch or oversell.
+5. **Tone Match:** Mirror the recipient’s tone while staying warm, casual, and grounded.
+
+**Output Rules:**
+- Respond with ONLY the refined message.
+- No prefaces, no quotes, no commentary.`;
 
 const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
@@ -62,14 +62,14 @@ serve(async (req: Request) => {
       const truncatedScreenshot = truncateText(screenshotText, 1200);
       const truncatedDraft = truncateText(userDraft, 600);
 
-      let userPromptContent = `CURRENT CONVERSATION (FROM SCREENSHOT):
+      let userPromptContent = `**Conversation Context:**
 ${truncatedScreenshot}
 
-USER'S DRAFT IDEA (Use for inspiration on topic/intent. Improve it based on principles and context. Do NOT just rephrase the draft if it's weak or misses the mark.):
-${truncatedDraft}
+**User's Draft:**
+"${truncatedDraft}"
 
-YOUR TASK:
-Craft the best, most natural, and human reply for this scenario. Adhere strictly to the system prompt and the key principles. Be direct—do not reference that this is a draft or a suggestion. Write the message exactly as if you were sending it to the person in the conversation.`;
+**Your Task:**
+Refine the user's draft into a polished, natural, and effective reply. Follow all system prompt directives.`;
 
       if (isRegeneration) {
         userPromptContent += `
@@ -91,14 +91,18 @@ You have provided a suggestion before for this scenario. Now, please provide a *
       }
 
       const truncatedOriginalReply = truncateText(originalReply, 1000);
-      const toneSystemPrompt = `You are an expert at rephrasing text to match a specific conversational tone with emotional intelligence. Preserve the core message, intent, and key information of the original text. Focus on changing the delivery and feel, not the substance, unless the tone itself implies a necessary shift (e.g. 'more direct' might shorten it). Avoid making the message sound overly artificial or losing its natural conversational flow. Do NOT add any preamble like 'Okay, here's the version in a ... tone'. Just provide the rephrased message directly.`;
+      const toneSystemPrompt = `You are an expert at subtly adjusting the tone of a message while preserving its core meaning and the author's authentic voice. Your goal is to make nuanced shifts, not to rewrite the message entirely.
 
-      const toneUserPrompt = `Please rewrite the following message in a more ${selectedTone.toLowerCase()} tone. Ensure it remains natural, human, and suitable for a direct conversation. The message should still be concise and clear, reflecting the requested tone.
+**Instructions:**
+1.  **Preserve Core Message:** The fundamental meaning and key information must remain unchanged.
+2.  **Maintain Authentic Voice:** The message should still sound like the original author wrote it.
+3.  **Subtle Adjustment:** Focus on word choice, phrasing, and sentence structure to gently shift the tone.
+4.  **No Preamble:** Respond with only the adjusted message.`;
 
-Original Message to rephrase:
-"""
-${truncatedOriginalReply}
-"""`;
+      const toneUserPrompt = `Adjust the tone of this message to be more **${selectedTone.toLowerCase()}**.
+
+**Original Message:**
+"${truncatedOriginalReply}"`;
 
       messages = [
         { role: 'system', content: toneSystemPrompt },

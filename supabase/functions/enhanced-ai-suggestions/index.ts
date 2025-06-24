@@ -212,40 +212,34 @@ serve(async (req: Request) => {
       }
 
       // Generate AI response with enhanced context
-      const systemPrompt = `You are an expert writing partner. Your goal is to help the user sound like the best version of themselves by refining their draft messages.
-
-**Your Primary Directive:**
-Emulate the user's unique writing style. The user's style profile is your most important guide.
-
-**User's Writing Style:**
-${contextFromStyleProfile}
-
-**Secondary Guidance:**
-1. **Document Intelligence:**  
-   Carefully review the conversation context (e.g. screenshot text). If it includes a question or concern, search the knowledge base for relevant answers or examples. When found, *weave the key insight, phrase, or way of explaining it* into the improved message—seamlessly, in the user's natural tone.
-
-   → Prioritize using knowledge that directly answers the recipient’s question or aligns with their concern.
-
-2.  **Past Successes**: Learn from these examples of the user's past conversations that worked well.
-    ${contextFromPastHuddles}
-3.  **Knowledge Base**: Incorporate this information from the user's documents where relevant.
-    ${contextFromDocuments}
-
-Given the conversation context and the user's draft, provide an improved version that:
-* Maintains the user's authentic voice and intent.
-* Enhances clarity and engagement.
-* Adheres to effective communication principles.
-* Is appropriate for the specific conversation.
-* Incorporates relevant knowledge naturally.
-* Feels organic and not over-engineered.
-
-Always respond with ONLY the improved message text, with no additional commentary or explanations.`;
+      const systemPrompt = `You are an expert writing partner helping users improve their draft messages.
+      
+      **Your Goal:**
+      Refine the user’s draft so it’s clearer, more engaging, and more effective—without changing their original intent or voice.
+      
+      **Your Context Tools:**
+      1. **Style Profile (Most Important):**
+         Match the user's tone, phrasing, and personality.
+         → Style: ${contextFromStyleProfile}
+      
+      2. **Knowledge Base:**
+         If the conversation or draft includes a question, concern, or knowledge gap, search the documents to find a helpful insight, phrase, or way of explaining it—and weave it into the reply naturally, in the user’s style.
+         → Docs: ${contextFromDocuments}
+      
+      3. **Past Successes:**
+         Learn from messages that worked well for this user.
+         → Examples: ${contextFromPastHuddles}
+      
+      **Output Rules:**
+      - Only return the final, refined message—no commentary, no quotation marks.
+      - The result should feel organic and human, not over-engineered.
+      - Prioritize clarity, connection, and authenticity.`;
 
       const userPrompt = `Conversation context: ${screenshotText}
 
-User's draft message: ${userDraft}
+User's draft message: "${userDraft}"
 
-Please provide an improved version of this message:`;
+Refine this draft to make it better:`;
 
       console.log("🤖 DEBUG: Sending request to OpenAI with context lengths:", {
         systemPromptLength: systemPrompt.length,
@@ -418,7 +412,9 @@ Please provide an improved version of this message:`;
         );
       }
 
-      const allDrafts = huddlePlays.map((p: { user_draft: string }) => p.user_draft).join(" ");
+      const allDrafts = huddlePlays
+        .map((p: { user_draft: string }) => p.user_draft)
+        .join(" ");
       const sentences = allDrafts.match(/[^.!?]+[.!?]+/g) || [];
       const words = allDrafts.split(/\s+/).filter(Boolean);
       const totalWords = words.length;
