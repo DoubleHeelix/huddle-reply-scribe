@@ -51,9 +51,11 @@ export type Database = {
       huddle_plays: {
         Row: {
           created_at: string
+          embedding: string | null
           final_reply: string | null
           generated_reply: string
           id: string
+          principles: string | null
           screenshot_text: string
           selected_tone: string | null
           updated_at: string
@@ -62,9 +64,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
           final_reply?: string | null
           generated_reply: string
           id?: string
+          principles?: string | null
           screenshot_text: string
           selected_tone?: string | null
           updated_at?: string
@@ -73,13 +77,57 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
           final_reply?: string | null
           generated_reply?: string
           id?: string
+          principles?: string | null
           screenshot_text?: string
           selected_tone?: string | null
           updated_at?: string
           user_draft?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_style_profiles: {
+        Row: {
+          avg_sentence_length: number | null
+          common_topics: string[] | null
+          created_at: string
+          formality: string | null
+          huddle_count: number | null
+          id: string
+          sentiment: string | null
+          top_bigrams: string[] | null
+          top_trigrams: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_sentence_length?: number | null
+          common_topics?: string[] | null
+          created_at?: string
+          formality?: string | null
+          huddle_count?: number | null
+          id?: string
+          sentiment?: string | null
+          top_bigrams?: string[] | null
+          top_trigrams?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_sentence_length?: number | null
+          common_topics?: string[] | null
+          created_at?: string
+          formality?: string | null
+          huddle_count?: number | null
+          id?: string
+          sentiment?: string | null
+          top_bigrams?: string[] | null
+          top_trigrams?: string[] | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -144,6 +192,23 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: unknown
+      }
+      match_huddle_plays: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          p_user_id: string
+        }
+        Returns: {
+          id: string
+          screenshot_text: string
+          user_draft: string
+          generated_reply: string
+          final_reply: string
+          created_at: string
+          similarity: number
+        }[]
       }
       search_document_knowledge: {
         Args: {

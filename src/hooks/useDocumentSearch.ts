@@ -14,8 +14,7 @@ export const useDocumentSearch = () => {
       // Generate embedding for the search query
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('create-embedding', {
         body: {
-          query_text: query,
-          user_id: user.id
+          query_text: query
         }
       });
 
@@ -26,15 +25,12 @@ export const useDocumentSearch = () => {
 
       // Search for similar documents using the generated embedding
       console.log('🔍 Calling search_document_knowledge with:', {
-        target_user_id: user.id,
-        match_threshold: 0.7,
-        match_count: maxResults,
-        query_embedding_length: embeddingData.embedding.length
+        match_threshold: 0.1,
+        match_count: maxResults
       });
 
       const { data, error } = await supabase.rpc('search_document_knowledge', {
         query_embedding: embeddingData.embedding,
-        target_user_id: user.id,
         match_threshold: 0.1,
         match_count: maxResults
       });
