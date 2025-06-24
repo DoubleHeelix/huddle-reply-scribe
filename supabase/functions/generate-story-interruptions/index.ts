@@ -62,6 +62,10 @@ serve(async (req: Request): Promise<Response> => {
       ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. All other guidelines are secondary to this style.`
       : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
 
+    const contextFromStyleProfile = styleProfile?.style_description
+      ? styleProfile.style_description
+      : "Default: Be observant, thoughtful, and curious. Keep it simple and authentic.";
+
     const systemPrompt = {
       system: styleInstruction,
       version: styleProfile ? "Custom" : "Default",
@@ -73,34 +77,24 @@ serve(async (req: Request): Promise<Response> => {
         ? `Story Content: ${storyText.trim()}`
         : "Story Content: This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.";
 
-    const userPrompt = `
-${userPromptHeader}
-
-${storyContentLine}
-
-Your Task:
-Write ${count} distinct, short, warm, and curious replies based strictly on the visible story (or text, if present). Each reply must be unique and feel human and authentic.
- 
- Instructions:
- - **Generate Unique Replies:** Each suggestion must be different from the others.
- - **Focus on Observable Details:** If it's an image, comment on or ask about something clearly visible. No guessing or making assumptions beyond what's directly shown. If it's ambiguous, a simple, positive comment works best.
-- **Engage with the Text:** If there's text, respond thoughtfully to its content.
-- **Spark Conversation:** Always end with an open-ended question that encourages the other person to share more. Aim for questions that feel organic and less like a quiz.
-- **Authentic & Simple Tone:** Be yourself. Avoid being overly dramatic, cutesy, or trying too hard to be witty. Keep it genuine and straightforward.
-- **Pet Neutrality:** When referring to animals, use straightforward terms like "your dog," "your cat," or "your pet." Skip the "pet-speak" (e.g., "fur baby," "pupper").
-- **Emoji Limit:** You may use one emoji—only if it feels natural and adds warmth. Never add emojis just to fill space.
-- **No Quotes or Preamble:** Get straight to the message. Do not use quotation marks, and do not include any introductory phrases like "Here's your reply:".
-- **Ignore Overlays:** Disregard any overlays, music tags, or device UI in images. Concentrate solely on the main scene or subject.
-
-Examples of Natural Questions:
-Good: "That breakfast looks amazing! What was your favorite part of it?"
-Good: "Looks like a fun night out! what was your favorite moment from the concert?"
-Good: "Your dog is adorable! How old are they?"
-Good: "That view is incredible! Whereabouts was that taken?"
-Good: "Looks like you're having a relaxing time. What's been the best part of your day so far?"
-Bad: "Cool project! What are you building?" (when nothing suggests a project)
-`;
-
+    const userPrompt = `A friend posted this on their story:
+    - Story Content: ${storyContentLine}
+    
+    Your Task: Write ${count} unique, short, warm replies that sound like a real and curious friend.
+    **Style Guide:**
+    - The user's tone and personality should come through in every reply.
+    - Write in the user's natural style:
+      ${contextFromStyleProfile}
+    
+    Each reply must:
+    - Be based strictly on visible details (text or image). Never guess what’s not shown.
+    - If the image is unclear, keep it positive and simple.
+    - End with a natural, open-ended question that invites conversation.
+    - Feel human and authentic—avoid being overly dramatic, cutesy, or overly witty.
+    - Use straightforward terms for pets (e.g., "your dog" not "fur baby").
+    - Use at most one emoji—only if it adds natural warmth.
+    - Ignore overlays, UI elements, or music tags.
+    - Get straight to the message (no quotes, no intros).`;
     // Prepare messages for API
     type Message = {
       role: "system" | "user";
