@@ -59,7 +59,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const styleInstruction = styleProfile?.style_description
-      ? `Your writing style should be: ${styleProfile.style_description}.`
+      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. All other guidelines are secondary to this style.`
       : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
 
     const systemPrompt = {
@@ -79,10 +79,11 @@ ${userPromptHeader}
 ${storyContentLine}
 
 Your Task:
-Write a short, warm, and curious reply based strictly on the visible story (or text, if present). The reply should feel human and authentic.
-
-Instructions:
-- **Focus on Observable Details:** If it's an image, comment on or ask about something clearly visible. No guessing or making assumptions beyond what's directly shown. If it's ambiguous, a simple, positive comment works best.
+Write ${count} distinct, short, warm, and curious replies based strictly on the visible story (or text, if present). Each reply must be unique and feel human and authentic.
+ 
+ Instructions:
+ - **Generate Unique Replies:** Each suggestion must be different from the others.
+ - **Focus on Observable Details:** If it's an image, comment on or ask about something clearly visible. No guessing or making assumptions beyond what's directly shown. If it's ambiguous, a simple, positive comment works best.
 - **Engage with the Text:** If there's text, respond thoughtfully to its content.
 - **Spark Conversation:** Always end with an open-ended question that encourages the other person to share more. Aim for questions that feel organic and less like a quiz.
 - **Authentic & Simple Tone:** Be yourself. Avoid being overly dramatic, cutesy, or trying too hard to be witty. Keep it genuine and straightforward.
@@ -165,8 +166,13 @@ Bad: "Cool project! What are you building?" (when nothing suggests a project)
     const data = await response.json();
     console.log("OpenAI response received, choices:", data.choices?.length);
 
-    const conversationStarters =
+    const rawStarters =
       data.choices?.map((choice: any) => choice.message.content.trim()) || [];
+
+    // Deduplicate the starters to ensure uniqueness
+    const uniqueStarters = [...new Set(rawStarters)];
+
+    const conversationStarters = uniqueStarters;
 
     console.log("Generated conversation starters:", conversationStarters);
 

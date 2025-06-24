@@ -20,7 +20,8 @@ export const useEnhancedAISuggestions = () => {
     screenshotText: string,
     userDraft: string,
     isRegeneration: boolean = false,
-    existingDocumentKnowledge: any[] = []
+    existingDocumentKnowledge: any[] = [],
+    existingPastHuddles: any[] = []
   ): Promise<GenerateReplyResult | null> => {
     try {
       setIsGenerating(true);
@@ -64,7 +65,7 @@ export const useEnhancedAISuggestions = () => {
         documentKnowledgeCount: documentKnowledge.length
       });
 
-      const pastHuddles = data.pastHuddles || [];
+      const pastHuddles = isRegeneration ? existingPastHuddles : (data.pastHuddles || []);
 
       console.log('📊 DEBUG: Final response summary:', {
         replyGenerated: !!data.reply,
@@ -75,7 +76,7 @@ export const useEnhancedAISuggestions = () => {
       return {
         reply: data.reply || '',
         pastHuddles,
-        documentKnowledge: data.documentKnowledge || []
+        documentKnowledge: documentKnowledge
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
