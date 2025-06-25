@@ -78,23 +78,25 @@ serve(async (req: Request): Promise<Response> => {
         : "Story Content: This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.";
 
     const userPrompt = `A friend posted this on their story:
-    - Story Content: ${storyContentLine}
-    
-    Your Task: Write ${count} unique, short, warm replies that sound like a real and curious friend.
-    **Style Guide:**
-    - The user's tone and personality should come through in every reply.
-    - Write in the user's natural style:
-      ${contextFromStyleProfile}
-    
-    Each reply must:
-    - Be based strictly on visible details (text or image). Never guess what’s not shown.
-    - If the image is unclear, keep it positive and simple.
-    - End with a natural, open-ended question that invites conversation.
-    - Feel human and authentic—avoid being overly dramatic, cutesy, or overly witty.
-    - Use straightforward terms for pets (e.g., "your dog" not "fur baby").
-    - Use at most one emoji—only if it adds natural warmth.
-    - Ignore overlays, UI elements, or music tags.
-    - Get straight to the message (no quotes, no intros).`;
+- Story Content: ${storyContentLine}
+
+Your Task: Write ONE unique, short, and warm reply that sounds like a real and curious friend.
+
+**Style Guide:**
+- The user's tone and personality should come through in the reply.
+- Write in the user's natural style:
+  ${contextFromStyleProfile}
+
+The reply must:
+- Be a single, complete message.
+- Be based strictly on visible details (text or image). Never guess what’s not shown.
+- If the image is unclear, keep it positive and simple.
+- End with a natural, open-ended question that invites conversation.
+- Feel human and authentic—avoid being overly dramatic, cutesy, or overly witty.
+- Use straightforward terms for pets (e.g., "your dog" not "fur baby").
+- Use at most one emoji—only if it adds natural warmth.
+- Ignore overlays, UI elements, or music tags.
+- Get straight to the message (no quotes, no intros, no numbered lists).`;
     // Prepare messages for API
     type Message = {
       role: "system" | "user";
@@ -123,47 +125,59 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    console.log("Calling OpenAI API with model gpt-4o...");
+    console.log(`Calling OpenAI API ${count} times in parallel with model gpt-4o...`);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25-second timeout
+    const apiCall = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    let response;
-    try {
-      response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openAIApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages,
-          max_tokens: 150,
-          n: count,
-          temperature: 0.6,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAIApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages,
+            max_tokens: 150,
+            n: 1, // Always request ONE choice
+            temperature: 0.7, // Slightly higher temp for more variety
+          }),
+          signal: controller.signal,
+        });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("OpenAI API error:", errorData);
-      throw new Error(
-        `OpenAI API error: ${response.status} ${response.statusText}`
-      );
-    }
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error("OpenAI API error:", errorData);
+          throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
 
-    const data = await response.json();
-    console.log("OpenAI response received, choices:", data.choices?.length);
+        const data = await response.json();
+        let content = data.choices[0].message.content.trim();
 
-    const rawStarters =
-      data.choices?.map((choice: any) => choice.message.content.trim()) || [];
+        // Aggressive sanitization: If the AI returns a list, take only the first item.
+        if (content.match(/^\s*1\./)) {
+          // Split by any subsequent numbered list markers (e.g., "2.", "3.")
+          const parts = content.split(/\s\d\./);
+          // Take the first part and remove the "1." prefix.
+          content = parts[0].replace(/^\s*1\.\s*/, '').trim();
+        }
+        
+        return content;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
 
-    // Deduplicate the starters to ensure uniqueness
+    // Create an array of promises
+    const promises = Array(count).fill(null).map(() => apiCall());
+
+    // Await all promises to resolve
+    const rawStarters = await Promise.all(promises);
+
+    // Deduplicate the starters to ensure uniqueness, as parallel calls might still yield similar results
     const uniqueStarters = [...new Set(rawStarters)];
 
     const conversationStarters = uniqueStarters;
