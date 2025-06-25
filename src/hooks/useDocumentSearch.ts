@@ -25,13 +25,13 @@ export const useDocumentSearch = () => {
 
       // Search for similar documents using the generated embedding
       console.log('🔍 Calling search_document_knowledge with:', {
-        match_threshold: 0.1,
+        match_threshold: 0.5,
         match_count: maxResults
       });
 
       const { data, error } = await supabase.rpc('search_document_knowledge', {
         query_embedding: embeddingData.embedding,
-        match_threshold: 0.1,
+        match_threshold: 0.5,
         match_count: maxResults
       });
 

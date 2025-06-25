@@ -213,7 +213,6 @@ export type Database = {
       search_document_knowledge: {
         Args: {
           query_embedding: string
-          target_user_id: string
           match_threshold?: number
           match_count?: number
         }

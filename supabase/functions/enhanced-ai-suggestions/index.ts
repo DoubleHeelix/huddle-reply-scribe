@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
-import { stopWords } from "../shared/stopWords.js";
+import { stopWords } from "../shared/stopWords.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -306,63 +306,71 @@ Refine this draft to make it better:`;
 
       // Store in Supabase for future learning (background task)
       if (userId) {
-        const storeInSupabase = async () => {
-          try {
-            console.log(
-              "💾 DEBUG: Storing huddle in Supabase for future learning..."
-            );
-            const embeddingResponse = await fetch(
-              "https://api.openai.com/v1/embeddings",
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${openaiApiKey}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  input: `${screenshotText} ${userDraft}`,
-                  model: "text-embedding-3-small",
-                }),
-              }
-            );
-
-            const embeddingData = await embeddingResponse.json();
-            const embedding = embeddingData.data[0].embedding;
-
-            const huddleToInsert = {
-              user_id: userId,
-              screenshot_text: screenshotText,
-              user_draft: userDraft,
-              generated_reply: reply,
-              principles: principles || "",
-              embedding: embedding,
-            };
-            console.log(
-              "💾 DEBUG: Attempting to insert huddle with embedding length:",
-              embedding.length
-            );
-
-            const { error } = await supabase
-              .from("huddle_plays")
-              .insert(huddleToInsert);
-
-            if (error) {
-              console.error(
-                "❌ DEBUG: INSERT into huddle_plays FAILED:",
-                error
+        // Quality check: Only store huddles with a meaningful draft
+        const wordCount = userDraft?.split(/\s+/).filter(Boolean).length || 0;
+        if (wordCount >= 3) {
+          const storeInSupabase = async () => {
+            try {
+              console.log(
+                `💾 DEBUG: Storing huddle (draft word count: ${wordCount}) in Supabase...`
               );
-            } else {
-              console.log("✅ DEBUG: INSERT into huddle_plays SUCCEEDED.");
-            }
-          } catch (error) {
-            console.error(
-              "❌ DEBUG: Error storing in Supabase:",
-              (error as Error).message
-            );
-          }
-        };
+              const embeddingResponse = await fetch(
+                "https://api.openai.com/v1/embeddings",
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${openaiApiKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    input: `${screenshotText} ${userDraft}`,
+                    model: "text-embedding-3-small",
+                  }),
+                }
+              );
 
-        await storeInSupabase();
+              const embeddingData = await embeddingResponse.json();
+              const embedding = embeddingData.data[0].embedding;
+
+              const huddleToInsert = {
+                user_id: userId,
+                screenshot_text: screenshotText,
+                user_draft: userDraft,
+                generated_reply: reply,
+                principles: principles || "",
+                embedding: embedding,
+              };
+              console.log(
+                "💾 DEBUG: Attempting to insert huddle with embedding length:",
+                embedding.length
+              );
+
+              const { error } = await supabase
+                .from("huddle_plays")
+                .insert(huddleToInsert);
+
+              if (error) {
+                console.error(
+                  "❌ DEBUG: INSERT into huddle_plays FAILED:",
+                  error
+                );
+              } else {
+                console.log("✅ DEBUG: INSERT into huddle_plays SUCCEEDED.");
+              }
+            } catch (error) {
+              console.error(
+                "❌ DEBUG: Error storing in Supabase:",
+                (error as Error).message
+              );
+            }
+          };
+
+          await storeInSupabase();
+        } else {
+          console.log(
+            `⚠️ DEBUG: Huddle not stored. Draft word count (${wordCount}) is below the threshold of 3.`
+          );
+        }
       }
 
       console.log("🎯 DEBUG: Returning response with:", {
