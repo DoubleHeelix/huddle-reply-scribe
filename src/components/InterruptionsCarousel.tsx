@@ -73,7 +73,7 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
                       variants={{
                         visible: {
                           transition: {
-                            staggerChildren: 0.1,
+                            staggerChildren: 0.2,
                           },
                         },
                       }}
@@ -86,8 +86,16 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
                         <motion.div
                           key={i}
                           variants={{
-                            hidden: { opacity: 0, y: 20 },
-                            visible: { opacity: 1, y: 0 },
+                            hidden: { opacity: 0, y: 30 },
+                            visible: {
+                              opacity: 1,
+                              y: 0,
+                              transition: {
+                                type: "spring",
+                                stiffness: 100,
+                                damping: 10,
+                              },
+                            },
                           }}
                           className="relative p-px overflow-hidden rounded-lg bg-transparent transition-all duration-300 hover:scale-[1.02]"
                         >
