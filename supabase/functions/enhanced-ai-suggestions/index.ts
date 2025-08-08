@@ -8,6 +8,78 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// ---------- Phrase extraction utilities ----------
+function normalizeAndTokenize(input: string): string[] {
+  // Keep letters, digits, intra-word apostrophes/hyphens; split on whitespace
+  const cleaned = input
+    .toLowerCase()
+    .replace(/[_*#@()[\]{}|\\/:;“”"’`,<>~^]/g, " ") // punctuation to spaces
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return [];
+  // Split to tokens and strip leading/trailing punctuation like .!? and commas
+  return cleaned
+    .split(" ")
+    .map((t) => t.replace(/^[.!?;,]+|[.!?;,]+$/g, ""))
+    .filter(Boolean);
+}
+
+function removeStopWords(tokens: string[], stop: Set<string>): string[] {
+  return tokens.filter((t) => {
+    // filter very short tokens and pure numbers
+    if (t.length < 2) return false;
+    if (/^\d+$/.test(t)) return false;
+    return !stop.has(t);
+  });
+}
+
+function ngrams(tokens: string[], n: number): string[] {
+  const grams: string[] = [];
+  for (let i = 0; i <= tokens.length - n; i++) {
+    const gramTokens = tokens.slice(i, i + n);
+    // skip n-grams that are entirely stop words or contain empty tokens
+    const allStop = gramTokens.every((t) => stopWords.has(t));
+    if (allStop) continue;
+    grams.push(gramTokens.join(" "));
+  }
+  return grams;
+}
+
+function topN(items: string[], n: number): string[] {
+  const freq = new Map<string, number>();
+  for (const it of items) {
+    freq.set(it, (freq.get(it) || 0) + 1);
+  }
+  const sorted = Array.from(freq.entries())
+    // Sort by frequency desc, then lexicographically for stability
+    .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+    .slice(0, n)
+    .map(([k]) => k);
+  return sorted;
+}
+
+function extractCommonPhrases(
+  texts: string[],
+  options?: { top?: number }
+): { bigrams: string[]; trigrams: string[] } {
+  const top = options?.top ?? 20;
+
+  // Concatenate texts; alternatively process per-text to preserve boundaries
+  const combined = texts.join(" ");
+  const tokens = normalizeAndTokenize(combined);
+  // For phrase style, we remove stop words before building n-grams to emphasize content words
+  const contentTokens = removeStopWords(tokens, stopWords);
+
+  const bigramsAll = ngrams(contentTokens, 2);
+  const trigramsAll = ngrams(contentTokens, 3);
+
+  const bigramsTop = topN(bigramsAll, top);
+  const trigramsTop = topN(trigramsAll, top);
+
+  return { bigrams: bigramsTop, trigrams: trigramsTop };
+}
+// -------------------------------------------------
+
 interface RequestBody {
   action:
     | "generateReply"
@@ -91,13 +163,23 @@ serve(async (req: Request) => {
 
         if (profile) {
           console.log("🎨 DEBUG: Found user style profile:", profile);
-          contextFromStyleProfile = `\n\nUser's typical writing style (for reference):\n- Average sentence length: ~${
-            profile.avg_sentence_length
-          } words.\n- Formality: ${
-            profile.formality || "not set"
-          }\n- Common topics: ${
-            profile.common_topics?.join(", ") || "not set"
-          }\n`;
+
+          // Include common phrases (bigrams/trigrams) if present
+          const phrases = (profile as any).common_phrases || {};
+          const bigrams: string[] = Array.isArray(phrases.bigrams) ? phrases.bigrams.slice(0, 10) : [];
+          const trigrams: string[] = Array.isArray(phrases.trigrams) ? phrases.trigrams.slice(0, 10) : [];
+          const formattedBigrams = bigrams.length ? bigrams.join(" | ") : "not set";
+          const formattedTrigrams = trigrams.length ? trigrams.join(" | ") : "not set";
+
+          contextFromStyleProfile = `
+
+User's typical writing style (for reference):
+- Average sentence length: ~${profile.avg_sentence_length} words.
+- Formality: ${profile.formality || "not set"}
+- Common topics: ${profile.common_topics?.join(", ") || "not set"}
+- Common phrases (bigrams): ${formattedBigrams}
+- Common phrases (trigrams): ${formattedTrigrams}
+`;
         }
       }
 
@@ -214,23 +296,27 @@ serve(async (req: Request) => {
       // Generate AI response with enhanced context
       const systemPrompt = `You are an expert writing partner helping users improve their draft messages.
       
-      **Your Goal:**
-      Refine the user’s draft so it’s clearer, more engaging, and more effective—without changing their original intent or voice.
-      
-      **Your Context Tools:**
-      1. **Style Profile (Most Important):**
-         Match the user's tone, phrasing, and personality.
-         → Style: ${contextFromStyleProfile}
-      
-      2. **Knowledge Base:**
-         If the conversation or draft includes a question, concern, or knowledge gap, search the documents to find a helpful insight, phrase, or way of explaining it—and weave it into the reply naturally, in the user’s style.
-         → Docs: ${contextFromDocuments}
-      
-      3. **Past Successes:**
+      Your Goal:
+      - Refine the user’s draft so it’s clearer, more engaging, and more effective—without changing their original intent or voice.
+
+      Style Guidance (Very Important):
+      - Match the user's tone, phrasing, and personality using their style profile below.
+      - Prefer the user's typical phrases (bigrams/trigrams) when they fit naturally; do not force them and avoid overusing them.
+      - If a phrase would sound awkward or repetitive in context, do not use it.
+
+      Context Tools:
+      1) Style Profile:
+         ${contextFromStyleProfile}
+
+      2) Knowledge Base:
+         If the conversation or draft includes a question, concern, or knowledge gap, weave in relevant document insights naturally, in the user’s style.
+         ${contextFromDocuments}
+
+      3) Past Successes:
          Learn from messages that worked well for this user.
-         → Examples: ${contextFromPastHuddles}
-      
-      **Output Rules:**
+         ${contextFromPastHuddles}
+
+      Output Rules:
       - Only return the final, refined message—no commentary, no quotation marks.
       - The result should feel organic and human, not over-engineered.
       - Prioritize clarity, connection, and authenticity.`;
@@ -396,19 +482,22 @@ Refine this draft to make it better:`;
         throw new Error("userId is required for style analysis");
       }
 
-      console.log("🔬 DEBUG: [1/5] Starting style analysis for user:", userId);
+      console.log("🔬 DEBUG: [1/6] Starting style analysis for user:", userId);
 
+      // Fetch latest 200 user-authored drafts from huddle_plays
       const { data: huddlePlays, error } = await supabase
         .from("huddle_plays")
-        .select("user_draft")
-        .eq("user_id", userId);
+        .select("user_draft, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(200);
 
       if (error) {
-        console.error("❌ DEBUG: [2/5] Error fetching huddle plays:", error);
+        console.error("❌ DEBUG: [2/6] Error fetching huddle plays:", error);
         throw error;
       }
       console.log(
-        `✅ DEBUG: [2/5] Found ${huddlePlays?.length || 0} huddle plays.`
+        `✅ DEBUG: [2/6] Found ${huddlePlays?.length || 0} recent huddle plays.`
       );
 
       if (!huddlePlays || huddlePlays.length === 0) {
@@ -420,9 +509,12 @@ Refine this draft to make it better:`;
         );
       }
 
-      const allDrafts = huddlePlays
-        .map((p: { user_draft: string }) => p.user_draft)
-        .join(" ");
+      // Aggregate drafts
+      const draftsArray = huddlePlays
+        .map((p: { user_draft: string }) => (p.user_draft || "").trim())
+        .filter(Boolean);
+
+      const allDrafts = draftsArray.join(" ");
       const sentences = allDrafts.match(/[^.!?]+[.!?]+/g) || [];
       const words = allDrafts.split(/\s+/).filter(Boolean);
       const totalWords = words.length;
@@ -430,12 +522,13 @@ Refine this draft to make it better:`;
       const avgSentenceLength =
         totalSentences > 0 ? Math.round(totalWords / totalSentences) : 0;
 
-      console.log("📊 DEBUG: [3/5] Calculated metrics:", {
+      console.log("📊 DEBUG: [3/6] Calculated metrics:", {
         totalWords,
         totalSentences,
         avgSentenceLength,
       });
 
+      // Unigrams -> common topics (existing behavior)
       const wordFrequencies: { [key: string]: number } = {};
       words.forEach((word) => {
         const lowerWord = word.toLowerCase().replace(/[^a-z]/g, "");
@@ -448,15 +541,27 @@ Refine this draft to make it better:`;
         .slice(0, 10)
         .map(([text]) => text);
 
-      console.log("✅ DEBUG: [4/5] Extracted common topics:", commonTopics);
+      // NEW: Phrase extraction (bigrams/trigrams) from latest 200 drafts
+      const { bigrams, trigrams } = extractCommonPhrases(draftsArray, { top: 20 });
+      console.log("🧩 DEBUG: [4/6] Extracted phrases:", {
+        bigramsCount: bigrams.length,
+        trigramsCount: trigrams.length,
+        sampleBigrams: bigrams.slice(0, 5),
+        sampleTrigrams: trigrams.slice(0, 5),
+      });
 
       const analysisResult = {
         huddle_count: huddlePlays.length,
         avg_sentence_length: avgSentenceLength,
         common_topics: commonTopics,
+        // Include phrases in analysis result so the client can confirm/save
+        common_phrases: {
+          bigrams,
+          trigrams,
+        },
       };
 
-      console.log("✅ DEBUG: [5/5] Style analysis complete.");
+      console.log("✅ DEBUG: [5/6] Style analysis complete (including phrases).");
 
       return new Response(JSON.stringify(analysisResult), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -469,11 +574,31 @@ Refine this draft to make it better:`;
         );
       }
 
-      const profileData = {
+      // Ensure phrases are present in the payload; if not, we can recompute quickly from latest drafts
+      let profileData = {
         ...analysisData,
         user_id: userId,
         updated_at: new Date().toISOString(),
-      };
+      } as any;
+
+      if (!profileData.common_phrases) {
+        console.log("ℹ️ DEBUG: common_phrases missing in analysisData; recomputing from latest drafts...");
+        const { data: latestDrafts, error: latestErr } = await supabase
+          .from("huddle_plays")
+          .select("user_draft, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (latestErr) {
+          console.error("❌ DEBUG: Error fetching drafts for phrase recompute:", latestErr);
+        } else {
+          const drafts = (latestDrafts || [])
+            .map((p: { user_draft: string }) => (p.user_draft || "").trim())
+            .filter(Boolean);
+          const { bigrams, trigrams } = extractCommonPhrases(drafts, { top: 20 });
+          profileData.common_phrases = { bigrams, trigrams };
+        }
+      }
 
       console.log("💾 DEBUG: Upserting profile data:", profileData);
 
