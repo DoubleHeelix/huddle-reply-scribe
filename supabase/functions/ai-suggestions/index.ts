@@ -120,7 +120,7 @@ You have provided a suggestion before for this scenario. Now, please provide a *
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5',
         messages,
         temperature,
         max_tokens: 400

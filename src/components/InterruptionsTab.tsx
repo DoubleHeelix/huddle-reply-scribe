@@ -23,7 +23,7 @@ export const InterruptionsTab = ({ stories, processStories, clearStories }: Inte
       <div className="text-center space-y-2">
         <h3 className="text-white text-xl font-semibold font-sans">📸 Story Interruption Generator</h3>
         <p className="text-gray-400 text-sm font-sans">
-          Upload up to 5 Instagram stories. The Huddle bot will suggest 3 warm, curious, and authentic replies for each.
+          Upload up to 5 Instagram stories. The Huddle bot will suggest 5 warm, curious, and authentic replies for each.
         </p>
       </div>
 

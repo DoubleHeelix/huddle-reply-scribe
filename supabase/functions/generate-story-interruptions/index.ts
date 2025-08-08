@@ -125,7 +125,7 @@ The reply must:
       });
     }
 
-    console.log(`Calling OpenAI API ${count} times in parallel with model gpt-4o...`);
+    console.log(`Calling OpenAI API ${count} times in parallel with model gpt-5...`);
 
     const apiCall = async () => {
       const controller = new AbortController();
@@ -139,7 +139,7 @@ The reply must:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "gpt-5",
             messages,
             max_tokens: 150,
             n: 1, // Always request ONE choice
