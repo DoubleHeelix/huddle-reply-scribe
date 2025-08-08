@@ -332,38 +332,38 @@ export const PastHuddlesTab = () => {
     <div className="space-y-4">
       <AlertDialog open={isConfirmingAnalysis} onOpenChange={setIsConfirmingAnalysis}>
         {/* Mobile-safe dialog: use dynamic viewport units (dvh) to avoid iOS/Android 100vh issues. */}
-        <AlertDialogContent className="p-0 w-[96vw] max-w-[860px] md:max-w-[900px] h-[92dvh] md:h-auto md:max-h-[85vh] overflow-hidden flex flex-col">
+        <AlertDialogContent className="p-0 w-[96vw] max-w-[860px] md:max-w-[900px] h-[92dvh] md:h-auto md:max-h-[85vh] overflow-hidden flex flex-col rounded-2xl shadow-2xl border border-gray-700 bg-gray-900">
           {/* Sticky header (visible at all times on mobile) */}
-          <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800 px-3 py-3 sm:px-6 sm:py-4">
+          <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800 px-4 py-4 sm:px-8 sm:py-6">
             <AlertDialogHeader className="p-0 m-0">
-              <AlertDialogTitle className="text-base sm:text-lg">Confirm Your Style Keywords</AlertDialogTitle>
-              <AlertDialogDescription className="text-xs sm:text-sm">
-                We've analyzed your past huddles and identified these common keywords and phrases. You can edit them before saving.
+              <AlertDialogTitle className="text-xl sm:text-2xl font-bold text-white">Confirm Your Style Profile</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm sm:text-base text-gray-400 mt-1">
+                We've analyzed your past huddles and identified common topics and phrases. Review and edit them before saving to refine your personalized style profile.
               </AlertDialogDescription>
             </AlertDialogHeader>
           </div>
           {/* Scrollable body — flex-1 ensures it fills between sticky header and sticky footer */}
-          <div className="px-3 py-3 sm:p-6 overflow-y-auto flex-1">
+          <div className="px-4 py-4 sm:p-8 overflow-y-auto flex-1 custom-scrollbar">
 
             {/* Editable Common Topics - chip-like inputs with better touch targets */}
-            <div className="py-3">
-              <h4 className="text-gray-200 text-sm font-semibold mb-3 font-sans text-center tracking-wide">
+            <div className="mb-8">
+              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
                 Common Topics
               </h4>
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-xl p-3 sm:p-4 mx-auto max-w-[820px] shadow-md">
-                <div className="flex flex-wrap gap-2 justify-center">
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
+                <div className="flex flex-wrap gap-3 justify-center">
                   {editableKeywords.length === 0 && (
-                    <p className="text-gray-500 text-sm font-sans">No topics detected.</p>
+                    <p className="text-gray-500 text-sm font-sans py-2">No topics detected. Engage in more huddles to generate insights!</p>
                   )}
                   {editableKeywords.map((keyword, index) => (
                     <div
                       key={`kw-${index}`}
-                      className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-3 py-2 hover:ring-1 hover:ring-[#39415a]/60 transition"
+                      className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
                     >
                       <Input
                         value={keyword}
                         onChange={(e) => handleKeywordChange(index, e.target.value)}
-                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-8 p-0 px-1 w-[8.5rem] sm:w-auto"
+                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[100px]"
                       />
                     </div>
                   ))}
@@ -372,99 +372,103 @@ export const PastHuddlesTab = () => {
             </div>
 
             {/* Editable Phrases - Bigrams */}
-            <div className="mt-4 bg-gray-900 border border-gray-700 rounded-lg p-3 mx-auto max-w-[800px]">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-white text-sm font-semibold font-sans">Common Phrases (Bigrams)</h4>
-                <div className="flex gap-2 justify-end">
+            <div className="mb-8">
+              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
+                Common Phrases (Bigrams)
+              </h4>
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
+                <div className="flex items-center justify-between mb-4">
                   <Input
                     value={newBigram}
                     onChange={(e) => setNewBigram(e.target.value)}
-                    placeholder="Add bigram (e.g. follow up)"
-                    className="bg-gray-800 border-gray-700 text-white h-8 text-xs w-[9.5rem] sm:w-56"
+                    placeholder="Add new bigram (e.g. 'follow up')"
+                    className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm w-full sm:w-auto flex-grow rounded-lg px-4"
                   />
-                  <Button size="sm" className="h-8" onClick={addBigram}>Add</Button>
-                </div>
-              </div>
-              {editableBigrams.length > 0 ? (
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {editableBigrams.map((p, idx) => (
-                    <div
-                      key={`bi-edit-${idx}`}
-                      className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-full px-3 py-1.5"
-                    >
-                      <Input
-                        value={p}
-                        onChange={(e) => handleBigramChange(idx, e.target.value)}
-                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-white h-7 p-0 px-1 w-[8.5rem] sm:w-auto text-xs sm:text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-red-400 hover:text-red-300"
-                        onClick={() => removeBigram(idx)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm font-sans">No bigrams. Add some above.</p>
-              )}
-            </div>
-
-            {/* Editable Phrases - Trigrams */}
-            <div className="mt-4 bg-[#0f1115] border border-[#1f2330] rounded-xl p-3 sm:p-4 mx-auto max-w-[820px] shadow-md">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-gray-200 text-sm font-semibold font-sans tracking-wide">
-                  Common Phrases (Trigrams)
-                </h4>
-                <div className="flex gap-2 justify-end">
-                  <Input
-                    value={newTrigram}
-                    onChange={(e) => setNewTrigram(e.target.value)}
-                    placeholder="Add trigram (e.g. get back soon)"
-                    className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-xs w-[10.5rem] sm:w-60"
-                  />
-                  <Button size="sm" className="h-9 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white" onClick={addTrigram}>
+                  <Button size="sm" className="h-10 px-6 ml-3 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addBigram}>
                     Add
                   </Button>
                 </div>
-              </div>
-              {editableTrigrams.length > 0 ? (
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {editableTrigrams.map((p, idx) => (
-                    <div
-                      key={`tri-edit-${idx}`}
-                      className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-3 py-1.5 hover:ring-1 hover:ring-[#39415a]/60 transition"
-                    >
-                      <Input
-                        value={p}
-                        onChange={(e) => handleTrigramChange(idx, e.target.value)}
-                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-7 p-0 px-1 w-[9.5rem] sm:w-auto text-xs sm:text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-red-400 hover:text-red-300"
-                        onClick={() => removeTrigram(idx)}
+                {editableBigrams.length > 0 ? (
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    {editableBigrams.map((p, idx) => (
+                      <div
+                        key={`bi-edit-${idx}`}
+                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
                       >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
+                        <Input
+                          value={p}
+                          onChange={(e) => handleBigramChange(idx, e.target.value)}
+                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[100px]"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-auto p-0 text-red-400 hover:text-red-300 text-sm"
+                          onClick={() => removeBigram(idx)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-sans text-center py-2">No bigrams. Add some above to personalize your style!</p>
+                )}
+              </div>
+            </div>
+
+            {/* Editable Phrases - Trigrams */}
+            <div className="mb-8">
+              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
+                Common Phrases (Trigrams)
+              </h4>
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <Input
+                    value={newTrigram}
+                    onChange={(e) => setNewTrigram(e.target.value)}
+                    placeholder="Add new trigram (e.g. 'get back soon')"
+                    className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm w-full sm:w-auto flex-grow rounded-lg px-4"
+                  />
+                  <Button size="sm" className="h-10 px-6 ml-3 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addTrigram}>
+                    Add
+                  </Button>
                 </div>
-              ) : (
-                <p className="text-gray-500 text-sm font-sans text-center">No trigrams. Add some above.</p>
-              )}
+                {editableTrigrams.length > 0 ? (
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    {editableTrigrams.map((p, idx) => (
+                      <div
+                        key={`tri-edit-${idx}`}
+                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
+                      >
+                        <Input
+                          value={p}
+                          onChange={(e) => handleTrigramChange(idx, e.target.value)}
+                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[9.5rem] sm:w-auto min-w-[100px]"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-auto p-0 text-red-400 hover:text-red-300 text-sm"
+                          onClick={() => removeTrigram(idx)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-sans text-center py-2">No trigrams. Add some above to personalize your style!</p>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Fixed bottom action bar (sticky) */}
-          <div className="sticky bottom-0 z-10 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 sm:px-6 py-3">
-            <AlertDialogFooter className="p-0 m-0 gap-2 flex w-full justify-end">
+          <div className="sticky bottom-0 z-10 bg-gray-900/95 backdrop-blur border-t border-gray-800 px-4 sm:px-8 py-4">
+            <AlertDialogFooter className="p-0 m-0 gap-3 flex w-full justify-end">
               <AlertDialogCancel
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto px-6 py-2.5 text-base rounded-lg border border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
                 onClick={() => {
                   setAnalysisResult(null);
                   setEditableKeywords([]);
@@ -476,8 +480,8 @@ export const PastHuddlesTab = () => {
               >
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction className="w-full sm:w-auto" onClick={handleConfirmAnalysis}>
-                Confirm & Save
+              <AlertDialogAction className="w-full sm:w-auto px-6 py-2.5 text-base rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors" onClick={handleConfirmAnalysis}>
+                Confirm & Save Style
               </AlertDialogAction>
             </AlertDialogFooter>
           </div>
