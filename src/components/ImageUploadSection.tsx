@@ -21,7 +21,7 @@ export const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
       <CardContent className="p-5 sm:p-6 md:p-7">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="w-full text-center">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 1</p>
               <p className="text-lg font-display">Upload your screenshot</p>
             </div>

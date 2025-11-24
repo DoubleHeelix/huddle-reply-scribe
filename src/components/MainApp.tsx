@@ -122,23 +122,23 @@ export const MainApp = () => {
 
         {/* Header + Tabs */}
         <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-950/90 border-b border-white/5">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
-            <div className="flex items-start sm:items-center gap-3 flex-col sm:flex-row">
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4 relative items-center text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/20 mx-auto">
                 <MessageSquare className="w-5 h-5 text-white" />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 text-center">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Huddle Assistant</p>
                 <h1 className="text-base sm:text-lg md:text-xl font-display leading-tight">Replies that stay human</h1>
               </div>
-              <div className="ml-auto flex items-center gap-3">
-                {user?.email && (
-                  <div className="user-chip hidden sm:flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-slate-200">
-                    <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-                    {user.email}
-                  </div>
-                )}
-              </div>
+            </div>
+            <div className="absolute right-3 top-3 flex items-center gap-3">
+              {user?.email && (
+                <div className="user-chip hidden sm:flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-slate-200">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+                  {user.email}
+                </div>
+              )}
             </div>
 
             <TabsList className="flex gap-2 overflow-x-auto bg-slate-900/70 border border-white/5 rounded-full p-1 backdrop-blur-md scrollbar-none">

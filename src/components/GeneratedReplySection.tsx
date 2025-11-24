@@ -36,8 +36,8 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   return (
     <Card className="bg-white dark:bg-slate-900/70 border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm dark:shadow-none glass-surface" data-section="generated-reply">
       <CardContent className="p-5 sm:p-6 md:p-7 space-y-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-full text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Step 3</p>
             <h3 className="text-slate-900 dark:text-white text-lg font-display">Your crafted reply</h3>
           </div>
@@ -45,7 +45,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
             onClick={onCopyReply}
             variant="outline"
             size="sm"
-            className="bg-white border border-gray-200 text-slate-900 hover:bg-gray-50 dark:bg-white/10 dark:border-white/20 dark:text-white dark:hover:bg-white/20 font-sans"
+            className="bg-white border border-gray-200 text-slate-900 hover:bg-gray-50 dark:bg-white/10 dark:border-white/20 dark:text-white dark:hover:bg-white/20 font-sans rounded-full px-4"
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy
