@@ -290,6 +290,33 @@ function formatStyleFingerprintSummary(fingerprint?: Partial<StyleFingerprint> |
   return parts.join("\n");
 }
 
+function extractMessageContent(choice: { message?: { content?: unknown } } | null | undefined): string {
+  if (!choice || !choice.message) return "";
+  const content = (choice.message as { content?: unknown }).content;
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object" && (part as { type?: string }).type === "text") {
+          const maybeText = (part as { text?: string }).text;
+          if (typeof maybeText === "string") return maybeText;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    return text;
+  }
+
+  return "";
+}
+
 interface RequestBody {
   action:
     | "generateReply"
@@ -370,32 +397,98 @@ serve(async (req: Request) => {
         console.log("👤 DEBUG: User ID from token:", userId);
       }
 
-      // Fetch user's style profile
+      // Kick off profile and similar-huddle retrieval in parallel to reduce latency
+      const profilePromise = userId
+        ? supabase
+            .from("user_style_profiles")
+            .select("*")
+            .eq("user_id", userId)
+            .single()
+        : Promise.resolve({ data: null, error: null });
+
+      let similarHuddles: SimilarHuddle[] = [];
+      let continuityThreads: SimilarHuddle[] = [];
+      const similarHuddlesPromise = (userId && !isRegeneration)
+        ? (async () => {
+            try {
+              console.log("🔍 DEBUG: Fetching similar huddles from Supabase...");
+
+              const embeddingResponse = await fetch(
+                "https://api.openai.com/v1/embeddings",
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${openaiApiKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    input: `${screenshotText} ${userDraft}`,
+                    model: "text-embedding-3-small",
+                  }),
+                }
+              );
+
+              const embeddingData = await embeddingResponse.json();
+              const embedding = embeddingData.data[0].embedding;
+
+              const rpcParams = {
+                query_embedding: embedding,
+                match_threshold: 0.1,
+                match_count: 3,
+                p_user_id: userId,
+              };
+              console.log(
+                "🔍 DEBUG: Calling match_huddle_plays with params:",
+                rpcParams
+              );
+
+              const { data, error } = await supabase.rpc(
+                "match_huddle_plays",
+                rpcParams
+              );
+
+              if (error) {
+                console.error("❌ DEBUG: RPC match_huddle_plays FAILED:", error);
+                return [];
+              } else {
+                console.log(
+                  `✅ DEBUG: RPC match_huddle_plays SUCCEEDED. Found ${data?.length || 0} huddles.`
+                );
+                return data || [];
+              }
+            } catch (error) {
+              console.error("❌ DEBUG: Error fetching similar huddles:", error);
+              return [];
+            }
+          })()
+        : Promise.resolve([]);
+
+      // Await parallel retrievals
+      const [profileResult, similarHuddleData] = await Promise.all([profilePromise, similarHuddlesPromise]);
+      similarHuddles = similarHuddleData || [];
+      continuityThreads = similarHuddles.slice(0, 3);
+
+      // Build style profile context after parallel fetch
       let contextFromStyleProfile = "";
-      if (userId) {
-        const { data: profile, error: profileError } = await supabase
-          .from("user_style_profiles")
-          .select("*")
-          .eq("user_id", userId)
-          .single();
+      if (profileResult?.data) {
+        const profile = profileResult.data as {
+          avg_sentence_length?: number;
+          formality?: string;
+          common_topics?: string[];
+          common_phrases?: { bigrams?: string[]; trigrams?: string[] };
+          style_fingerprint?: Partial<StyleFingerprint>;
+        };
+        console.log("🎨 DEBUG: Found user style profile:", profile);
 
-        if (profile) {
-          console.log("🎨 DEBUG: Found user style profile:", profile);
+        const phrases = profile.common_phrases || {};
+        const bigrams: string[] = Array.isArray(phrases.bigrams) ? phrases.bigrams.slice(0, 10) : [];
+        const trigrams: string[] = Array.isArray(phrases.trigrams) ? phrases.trigrams.slice(0, 10) : [];
+        const formattedBigrams = bigrams.length ? bigrams.join(" | ") : "not set";
+        const formattedTrigrams = trigrams.length ? trigrams.join(" | ") : "not set";
 
-          // Include common phrases (bigrams/trigrams) if present
-          const phrases =
-            (profile as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })
-              .common_phrases || {};
-          const bigrams: string[] = Array.isArray(phrases.bigrams) ? phrases.bigrams.slice(0, 10) : [];
-          const trigrams: string[] = Array.isArray(phrases.trigrams) ? phrases.trigrams.slice(0, 10) : [];
-          const formattedBigrams = bigrams.length ? bigrams.join(" | ") : "not set";
-          const formattedTrigrams = trigrams.length ? trigrams.join(" | ") : "not set";
+        const styleFingerprintSummary = formatStyleFingerprintSummary(profile.style_fingerprint);
 
-          const styleFingerprintSummary = formatStyleFingerprintSummary(
-            (profile as { style_fingerprint?: Partial<StyleFingerprint> }).style_fingerprint
-          );
-
-          contextFromStyleProfile = `
+        contextFromStyleProfile = `
 
 User's typical writing style (for reference):
 - Average sentence length: ~${profile.avg_sentence_length} words.
@@ -405,68 +498,6 @@ User's typical writing style (for reference):
 - Common phrases (trigrams): ${formattedTrigrams}
 ${styleFingerprintSummary ? styleFingerprintSummary : ""}
 `;
-        }
-      }
-
-      // Fetch similar past huddles from Supabase if available
-      let similarHuddles: SimilarHuddle[] = [];
-      let continuityThreads: SimilarHuddle[] = [];
-      if (userId && !isRegeneration) {
-        try {
-          console.log("🔍 DEBUG: Fetching similar huddles from Supabase...");
-
-          const embeddingResponse = await fetch(
-            "https://api.openai.com/v1/embeddings",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${openaiApiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                input: `${screenshotText} ${userDraft}`,
-                model: "text-embedding-3-small",
-              }),
-            }
-          );
-
-          const embeddingData = await embeddingResponse.json();
-          const embedding = embeddingData.data[0].embedding;
-
-          const rpcParams = {
-            query_embedding: embedding,
-            match_threshold: 0.1,
-            match_count: 3,
-            p_user_id: userId,
-          };
-          console.log(
-            "🔍 DEBUG: Calling match_huddle_plays with params:",
-            rpcParams
-          );
-
-          const { data, error } = await supabase.rpc(
-            "match_huddle_plays",
-            rpcParams
-          );
-
-          if (error) {
-            console.error("❌ DEBUG: RPC match_huddle_plays FAILED:", error);
-          } else {
-            similarHuddles = data || [];
-            console.log(
-              `✅ DEBUG: RPC match_huddle_plays SUCCEEDED. Found ${similarHuddles.length} huddles.`
-            );
-            continuityThreads = similarHuddles.slice(0, 3);
-            if (similarHuddles.length > 0) {
-              console.log(
-                "✅ DEBUG: Similar huddles found:",
-                JSON.stringify(similarHuddles, null, 2)
-              );
-            }
-          }
-        } catch (error) {
-          console.error("❌ DEBUG: Error fetching similar huddles:", error);
-        }
       }
 
       // Fallback continuity context: most recent threads if no similar matches
@@ -613,11 +644,12 @@ Refine this draft to make it better:`;
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-5",
+            model: "gpt-4o",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
             ],
+            temperature: 0.65,
             max_completion_tokens: 500,
           }),
         }
@@ -637,19 +669,12 @@ Refine this draft to make it better:`;
 
       const data = await response.json();
 
-      if (
-        !data.choices ||
-        data.choices.length === 0 ||
-        !data.choices[0].message
-      ) {
-        console.error(
-          "❌ DEBUG: OpenAI response is missing expected structure:",
-          data
-        );
+      if (!data.choices || data.choices.length === 0) {
+        console.error("❌ DEBUG: OpenAI response is missing choices:", data);
         throw new Error("Invalid response structure from OpenAI API.");
       }
 
-      const reply = data.choices[0].message.content.trim();
+      const reply = extractMessageContent(data.choices[0]) || "Thanks for sharing—add a bit more context and I'll tailor a reply.";
 
       console.log(
         "✅ DEBUG: OpenAI response received, reply length:",
@@ -942,7 +967,7 @@ Refine this draft to make it better:`;
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-5",
+            model: "gpt-4o",
             messages: [
               {
                 role: "system",
@@ -953,13 +978,14 @@ Refine this draft to make it better:`;
                 content: originalReply,
               },
             ],
+            temperature: 0.55,
             max_completion_tokens: 500,
           }),
         }
       );
 
       const data = await response.json();
-      const adjustedReply = data.choices[0].message.content.trim();
+      const adjustedReply = extractMessageContent(data.choices?.[0]) || originalReply;
 
       return new Response(JSON.stringify({ reply: adjustedReply }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
