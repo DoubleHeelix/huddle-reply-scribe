@@ -80,6 +80,216 @@ function extractCommonPhrases(
 }
 // -------------------------------------------------
 
+type StyleFingerprint = {
+  emoji_rate_per_message: number;
+  emoji_message_share: number;
+  exclamation_per_sentence: number;
+  question_per_sentence: number;
+  uppercase_word_ratio: number;
+  typical_word_count: number;
+  typical_char_count: number;
+  slang_examples: string[];
+  greetings: string[];
+  closings: string[];
+};
+
+const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+const slangTerms = [
+  "lol",
+  "omg",
+  "brb",
+  "idk",
+  "ttyl",
+  "btw",
+  "lmk",
+  "haha",
+  "hehe",
+  "y'all",
+  "yall",
+  "nah",
+  "yup",
+  "nope",
+  "dude",
+  "bro",
+  "brooo",
+  "man",
+  "fam",
+  "bet",
+  "say less",
+  "fr",
+  "rn",
+  "imo",
+  "imho",
+  "jk",
+  "smh",
+];
+const greetingsList = [
+  "hey",
+  "hi",
+  "yo",
+  "hiya",
+  "hello",
+  "sup",
+  "what's up",
+  "whats up",
+  "morning",
+  "gm",
+  "good morning",
+  "evening",
+  "good evening",
+  "hey there",
+];
+const closingsList = [
+  "thanks",
+  "thank you",
+  "appreciate it",
+  "appreciate you",
+  "talk soon",
+  "ttyl",
+  "cheers",
+  "later",
+  "lmk",
+  "let me know",
+  "catch you later",
+  "see ya",
+  "see you soon",
+];
+
+function median(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+  return sorted[mid];
+}
+
+function topItems(map: Map<string, number>, limit: number): string[] {
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+function computeStyleFingerprint(drafts: string[]): StyleFingerprint {
+  let emojiTotal = 0;
+  let messagesWithEmoji = 0;
+  let exclamationCount = 0;
+  let questionCount = 0;
+  let uppercaseWords = 0;
+  let totalWords = 0;
+  let totalSentences = 0;
+  const wordCounts: number[] = [];
+  const charCounts: number[] = [];
+  const greetingHits = new Map<string, number>();
+  const closingHits = new Map<string, number>();
+  const slangHits = new Map<string, number>();
+
+  drafts.forEach((raw) => {
+    const text = (raw || "").trim();
+    if (!text) return;
+
+    const words = text.split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
+    wordCounts.push(wordCount);
+    charCounts.push(text.length);
+    totalWords += wordCount;
+
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+    totalSentences += sentences.length || 1; // assume at least one clause
+
+    const emojiMatches = text.match(emojiRegex) || [];
+    emojiTotal += emojiMatches.length;
+    if (emojiMatches.length > 0) messagesWithEmoji += 1;
+
+    exclamationCount += (text.match(/!/g) || []).length;
+    questionCount += (text.match(/\?/g) || []).length;
+
+    uppercaseWords += words.filter((w) => w.length >= 3 && /^[A-Z0-9]+$/.test(w)).length;
+
+    const lowerText = text.toLowerCase();
+
+    greetingsList.forEach((greet) => {
+      if (lowerText.startsWith(greet)) {
+        greetingHits.set(greet, (greetingHits.get(greet) || 0) + 1);
+      }
+    });
+
+    closingsList.forEach((close) => {
+      // check within last 6 words to reduce false positives
+      const tail = lowerText.split(/\s+/).slice(-6).join(" ");
+      if (tail.includes(close)) {
+        closingHits.set(close, (closingHits.get(close) || 0) + 1);
+      }
+    });
+
+    slangTerms.forEach((term) => {
+      if (lowerText.includes(term)) {
+        slangHits.set(term, (slangHits.get(term) || 0) + 1);
+      }
+    });
+  });
+
+  const messageCount = drafts.filter((d) => (d || "").trim()).length || 1;
+  const denominatorSentences = Math.max(totalSentences, 1);
+  const denominatorWords = Math.max(totalWords, 1);
+
+  return {
+    emoji_rate_per_message: Number((emojiTotal / messageCount).toFixed(2)),
+    emoji_message_share: Number((messagesWithEmoji / messageCount).toFixed(2)),
+    exclamation_per_sentence: Number((exclamationCount / denominatorSentences).toFixed(2)),
+    question_per_sentence: Number((questionCount / denominatorSentences).toFixed(2)),
+    uppercase_word_ratio: Number((uppercaseWords / denominatorWords).toFixed(2)),
+    typical_word_count: median(wordCounts) || 0,
+    typical_char_count: median(charCounts) || 0,
+    slang_examples: topItems(slangHits, 5),
+    greetings: topItems(greetingHits, 3),
+    closings: topItems(closingHits, 3),
+  };
+}
+
+function formatStyleFingerprintSummary(fingerprint?: Partial<StyleFingerprint> | null): string {
+  if (!fingerprint) return "";
+  const parts: string[] = [];
+
+  if (fingerprint.typical_word_count) {
+    parts.push(`- Typical length: ~${fingerprint.typical_word_count} words (${fingerprint.typical_char_count || 0} chars).`);
+  }
+
+  if (fingerprint.emoji_rate_per_message !== undefined) {
+    parts.push(
+      `- Emoji cadence: ~${fingerprint.emoji_rate_per_message} per message; used in ${
+        fingerprint.emoji_message_share !== undefined ? Math.round((fingerprint.emoji_message_share || 0) * 100) : 0
+      }% of messages.`
+    );
+  }
+
+  if (fingerprint.exclamation_per_sentence !== undefined || fingerprint.question_per_sentence !== undefined) {
+    parts.push(
+      `- Punctuation lean: exclamations ${fingerprint.exclamation_per_sentence ?? 0}/sentence, questions ${
+        fingerprint.question_per_sentence ?? 0
+      }/sentence.`
+    );
+  }
+
+  if (fingerprint.uppercase_word_ratio !== undefined) {
+    parts.push(`- Capitalization: uppercase words ${(fingerprint.uppercase_word_ratio * 100 || 0).toFixed(0)}% of the time (>=3 letters).`);
+  }
+
+  if (fingerprint.slang_examples && fingerprint.slang_examples.length) {
+    parts.push(`- Common slang/abbreviations: ${fingerprint.slang_examples.join(", ")}.`);
+  }
+
+  if ((fingerprint.greetings && fingerprint.greetings.length) || (fingerprint.closings && fingerprint.closings.length)) {
+    const greetingText = fingerprint.greetings && fingerprint.greetings.length ? `greetings like ${fingerprint.greetings.join(", ")}` : "";
+    const closingText = fingerprint.closings && fingerprint.closings.length ? `closings like ${fingerprint.closings.join(", ")}` : "";
+    parts.push(`- Open/close habits: ${[greetingText, closingText].filter(Boolean).join("; ")}.`);
+  }
+
+  return parts.join("\n");
+}
+
 interface RequestBody {
   action:
     | "generateReply"
@@ -106,6 +316,7 @@ type SimilarHuddle = {
   user_draft: string;
   final_reply?: string | null;
   generated_reply: string;
+  created_at?: string;
 };
 
 serve(async (req: Request) => {
@@ -180,6 +391,10 @@ serve(async (req: Request) => {
           const formattedBigrams = bigrams.length ? bigrams.join(" | ") : "not set";
           const formattedTrigrams = trigrams.length ? trigrams.join(" | ") : "not set";
 
+          const styleFingerprintSummary = formatStyleFingerprintSummary(
+            (profile as { style_fingerprint?: Partial<StyleFingerprint> }).style_fingerprint
+          );
+
           contextFromStyleProfile = `
 
 User's typical writing style (for reference):
@@ -188,12 +403,14 @@ User's typical writing style (for reference):
 - Common topics: ${profile.common_topics?.join(", ") || "not set"}
 - Common phrases (bigrams): ${formattedBigrams}
 - Common phrases (trigrams): ${formattedTrigrams}
+${styleFingerprintSummary ? styleFingerprintSummary : ""}
 `;
         }
       }
 
       // Fetch similar past huddles from Supabase if available
       let similarHuddles: SimilarHuddle[] = [];
+      let continuityThreads: SimilarHuddle[] = [];
       if (userId && !isRegeneration) {
         try {
           console.log("🔍 DEBUG: Fetching similar huddles from Supabase...");
@@ -239,6 +456,7 @@ User's typical writing style (for reference):
             console.log(
               `✅ DEBUG: RPC match_huddle_plays SUCCEEDED. Found ${similarHuddles.length} huddles.`
             );
+            continuityThreads = similarHuddles.slice(0, 3);
             if (similarHuddles.length > 0) {
               console.log(
                 "✅ DEBUG: Similar huddles found:",
@@ -248,6 +466,25 @@ User's typical writing style (for reference):
           }
         } catch (error) {
           console.error("❌ DEBUG: Error fetching similar huddles:", error);
+        }
+      }
+
+      // Fallback continuity context: most recent threads if no similar matches
+      if (continuityThreads.length === 0 && userId) {
+        const { data: recentHuddles, error: recentErr } = await supabase
+          .from("huddle_plays")
+          .select("screenshot_text, user_draft, generated_reply, final_reply, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        if (recentErr) {
+          console.error("❌ DEBUG: Error fetching recent huddles for continuity:", recentErr);
+        } else if (recentHuddles && recentHuddles.length) {
+          continuityThreads = recentHuddles as SimilarHuddle[];
+          console.log(
+            `ℹ️ DEBUG: Using ${continuityThreads.length} recent huddles for continuity context.`
+          );
         }
       }
 
@@ -269,6 +506,25 @@ User's typical writing style (for reference):
         console.log(
           "✅ DEBUG: Past huddles context built, length:",
           contextFromPastHuddles.length
+        );
+      }
+
+      // Build continuity context (recent or similar threads)
+      let continuityContext = "";
+      if (continuityThreads.length > 0) {
+        continuityContext =
+          "\n\nContinuity notes (same contact/topic if it fits):\n";
+        continuityThreads.forEach((huddle, index: number) => {
+          const acceptedReply = huddle.final_reply || huddle.generated_reply;
+          continuityContext += `\nThread ${index + 1} (recent):\nContext: ${
+            huddle.screenshot_text
+          }\nLast message I sent: ${acceptedReply}\n`;
+        });
+        continuityContext +=
+          "\nIf the current request is the same conversation, carry forward callbacks, references, or light-running jokes naturally.\n";
+        console.log(
+          "✅ DEBUG: Continuity context built, length:",
+          continuityContext.length
         );
       }
 
@@ -325,6 +581,10 @@ User's typical writing style (for reference):
          Learn from messages that worked well for this user.
          ${contextFromPastHuddles}
 
+      4) Continuity:
+         If any notes below match the same contact or topic, continue naturally—reference past beats, answer follow-ups, keep running jokes going without repeating them verbatim.
+         ${continuityContext}
+
       Output Rules:
       - Only return the final, refined message—no commentary, no quotation marks.
       - The result should feel organic and human, not over-engineered.
@@ -341,6 +601,7 @@ Refine this draft to make it better:`;
         userPromptLength: userPrompt.length,
         hasDocumentContext: contextFromDocuments.length > 0,
         hasPastHuddlesContext: contextFromPastHuddles.length > 0,
+        hasContinuityContext: continuityContext.length > 0,
       });
 
       const response = await fetch(
@@ -559,10 +820,14 @@ Refine this draft to make it better:`;
         sampleTrigrams: trigrams.slice(0, 5),
       });
 
+      const styleFingerprint = computeStyleFingerprint(draftsArray);
+      console.log("🧬 DEBUG: [5/6] Style fingerprint:", styleFingerprint);
+
       const analysisResult = {
         huddle_count: huddlePlays.length,
         avg_sentence_length: avgSentenceLength,
         common_topics: commonTopics,
+        style_fingerprint: styleFingerprint,
         // Include phrases in analysis result so the client can confirm/save
         common_phrases: {
           bigrams,
@@ -570,7 +835,7 @@ Refine this draft to make it better:`;
         },
       };
 
-      console.log("✅ DEBUG: [5/6] Style analysis complete (including phrases).");
+      console.log("✅ DEBUG: [6/6] Style analysis complete (including phrases and fingerprint).");
 
       return new Response(JSON.stringify(analysisResult), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -588,6 +853,7 @@ Refine this draft to make it better:`;
         user_id: string;
         updated_at: string;
         common_phrases?: { bigrams?: string[]; trigrams?: string[] };
+        style_fingerprint?: StyleFingerprint;
       } = {
         ...analysisData,
         user_id: userId,
@@ -610,6 +876,24 @@ Refine this draft to make it better:`;
             .filter(Boolean);
           const { bigrams, trigrams } = extractCommonPhrases(drafts, { top: 20 });
           profileData.common_phrases = { bigrams, trigrams };
+        }
+      }
+
+      if (!profileData.style_fingerprint) {
+        console.log("ℹ️ DEBUG: style_fingerprint missing in analysisData; recomputing from latest drafts...");
+        const { data: latestDrafts, error: latestErr } = await supabase
+          .from("huddle_plays")
+          .select("user_draft, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (latestErr) {
+          console.error("❌ DEBUG: Error fetching drafts for fingerprint recompute:", latestErr);
+        } else {
+          const drafts = (latestDrafts || [])
+            .map((p: { user_draft: string }) => (p.user_draft || "").trim())
+            .filter(Boolean);
+          profileData.style_fingerprint = computeStyleFingerprint(drafts);
         }
       }
 

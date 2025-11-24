@@ -98,9 +98,9 @@ export type Database = {
           formality: string | null
           huddle_count: number | null
           id: string
+          common_phrases: Json | null
+          style_fingerprint: Json | null
           sentiment: string | null
-          top_bigrams: string[] | null
-          top_trigrams: string[] | null
           updated_at: string
           user_id: string
         }
@@ -108,12 +108,12 @@ export type Database = {
           avg_sentence_length?: number | null
           common_topics?: string[] | null
           created_at?: string
+          common_phrases?: Json | null
           formality?: string | null
           huddle_count?: number | null
           id?: string
+          style_fingerprint?: Json | null
           sentiment?: string | null
-          top_bigrams?: string[] | null
-          top_trigrams?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -121,12 +121,12 @@ export type Database = {
           avg_sentence_length?: number | null
           common_topics?: string[] | null
           created_at?: string
+          common_phrases?: Json | null
           formality?: string | null
           huddle_count?: number | null
           id?: string
+          style_fingerprint?: Json | null
           sentiment?: string | null
-          top_bigrams?: string[] | null
-          top_trigrams?: string[] | null
           updated_at?: string
           user_id?: string
         }

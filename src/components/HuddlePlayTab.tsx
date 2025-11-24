@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Zap } from "lucide-react";
 import { ImageUploadSection } from './ImageUploadSection';
@@ -6,7 +6,7 @@ import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
-import { useEffect, useCallback, useState } from 'react';
+import { cn } from "@/lib/utils";
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
@@ -284,8 +284,37 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     return () => window.removeEventListener('keydown', handleShortcut);
   }, [handleShortcut]);
 
+  const progressActive = isOCRProcessing || isGenerating || isAdjustingTone;
+  const progressPercent = isGenerating ? 80 : isAdjustingTone ? 90 : isOCRProcessing ? 40 : 0;
+  const progressLabel = isGenerating
+    ? "Generating reply..."
+    : isAdjustingTone
+    ? "Adjusting tone..."
+    : "Processing image...";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {progressActive && (
+        <div className="sticky top-0 z-20">
+          <div className="h-1.5 bg-slate-800/60 rounded-full overflow-hidden border border-slate-700/60">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400",
+              )}
+              style={{ width: `${progressPercent}%` }}
+              role="progressbar"
+              aria-label={progressLabel}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent}
+            />
+          </div>
+          <p className="text-xs text-slate-400 mt-1" aria-live="polite">
+            {progressLabel}
+          </p>
+        </div>
+      )}
+
       <ImageUploadSection
         uploadedImage={uploadedImage}
         isOCRProcessing={isOCRProcessing}
