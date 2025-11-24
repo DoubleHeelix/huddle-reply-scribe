@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, History, Camera } from "lucide-react";
+import { MessageSquare, History, Camera, Users } from "lucide-react";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
@@ -85,7 +85,7 @@ export const MainApp = () => {
   };
 
   const handleTabChange = (newTab: string) => {
-    const tabs = ["huddle-play", "interruptions", "past-huddles"];
+    const tabs = ["huddle-play", "interruptions", "people", "past-huddles"];
     const oldIndex = tabs.indexOf(activeTab);
     const newIndex = tabs.indexOf(newTab);
     setDirection(newIndex - oldIndex);
@@ -128,7 +128,7 @@ export const MainApp = () => {
 
       <div className="p-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
             <TabsTrigger
               value="huddle-play"
               className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
@@ -142,6 +142,13 @@ export const MainApp = () => {
             >
               <Camera className="w-4 h-4" />
               Interruptions
+            </TabsTrigger>
+            <TabsTrigger
+              value="people"
+              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
+            >
+              <Users className="w-4 h-4" />
+              People
             </TabsTrigger>
             <TabsTrigger
               value="past-huddles"
@@ -170,6 +177,11 @@ export const MainApp = () => {
                   processStories={interruptionsState.processStories}
                   clearStories={interruptionsState.clearStories}
                 />
+              </TabsContent>
+              <TabsContent value="people" forceMount className={activeTab === 'people' ? 'block' : 'hidden'}>
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-sans">
+                  People section coming soon.
+                </div>
               </TabsContent>
               <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
                 <PastHuddlesTab />
