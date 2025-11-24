@@ -16,13 +16,103 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { RefreshCcw, MessageSquare, Calendar, Search, Bot, ChevronDown } from 'lucide-react';
+import { RefreshCcw, MessageSquare, Calendar, Search, ChevronDown, Sparkles, X, Loader2 } from 'lucide-react';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
 import { getCategory } from '@/utils/huddleCategorization';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
+
+type Fingerprint = Record<string, unknown> | null;
+
+const formatFingerprintValue = (
+  analysisResult: Fingerprint,
+  primary: string,
+  secondary?: string
+): string => {
+  const fp = (analysisResult as { style_fingerprint?: Record<string, unknown> })?.style_fingerprint || {};
+  if (!fp) return '—';
+
+  if (primary === 'emoji_rate_per_message') {
+    const rate = fp['emoji_rate_per_message'] as number | undefined;
+    const share = fp['emoji_message_share'] as number | undefined;
+    if (rate === undefined && share === undefined) return '—';
+    const sharePct = share !== undefined ? `${Math.round(share * 100)}% msgs` : '';
+    return `${rate ?? '—'}/msg ${sharePct ? `• ${sharePct}` : ''}`;
+  }
+
+  if (primary === 'exclamation_per_sentence') {
+    const ex = fp['exclamation_per_sentence'] as number | undefined;
+    const q = fp['question_per_sentence'] as number | undefined;
+    if (ex === undefined && q === undefined) return '—';
+    return `! ${ex ?? '—'}/sent • ? ${q ?? '—'}/sent`;
+  }
+
+  if (primary === 'uppercase_word_ratio') {
+    const ratio = fp['uppercase_word_ratio'] as number | undefined;
+    return ratio !== undefined ? `${Math.round(ratio * 100)}% of words` : '—';
+  }
+
+  if (primary === 'typical_word_count') {
+    const words = fp['typical_word_count'] as number | undefined;
+    const chars = fp['typical_char_count'] as number | undefined;
+    if (words === undefined && chars === undefined) return '—';
+    return `${words ?? '—'} words • ${chars ?? '—'} chars`;
+  }
+
+  if (secondary) {
+    const primaryVal = fp[primary] as number | undefined;
+    const secondaryVal = fp[secondary] as number | undefined;
+    if (primaryVal === undefined && secondaryVal === undefined) return '—';
+    return `${primaryVal ?? '—'} • ${secondaryVal ?? '—'}`;
+  }
+
+  const val = fp[primary] as string | number | undefined;
+  if (typeof val === 'number') return val.toFixed(2);
+  if (val) return String(val);
+  return '—';
+};
+
+const formatFingerprintList = (analysisResult: Fingerprint, key: string): string => {
+  const fp = (analysisResult as { style_fingerprint?: Record<string, unknown> })?.style_fingerprint || {};
+  const list = fp?.[key] as string[] | undefined;
+  if (!list || list.length === 0) return '—';
+  return list.join(', ');
+};
+
+const FingerprintRow = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex items-start gap-2 rounded-xl bg-[#111522] border border-[#1f2330] px-3 py-2">
+    <span className="text-gray-400 text-xs uppercase tracking-wide">{label}</span>
+    <span className="text-gray-100 text-sm">{value}</span>
+  </div>
+);
+
+const ChipEditable = ({
+  value,
+  onChange,
+  onRemove,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onRemove: () => void;
+}) => (
+  <div className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out shadow-sm">
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[110px]"
+    />
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-auto p-0 text-gray-400 hover:text-gray-200 text-sm"
+      onClick={onRemove}
+    >
+      <X className="w-4 h-4" />
+    </Button>
+  </div>
+);
 
 export const PastHuddlesTab = () => {
   const { huddlePlays: initialHuddlePlays, isLoading, error, refetch } = useHuddlePlays();
@@ -345,122 +435,121 @@ export const PastHuddlesTab = () => {
           </div>
           {/* Scrollable body — flex-1 ensures it fills between sticky header and sticky footer */}
           <div className="px-4 py-4 sm:p-8 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-[#5b6bfa]/15 via-[#9c6bfa]/15 to-[#5b6bfa]/10 border border-[#1f2330] px-4 py-4 sm:px-6 sm:py-5 shadow-lg">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.15em] text-gray-400 font-semibold">Review your style</p>
+                  <p className="text-white text-lg font-semibold">Edit topics, phrases, and cadence before saving.</p>
+                </div>
+                <div className="flex gap-3 text-sm text-gray-300 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                    {editableKeywords.length || 0} topics
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                    {(analysisResult as { huddle_count?: number })?.huddle_count || '—'} drafts scanned
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                    {(analysisResult as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })?.common_phrases?.bigrams?.length || 0} bigrams • {(analysisResult as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })?.common_phrases?.trigrams?.length || 0} trigrams
+                  </span>
+                </div>
+              </div>
+            </div>
 
-            {/* Editable Common Topics - chip-like inputs with better touch targets */}
-            <div className="mb-8">
-              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
-                Common Topics
-              </h4>
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {editableKeywords.length === 0 && (
-                    <p className="text-gray-500 text-sm font-sans py-2">No topics detected. Engage in more huddles to generate insights!</p>
-                  )}
-                  {editableKeywords.map((keyword, index) => (
-                    <div
-                      key={`kw-${index}`}
-                      className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
-                    >
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-6">
+                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Topics</h4>
+                    <span className="text-xs text-gray-500">Tap to edit</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {editableKeywords.length === 0 && (
+                      <p className="text-gray-500 text-sm font-sans py-2">No topics detected. Engage in more huddles to generate insights!</p>
+                    )}
+                    {editableKeywords.map((keyword, index) => (
+                      <div
+                        key={`kw-${index}`}
+                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out shadow-sm"
+                      >
+                        <Input
+                          value={keyword}
+                          onChange={(e) => handleKeywordChange(index, e.target.value)}
+                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[110px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-[#9c6bfa]" />
+                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Cadence & tone</h4>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3 text-sm text-gray-300">
+                    <FingerprintRow label="Emoji cadence" value={formatFingerprintValue(analysisResult, 'emoji_rate_per_message', 'emoji_message_share')} />
+                    <FingerprintRow label="Punctuation lean" value={formatFingerprintValue(analysisResult, 'exclamation_per_sentence', 'question_per_sentence')} />
+                    <FingerprintRow label="Capitalization" value={formatFingerprintValue(analysisResult, 'uppercase_word_ratio')} />
+                    <FingerprintRow label="Typical length" value={formatFingerprintValue(analysisResult, 'typical_word_count', 'typical_char_count')} />
+                    <FingerprintRow label="Greetings" value={formatFingerprintList(analysisResult, 'greetings')} />
+                    <FingerprintRow label="Closings" value={formatFingerprintList(analysisResult, 'closings')} />
+                    <FingerprintRow label="Slang" value={formatFingerprintList(analysisResult, 'slang_examples')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Bigrams)</h4>
+                    <div className="flex items-center gap-2">
                       <Input
-                        value={keyword}
-                        onChange={(e) => handleKeywordChange(index, e.target.value)}
-                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[100px]"
+                        value={newBigram}
+                        onChange={(e) => setNewBigram(e.target.value)}
+                        placeholder="Add bigram (e.g. 'follow up')"
+                        className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
                       />
+                      <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addBigram}>
+                        Add
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Editable Phrases - Bigrams */}
-            <div className="mb-8">
-              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
-                Common Phrases (Bigrams)
-              </h4>
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <Input
-                    value={newBigram}
-                    onChange={(e) => setNewBigram(e.target.value)}
-                    placeholder="Add new bigram (e.g. 'follow up')"
-                    className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm w-full sm:w-auto flex-grow rounded-lg px-4"
-                  />
-                  <Button size="sm" className="h-10 px-6 ml-3 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addBigram}>
-                    Add
-                  </Button>
-                </div>
-                {editableBigrams.length > 0 ? (
-                  <div className="flex flex-wrap gap-3 justify-center">
-                    {editableBigrams.map((p, idx) => (
-                      <div
-                        key={`bi-edit-${idx}`}
-                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
-                      >
-                        <Input
-                          value={p}
-                          onChange={(e) => handleBigramChange(idx, e.target.value)}
-                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[100px]"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-auto p-0 text-red-400 hover:text-red-300 text-sm"
-                          onClick={() => removeBigram(idx)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
                   </div>
-                ) : (
-                  <p className="text-gray-500 text-sm font-sans text-center py-2">No bigrams. Add some above to personalize your style!</p>
-                )}
-              </div>
-            </div>
-
-            {/* Editable Phrases - Trigrams */}
-            <div className="mb-8">
-              <h4 className="text-gray-200 text-lg font-semibold mb-4 font-sans text-center tracking-wide">
-                Common Phrases (Trigrams)
-              </h4>
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 mx-auto max-w-[820px] shadow-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <Input
-                    value={newTrigram}
-                    onChange={(e) => setNewTrigram(e.target.value)}
-                    placeholder="Add new trigram (e.g. 'get back soon')"
-                    className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm w-full sm:w-auto flex-grow rounded-lg px-4"
-                  />
-                  <Button size="sm" className="h-10 px-6 ml-3 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addTrigram}>
-                    Add
-                  </Button>
+                  {editableBigrams.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">
+                      {editableBigrams.map((p, idx) => (
+                        <ChipEditable key={`bi-edit-${idx}`} value={p} onChange={(v) => handleBigramChange(idx, v)} onRemove={() => removeBigram(idx)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm font-sans text-center py-2">No bigrams. Add some above to personalize your style!</p>
+                  )}
                 </div>
-                {editableTrigrams.length > 0 ? (
-                  <div className="flex flex-wrap gap-3 justify-center">
-                    {editableTrigrams.map((p, idx) => (
-                      <div
-                        key={`tri-edit-${idx}`}
-                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out"
-                      >
-                        <Input
-                          value={p}
-                          onChange={(e) => handleTrigramChange(idx, e.target.value)}
-                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[9.5rem] sm:w-auto min-w-[100px]"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-auto p-0 text-red-400 hover:text-red-300 text-sm"
-                          onClick={() => removeTrigram(idx)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
+
+                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Trigrams)</h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={newTrigram}
+                        onChange={(e) => setNewTrigram(e.target.value)}
+                        placeholder="Add trigram (e.g. 'get back soon')"
+                        className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
+                      />
+                      <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addTrigram}>
+                        Add
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-gray-500 text-sm font-sans text-center py-2">No trigrams. Add some above to personalize your style!</p>
-                )}
+                  {editableTrigrams.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">
+                      {editableTrigrams.map((p, idx) => (
+                        <ChipEditable key={`tri-edit-${idx}`} value={p} onChange={(v) => handleTrigramChange(idx, v)} onRemove={() => removeTrigram(idx)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm font-sans text-center py-2">No trigrams. Add some above to personalize your style!</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -520,11 +609,20 @@ export const PastHuddlesTab = () => {
             onClick={handleAnalyzeStyle}
             variant="ghost"
             size="sm"
-            className="bg-purple-600 text-white hover:bg-purple-700 font-sans shrink-0 rounded-full shadow-sm"
+            className="bg-purple-600 text-white hover:bg-purple-700 font-sans shrink-0 rounded-full shadow-sm px-4"
             disabled={isAnalyzing}
           >
-            <Bot className="w-4 h-4 mr-2" />
-            {isAnalyzing ? 'Analyzing...' : 'Analyze My Style'}
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Refresh my fingerprint
+              </>
+            )}
           </Button>
         </div>
       </div>

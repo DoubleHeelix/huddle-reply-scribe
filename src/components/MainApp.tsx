@@ -103,7 +103,7 @@ export const MainApp = () => {
 
   return (
     <div
-      className="min-h-screen bg-slate-950 text-white"
+      className="min-h-screen bg-background text-foreground"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -180,8 +180,8 @@ export const MainApp = () => {
                   History
                 </TabsTrigger>
               </TabsList>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-l-full" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-r-full" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-l-full hidden dark:block" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-r-full hidden dark:block" />
             </div>
           </div>
         </div>

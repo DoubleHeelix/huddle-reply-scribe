@@ -13,6 +13,55 @@ const allowedOrigins = [
   // Add your mobile device's local IP if needed, e.g., 'http://192.168.1.100:8080'
 ];
 
+function formatStyleFingerprintSummary(
+  fingerprint?: {
+    emoji_rate_per_message?: number;
+    emoji_message_share?: number;
+    exclamation_per_sentence?: number;
+    question_per_sentence?: number;
+    uppercase_word_ratio?: number;
+    typical_word_count?: number;
+    typical_char_count?: number;
+    slang_examples?: string[];
+    greetings?: string[];
+    closings?: string[];
+  } | null
+): string {
+  if (!fingerprint) return "";
+  const parts: string[] = [];
+
+  if (fingerprint.typical_word_count) {
+    parts.push(`Keep length around ~${fingerprint.typical_word_count} words (${fingerprint.typical_char_count || 0} chars).`);
+  }
+  if (fingerprint.emoji_rate_per_message !== undefined) {
+    parts.push(
+      `Emoji: ~${fingerprint.emoji_rate_per_message} per message, used in ${
+        fingerprint.emoji_message_share !== undefined ? Math.round((fingerprint.emoji_message_share || 0) * 100) : 0
+      }% of messages.`
+    );
+  }
+  if (fingerprint.exclamation_per_sentence !== undefined || fingerprint.question_per_sentence !== undefined) {
+    parts.push(
+      `Punctuation lean: exclamations ${fingerprint.exclamation_per_sentence ?? 0}/sentence, questions ${
+        fingerprint.question_per_sentence ?? 0
+      }/sentence.`
+    );
+  }
+  if (fingerprint.uppercase_word_ratio !== undefined) {
+    parts.push(`Uppercase words ${(fingerprint.uppercase_word_ratio * 100 || 0).toFixed(0)}% of the time.`);
+  }
+  if (fingerprint.slang_examples && fingerprint.slang_examples.length) {
+    parts.push(`Slang to prefer if natural: ${fingerprint.slang_examples.join(", ")}.`);
+  }
+  if ((fingerprint.greetings && fingerprint.greetings.length) || (fingerprint.closings && fingerprint.closings.length)) {
+    const greetingText = fingerprint.greetings && fingerprint.greetings.length ? `greetings (${fingerprint.greetings.join(", ")})` : "";
+    const closingText = fingerprint.closings && fingerprint.closings.length ? `closings (${fingerprint.closings.join(", ")})` : "";
+    parts.push(`Open/close habits: ${[greetingText, closingText].filter(Boolean).join("; ")}.`);
+  }
+
+  return parts.join(" ");
+}
+
 serve(async (req: Request): Promise<Response> => {
   const origin = req.headers.get("Origin") || "";
   const corsHeaders = {
@@ -49,7 +98,7 @@ serve(async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     const { data: styleProfile, error: styleError } = await supabase
       .from("user_style_profiles")
-      .select("style_description")
+      .select("style_description, style_fingerprint")
       .eq("user_id", userId)
       .single();
 
@@ -58,12 +107,18 @@ serve(async (req: Request): Promise<Response> => {
       // Continue without style profile for now, or handle error as needed
     }
 
+    const fingerprintSummary = formatStyleFingerprintSummary(
+      styleProfile?.style_fingerprint as Record<string, unknown> | undefined
+    );
+
     const styleInstruction = styleProfile?.style_description
-      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. All other guidelines are secondary to this style.`
+      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. All other guidelines are secondary to this style.${
+          fingerprintSummary ? ` Cadence notes: ${fingerprintSummary}` : ""
+        }`
       : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
 
     const contextFromStyleProfile = styleProfile?.style_description
-      ? styleProfile.style_description
+      ? `${styleProfile.style_description}${fingerprintSummary ? `\n${fingerprintSummary}` : ""}`
       : "Default: Be observant, thoughtful, and curious. Keep it simple and authentic.";
 
     const systemPrompt = {
