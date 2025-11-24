@@ -489,7 +489,7 @@ export const PastHuddlesTab = () => {
         </AlertDialogContent>
       </AlertDialog>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <h3 className="text-white text-xl font-bold font-sans shrink-0">
+        <h3 className="text-slate-900 dark:text-white text-xl font-bold font-sans shrink-0">
           Past Huddles ({filteredHuddles.length})
         </h3>
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -501,14 +501,14 @@ export const PastHuddlesTab = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="bg-gray-800 border-gray-700 text-white pl-10 w-full rounded-full focus:ring-2 focus:ring-purple-500"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white pl-10 w-full rounded-full focus:ring-2 focus:ring-purple-500 shadow-sm"
             />
           </div>
           <Button
             onClick={handleAnalyzeStyle}
             variant="ghost"
             size="sm"
-            className="bg-purple-600 text-white hover:bg-purple-700 font-sans shrink-0 rounded-full"
+            className="bg-purple-600 text-white hover:bg-purple-700 font-sans shrink-0 rounded-full shadow-sm"
             disabled={isAnalyzing}
           >
             <Bot className="w-4 h-4 mr-2" />
@@ -519,12 +519,12 @@ export const PastHuddlesTab = () => {
 
       <div className="space-y-3 pb-4">
         {sortedCategories.map((category) => (
-          <Card key={category} className="bg-gray-800/50 border-gray-700/50 overflow-hidden rounded-lg">
+          <Card key={category} className="bg-white/80 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 overflow-hidden rounded-lg shadow-sm dark:shadow-none">
             <div
-              className="p-4 cursor-pointer flex justify-between items-center hover:bg-gray-700/30 transition-colors"
+              className="p-4 cursor-pointer flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700/30 transition-colors"
               onClick={() => toggleCategoryExpansion(category)}
             >
-              <h4 className="text-white font-semibold text-md">
+              <h4 className="text-slate-900 dark:text-white font-semibold text-md">
                 {category} ({categorizedHuddles[category].length})
               </h4>
               <motion.div
@@ -552,12 +552,12 @@ export const PastHuddlesTab = () => {
                     >
                       {categorizedHuddles[category].map((huddle) => (
                         <motion.div key={huddle.id} variants={itemVariants}>
-                          <Card className="bg-gray-800/90 rounded-lg border border-gray-700">
-                            <CardContent className="p-4">
+                          <Card className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                            <CardContent className="p-4 space-y-4">
                             <div className="flex justify-between items-start mb-3">
                               <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-gray-400" />
-                                <span className="text-gray-400 text-sm font-sans">
+                                <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                <span className="text-gray-600 dark:text-gray-400 text-sm font-sans">
                                   {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
                                 </span>
                               </div>
@@ -577,14 +577,14 @@ export const PastHuddlesTab = () => {
 
                             <div className="space-y-4">
                               <div>
-                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
-                                <p className={`text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
+                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
+                                <p className={`text-gray-700 dark:text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
                                   {huddle.screenshot_text}
                                 </p>
                                 {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
                                   <Button
                                     variant="link"
-                                    className="p-0 h-auto text-xs text-blue-400 hover:no-underline"
+                                    className="p-0 h-auto text-xs text-blue-600 dark:text-blue-400 hover:no-underline"
                                     onClick={() => toggleHuddleExpansion(huddle.id)}
                                   >
                                     {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
@@ -593,18 +593,18 @@ export const PastHuddlesTab = () => {
                               </div>
 
                               <div>
-                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">Your Draft:</p>
-                                <p className="text-gray-200 text-sm font-sans line-clamp-2">
+                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">Your Draft:</p>
+                                <p className="text-gray-800 dark:text-gray-200 text-sm font-sans line-clamp-2">
                                   {huddle.user_draft}
                                 </p>
                               </div>
 
                               <div>
-                                <p className="text-gray-300 text-sm font-medium mb-1 font-sans">
+                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
                                   {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
                                 </p>
-                                <div className="bg-gray-900 p-3 rounded-lg border border-gray-700">
-                                  <p className="text-white text-sm font-sans">
+                                <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                  <p className="text-gray-900 dark:text-white text-sm font-sans">
                                     {huddle.final_reply || huddle.generated_reply}
                                   </p>
                                 </div>

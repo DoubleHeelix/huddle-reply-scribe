@@ -95,7 +95,7 @@ export const MainApp = () => {
 
   return (
     <div
-      className="min-h-screen bg-gray-900 text-white"
+      className="min-h-screen bg-slate-950 text-white"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -103,92 +103,109 @@ export const MainApp = () => {
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      {/* Settings Sidebar */}
-      <SettingsSidebar
-        googleCloudApiKey={googleCloudApiKey}
-        onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
-        enableAutoCropping={enableAutoCropping}
-        onAutoCroppingChange={handleAutoCroppingChange}
-        autoCropMargin={autoCropMargin}
-        onAutoCropMarginChange={handleAutoCropMarginChange}
-        onTestOCR={uploadedImage ? handleTestOCR : undefined}
-        isTestingOCR={isOCRProcessing}
-        uploadedImage={uploadedImage}
-        user={user}
-        onSignOut={onSignOut}
-        isAdmin={isAdmin}
-      />
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        {/* Settings Sidebar */}
+        <SettingsSidebar
+          googleCloudApiKey={googleCloudApiKey}
+          onGoogleCloudApiKeyChange={handleGoogleCloudApiKeyChange}
+          enableAutoCropping={enableAutoCropping}
+          onAutoCroppingChange={handleAutoCroppingChange}
+          autoCropMargin={autoCropMargin}
+          onAutoCropMarginChange={handleAutoCropMarginChange}
+          onTestOCR={uploadedImage ? handleTestOCR : undefined}
+          isTestingOCR={isOCRProcessing}
+          uploadedImage={uploadedImage}
+          user={user}
+          onSignOut={onSignOut}
+          isAdmin={isAdmin}
+        />
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-500 p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2 font-sans">🤝 Huddle Assistant</h1>
-          <p className="text-purple-100 font-sans">AI-powered conversation suggestions</p>
+        {/* Header + Tabs */}
+        <div className="sticky top-0 z-40 backdrop-blur-xl bg-slate-950/90 border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4">
+            <div className="flex items-start sm:items-center gap-3 flex-col sm:flex-row">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <MessageSquare className="w-5 h-5 text-white" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Huddle Assistant</p>
+                <h1 className="text-base sm:text-lg md:text-xl font-display leading-tight">Replies that stay human</h1>
+              </div>
+              <div className="ml-auto flex items-center gap-3">
+                {user?.email && (
+                  <div className="user-chip hidden sm:flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-slate-200">
+                    <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+                    {user.email}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <TabsList className="flex gap-2 overflow-x-auto bg-slate-900/70 border border-white/5 rounded-full p-1 backdrop-blur-md scrollbar-none">
+              <TabsTrigger
+                value="huddle-play"
+                className="flex items-center gap-2 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-cyan-400 data-[state=active]:text-white rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Huddle
+              </TabsTrigger>
+              <TabsTrigger
+                value="interruptions"
+                className="flex items-center gap-2 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-cyan-400 data-[state=active]:text-white rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <Camera className="w-4 h-4" />
+                Interruptions
+              </TabsTrigger>
+              <TabsTrigger
+                value="people"
+                className="flex items-center gap-2 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-cyan-400 data-[state=active]:text-white rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <Users className="w-4 h-4" />
+                People
+              </TabsTrigger>
+              <TabsTrigger
+                value="past-huddles"
+                className="flex items-center gap-2 text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-cyan-400 data-[state=active]:text-white rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <History className="w-4 h-4" />
+                History
+              </TabsTrigger>
+            </TabsList>
+          </div>
         </div>
-      </div>
 
-      <div className="p-4">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mt-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-800/50 border border-gray-700 rounded-lg p-1">
-            <TabsTrigger
-              value="huddle-play"
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Huddle
-            </TabsTrigger>
-            <TabsTrigger
-              value="interruptions"
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
-            >
-              <Camera className="w-4 h-4" />
-              Interruptions
-            </TabsTrigger>
-            <TabsTrigger
-              value="people"
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
-            >
-              <Users className="w-4 h-4" />
-              People
-            </TabsTrigger>
-            <TabsTrigger
-              value="past-huddles"
-              className="flex items-center gap-2 text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-md transition-all duration-200 font-sans text-xs"
-            >
-              <History className="w-4 h-4" />
-              History
-            </TabsTrigger>
-          </TabsList>
-          
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              variants={tabContentVariants}
-              custom={direction}
-            >
-              <TabsContent value="huddle-play" forceMount className={activeTab === 'huddle-play' ? 'block' : 'hidden'}>
-                <HuddlePlayTab huddleState={huddleState} />
-              </TabsContent>
-              <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
-                <InterruptionsTab
-                  stories={interruptionsState.stories}
-                  processStories={interruptionsState.processStories}
-                  clearStories={interruptionsState.clearStories}
-                />
-              </TabsContent>
-              <TabsContent value="people" forceMount className={activeTab === 'people' ? 'block' : 'hidden'}>
-                <PeopleTab />
-              </TabsContent>
-              <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
-                <PastHuddlesTab />
-              </TabsContent>
-            </motion.div>
-          </AnimatePresence>
-        </Tabs>
-      </div>
+        <div className="px-3 sm:px-4 py-5 sm:py-6">
+          <div className="max-w-6xl mx-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={tabContentVariants}
+                custom={direction}
+              >
+                <TabsContent value="huddle-play" forceMount className={activeTab === 'huddle-play' ? 'block' : 'hidden'}>
+                  <HuddlePlayTab huddleState={huddleState} />
+                </TabsContent>
+                <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
+                  <InterruptionsTab
+                    stories={interruptionsState.stories}
+                    processStories={interruptionsState.processStories}
+                    clearStories={interruptionsState.clearStories}
+                  />
+                </TabsContent>
+                <TabsContent value="people" forceMount className={activeTab === 'people' ? 'block' : 'hidden'}>
+                  <PeopleTab />
+                </TabsContent>
+                <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
+                  <PastHuddlesTab />
+                </TabsContent>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+      </Tabs>
     </div>
   );
 };
