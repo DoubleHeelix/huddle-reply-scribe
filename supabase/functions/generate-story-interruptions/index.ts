@@ -194,9 +194,9 @@ The reply must:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-5",
+            model: "gpt-4o",
             messages,
-            max_tokens: 150,
+            max_completion_tokens: 150,
             n: 1, // Always request ONE choice
             temperature: 0.7, // Slightly higher temp for more variety
           }),
