@@ -3,13 +3,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useEnhancedAISuggestions } from '@/hooks/useEnhancedAISuggestions';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { useOCR } from '@/hooks/useOCR';
+import type { DocumentKnowledge } from '@/types/document';
+import type { HuddlePlay } from '@/utils/huddlePlayService';
 
 export const useHuddleState = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
   const [selectedTone, setSelectedTone] = useState("none");
-  const [lastUsedHuddles, setLastUsedHuddles] = useState<any[]>([]);
+  const [lastUsedHuddles, setLastUsedHuddles] = useState<(HuddlePlay & { similarity?: number })[]>([]);
   const [showKnowledgeSources, setShowKnowledgeSources] = useState(false);
   const [googleCloudApiKey, setGoogleCloudApiKey] = useState("");
   const [enableAutoCropping, setEnableAutoCropping] = useState(true);
@@ -17,7 +19,7 @@ export const useHuddleState = () => {
   const [extractedText, setExtractedText] = useState("");
   const [showExtractedText, setShowExtractedText] = useState(false);
   const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
-  const [lastUsedDocuments, setLastUsedDocuments] = useState<any[]>([]);
+  const [lastUsedDocuments, setLastUsedDocuments] = useState<DocumentKnowledge[]>([]);
   const [interruptionImage, setInterruptionImage] = useState<string | null>(null);
   const [interruptionText, setInterruptionText] = useState("");
   const [conversationStarters, setConversationStarters] = useState<string[]>([]);

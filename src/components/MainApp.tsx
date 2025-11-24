@@ -6,6 +6,7 @@ import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
+import { PeopleTab } from "@/components/PeopleTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
 import { useInterruptions } from "@/hooks/useInterruptions";
 import { useAuth } from '@/hooks/useAuth';
@@ -179,9 +180,7 @@ export const MainApp = () => {
                 />
               </TabsContent>
               <TabsContent value="people" forceMount className={activeTab === 'people' ? 'block' : 'hidden'}>
-                <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-sans">
-                  People section coming soon.
-                </div>
+                <PeopleTab />
               </TabsContent>
               <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
                 <PastHuddlesTab />

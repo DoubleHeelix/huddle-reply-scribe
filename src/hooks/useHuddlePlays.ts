@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { saveHuddlePlay, getUserHuddlePlays, updateHuddlePlayFinalReply, type HuddlePlay } from '@/utils/huddlePlayService';
 import { useAuth } from './useAuth';
@@ -10,7 +10,7 @@ export const useHuddlePlays = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchHuddlePlays = async () => {
+  const fetchHuddlePlays = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -27,7 +27,7 @@ export const useHuddlePlays = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   const saveCurrentHuddle = async (huddlePlay: Omit<HuddlePlay, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     try {
@@ -70,7 +70,7 @@ export const useHuddlePlays = () => {
       setIsLoading(false);
       setHuddlePlays([]);
     }
-  }, [user]);
+  }, [fetchHuddlePlays, user]);
 
   return {
     huddlePlays,

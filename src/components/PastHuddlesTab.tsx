@@ -22,16 +22,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { getCategory } from '@/utils/huddleCategorization';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { HuddlePlay } from '@/utils/huddlePlayService';
 
 export const PastHuddlesTab = () => {
   const { huddlePlays: initialHuddlePlays, isLoading, error, refetch } = useHuddlePlays();
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [searchResults, setSearchResults] = useState<HuddlePlay[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
-  const [analysisResult, setAnalysisResult] = useState<any | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [editableKeywords, setEditableKeywords] = useState<string[]>([]);
   // NEW: editable bigrams/trigrams state
   const [editableBigrams, setEditableBigrams] = useState<string[]>([]);

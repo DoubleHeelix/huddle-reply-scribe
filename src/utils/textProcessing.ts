@@ -14,7 +14,9 @@ export const formatExtractedText = (text: string): string => {
 
   // 2. Remove a wide range of symbols, emojis, and non-standard characters
   // This regex targets many common visual artifacts from PDFs and unicode symbols.
-  cleanedText = cleanedText.replace(/[\u25A0-\u25FF\u2022\u2013\uFFFD\uD83C-\uDBFF\uDC00-\uDFFF]/g, ' ');
+  cleanedText = cleanedText
+    .replace(/[\u25A0-\u25FF\u2022\u2013\uFFFD]/gu, ' ')
+    .replace(/\p{Extended_Pictographic}/gu, ' ');
 
   // 3. Normalize whitespace and remove leading/trailing whitespace from lines
   cleanedText = cleanedText.split('\n').map(line => line.trim()).join('\n');

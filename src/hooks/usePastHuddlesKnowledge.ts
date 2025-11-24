@@ -36,9 +36,10 @@ export const usePastHuddlesKnowledge = () => {
       }
       
       return data as PastHuddleKnowledge[];
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : 'Failed to search past huddles';
+      setError(message);
       return [];
     } finally {
       setIsLoading(false);

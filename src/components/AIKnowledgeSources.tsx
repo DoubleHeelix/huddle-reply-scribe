@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatExtractedText } from '@/utils/textProcessing';
+import type { DocumentKnowledge } from '@/types/document';
 
 interface PastHuddle {
   id: string;
@@ -13,14 +14,6 @@ interface PastHuddle {
   final_reply?: string;
   created_at: string;
   similarity: number;
-}
-
-interface DocumentKnowledge {
-  id: string;
-  document_name: string;
-  content_chunk: string;
-  similarity: number;
-  metadata?: any;
 }
 
 interface AIKnowledgeSourcesProps {

@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, RefreshCw, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { supabase } from '@/integrations/supabase/client';
+import type { FileObject } from '@supabase/storage-js';
 
 export const DocumentProcessor: React.FC = () => {
-  const [storageFiles, setStorageFiles] = useState<any[]>([]);
+  const [storageFiles, setStorageFiles] = useState<FileObject[]>([]);
   const [isLoadingStorage, setIsLoadingStorage] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   
