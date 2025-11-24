@@ -1,5 +1,6 @@
 
 import * as pdfjs from 'pdfjs-dist';
+import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { supabase } from '@/integrations/supabase/client';
 
 // Set workerSrc to avoid issues with Vite
@@ -8,7 +9,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 export interface PDFProcessingResult {
   text: string;
   pageCount: number;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export const pdfProcessor = {
@@ -21,7 +22,7 @@ export const pdfProcessor = {
       for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
         const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ');
+        text += content.items.map((item) => (item as TextItem).str).join(' ');
       }
       console.log(`✅ PDF processing complete: ${text.length} characters`);
       return {
@@ -36,7 +37,8 @@ export const pdfProcessor = {
       };
     } catch (error) {
       console.error('❌ PDF text extraction failed:', error);
-      throw new Error(`Failed to extract text from PDF: ${error.message}`);
+      const message = error instanceof Error ? error.message : 'Unknown PDF extraction error';
+      throw new Error(`Failed to extract text from PDF: ${message}`);
     }
   },
 
@@ -51,7 +53,7 @@ export const pdfProcessor = {
       for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
         const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ');
+        text += content.items.map((item) => (item as TextItem).str).join(' ');
       }
       console.log(`✅ PDF extraction complete: ${text.length} characters`);
       return {
@@ -65,7 +67,8 @@ export const pdfProcessor = {
       };
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
-      throw new Error(`Failed to extract text from PDF: ${error.message}`);
+      const message = error instanceof Error ? error.message : 'Unknown PDF extraction error';
+      throw new Error(`Failed to extract text from PDF: ${message}`);
     }
   }
 };

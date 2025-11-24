@@ -37,7 +37,7 @@ export const documentService = {
     );
   },
 
-  async processDocumentFromStorage(fileName: string): Promise<any> {
+  async processDocumentFromStorage(fileName: string): Promise<{ success: boolean; chunks_processed: number }> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
@@ -134,7 +134,7 @@ export const documentService = {
     return chunks;
   },
 
-  async processUploadedFile(file: File): Promise<any> {
+  async processUploadedFile(): Promise<never> {
     // This function is not used in the current flow, but we'll keep it for now
     throw new Error('File upload processing not implemented in this flow.');
   },

@@ -10,5 +10,5 @@ export interface DocumentKnowledge {
   document_name: string;
   content_chunk: string;
   similarity: number;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }

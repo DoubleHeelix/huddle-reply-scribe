@@ -98,8 +98,15 @@ interface RequestBody {
     similarity: number;
   }>;
   userId?: string;
-  analysisData?: any;
+  analysisData?: Record<string, unknown>;
 }
+
+type SimilarHuddle = {
+  screenshot_text: string;
+  user_draft: string;
+  final_reply?: string | null;
+  generated_reply: string;
+};
 
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -165,7 +172,9 @@ serve(async (req: Request) => {
           console.log("🎨 DEBUG: Found user style profile:", profile);
 
           // Include common phrases (bigrams/trigrams) if present
-          const phrases = (profile as any).common_phrases || {};
+          const phrases =
+            (profile as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })
+              .common_phrases || {};
           const bigrams: string[] = Array.isArray(phrases.bigrams) ? phrases.bigrams.slice(0, 10) : [];
           const trigrams: string[] = Array.isArray(phrases.trigrams) ? phrases.trigrams.slice(0, 10) : [];
           const formattedBigrams = bigrams.length ? bigrams.join(" | ") : "not set";
@@ -184,7 +193,7 @@ User's typical writing style (for reference):
       }
 
       // Fetch similar past huddles from Supabase if available
-      let similarHuddles = [];
+      let similarHuddles: SimilarHuddle[] = [];
       if (userId && !isRegeneration) {
         try {
           console.log("🔍 DEBUG: Fetching similar huddles from Supabase...");
@@ -248,7 +257,7 @@ User's typical writing style (for reference):
         console.log("🧠 DEBUG: Building context from past huddles...");
         contextFromPastHuddles =
           "\n\nHere are some similar past conversations and responses that worked well:\n";
-        similarHuddles.forEach((huddle: any, index: number) => {
+        similarHuddles.forEach((huddle, index: number) => {
           contextFromPastHuddles += `\nExample ${index + 1}:\nContext: ${
             huddle.screenshot_text
           }\nDraft: ${huddle.user_draft}\nSuccessful Reply: ${
@@ -575,11 +584,15 @@ Refine this draft to make it better:`;
       }
 
       // Ensure phrases are present in the payload; if not, we can recompute quickly from latest drafts
-      let profileData = {
+      const profileData: Record<string, unknown> & {
+        user_id: string;
+        updated_at: string;
+        common_phrases?: { bigrams?: string[]; trigrams?: string[] };
+      } = {
         ...analysisData,
         user_id: userId,
         updated_at: new Date().toISOString(),
-      } as any;
+      };
 
       if (!profileData.common_phrases) {
         console.log("ℹ️ DEBUG: common_phrases missing in analysisData; recomputing from latest drafts...");

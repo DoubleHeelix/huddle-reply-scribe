@@ -2,11 +2,15 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
+import type { DocumentKnowledge } from '@/types/document';
+import type { HuddlePlay } from '@/utils/huddlePlayService';
+
+type PastHuddleWithSimilarity = HuddlePlay & { similarity?: number };
 
 interface GenerateReplyResult {
   reply: string;
-  pastHuddles?: any[];
-  documentKnowledge?: any[];
+  pastHuddles?: PastHuddleWithSimilarity[];
+  documentKnowledge?: DocumentKnowledge[];
 }
 
 export const useEnhancedAISuggestions = () => {
@@ -20,8 +24,8 @@ export const useEnhancedAISuggestions = () => {
     screenshotText: string,
     userDraft: string,
     isRegeneration: boolean = false,
-    existingDocumentKnowledge: any[] = [],
-    existingPastHuddles: any[] = []
+    existingDocumentKnowledge: DocumentKnowledge[] = [],
+    existingPastHuddles: PastHuddleWithSimilarity[] = []
   ): Promise<GenerateReplyResult | null> => {
     try {
       setIsGenerating(true);
@@ -32,7 +36,7 @@ export const useEnhancedAISuggestions = () => {
       console.log('✏️ DEBUG: User draft length:', userDraft.length);
 
       // Search for relevant documents based on screenshot + draft content
-      let documentKnowledge: any[] = [];
+      let documentKnowledge: DocumentKnowledge[] = [];
       if (isRegeneration) {
         documentKnowledge = existingDocumentKnowledge;
         console.log(`📚 DEBUG: Re-using ${documentKnowledge.length} document chunks for regeneration`);
@@ -65,7 +69,9 @@ export const useEnhancedAISuggestions = () => {
         documentKnowledgeCount: documentKnowledge.length
       });
 
-      const pastHuddles = isRegeneration ? existingPastHuddles : (data.pastHuddles || []);
+      const pastHuddles: PastHuddleWithSimilarity[] = isRegeneration
+        ? existingPastHuddles
+        : (data.pastHuddles || []);
 
       console.log('📊 DEBUG: Final response summary:', {
         replyGenerated: !!data.reply,
@@ -76,7 +82,7 @@ export const useEnhancedAISuggestions = () => {
       return {
         reply: data.reply || '',
         pastHuddles,
-        documentKnowledge: documentKnowledge
+        documentKnowledge
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
