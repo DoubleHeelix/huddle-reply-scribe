@@ -618,7 +618,6 @@ Refine this draft to make it better:`;
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
             ],
-            temperature: 0.7,
             max_completion_tokens: 500,
           }),
         }
@@ -954,7 +953,6 @@ Refine this draft to make it better:`;
                 content: originalReply,
               },
             ],
-            temperature: 0.7,
             max_completion_tokens: 500,
           }),
         }
