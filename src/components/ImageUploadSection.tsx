@@ -17,60 +17,70 @@ export const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
   onImageUpload
 }) => {
   return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardContent className="p-6">
-        <div className="text-center space-y-4">
+    <Card className="bg-slate-900/70 border-white/5 glass-surface">
+      <CardContent className="p-5 sm:p-6 md:p-7">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-gray-300 text-lg font-sans">Upload Screenshot</p>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 1</p>
+              <p className="text-lg font-display">Upload your screenshot</p>
+            </div>
             {isOCRProcessing && (
-              <Badge variant="secondary" className="bg-blue-600 font-sans">
+              <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-100 border border-cyan-500/20">
                 Processing OCR...
               </Badge>
             )}
           </div>
-          <p className="text-gray-500 text-sm font-sans">JPG, JPEG, PNG • Max 10MB</p>
-          
-          {!uploadedImage && (
-            <div className="border-2 border-dashed border-purple-500 rounded-xl p-8 bg-purple-500/5">
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer flex flex-col items-center space-y-2"
-              >
-                <Upload className="w-8 h-8 text-purple-400" />
-                <div className="bg-gray-700 px-6 py-3 rounded-lg border border-gray-600">
-                  <span className="text-white font-sans">
-                    {isOCRProcessing ? "Processing..." : "Choose file"}
-                  </span>
-                </div>
-              </label>
+          <p className="text-sm text-slate-400">PNG or JPG, up to 10MB. We’ll auto-read the text so you don’t have to retype context.</p>
+        </div>
+
+        {!uploadedImage && (
+          <label
+            htmlFor="file-upload"
+            className="mt-5 block cursor-pointer rounded-xl border border-white/10 bg-white/5 p-5 sm:p-6 text-center transition duration-300 hover:border-white/20 hover:bg-white/10"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-purple-500/15 text-purple-200 flex items-center justify-center">
+                <Upload className="w-5 h-5" />
+              </div>
+              <p className="text-base font-medium">Drop a file or browse</p>
+              <p className="text-xs text-slate-400">We’ll start extracting text as soon as it uploads.</p>
             </div>
-          )}
-          
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={onImageUpload}
-            className="hidden"
-            id="file-upload"
-            disabled={isOCRProcessing}
-          />
-          
-          {uploadedImage && (
-            <div className="mt-4 space-y-3">
+          </label>
+        )}
+
+        <Input
+          type="file"
+          accept="image/*"
+          onChange={onImageUpload}
+          className="hidden"
+          id="file-upload"
+          disabled={isOCRProcessing}
+        />
+
+        {uploadedImage && (
+          <div className="mt-5 space-y-4">
+            <div className="rounded-xl overflow-hidden border border-white/10 bg-slate-900/60">
               <img
                 src={uploadedImage}
                 alt="Uploaded screenshot"
-                className="w-full max-w-lg mx-auto rounded-lg border border-gray-600 shadow-lg"
+                className="mx-auto h-auto w-auto max-w-full"
               />
+            </div>
+            <div className="flex items-center justify-between">
               <label
                 htmlFor="file-upload"
-                className="cursor-pointer inline-block bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                className="cursor-pointer inline-flex items-center gap-2 bg-white/10 text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors text-sm"
               >
-                Change Screenshot
+                <Upload className="w-4 h-4" />
+                Replace screenshot
               </label>
+              <Badge variant="outline" className="border-emerald-400/40 text-emerald-200 bg-emerald-400/10">
+                Captured
+              </Badge>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

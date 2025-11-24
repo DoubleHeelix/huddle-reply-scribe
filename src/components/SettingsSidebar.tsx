@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentProcessor } from "./DocumentProcessor";
 import { documentService } from "@/services/documentService";
@@ -40,6 +40,24 @@ export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarPro
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    const stored = localStorage.getItem('theme_preference');
+    return stored === 'light' ? 'light' : 'dark';
+  });
+
+  // Sync theme to document and localStorage.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.add('dark');
+    }
+    localStorage.setItem('theme_preference', theme);
+  }, [theme]);
 
   const handleDeleteAll = async () => {
     setIsDeleting(true);
@@ -80,6 +98,28 @@ export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarPro
           <SheetHeader>
             <SheetTitle className="text-white">Settings</SheetTitle>
           </SheetHeader>
+
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <h3 className="text-sm text-gray-300 mb-2">Appearance</h3>
+            <div className="flex gap-2">
+              <Button
+                variant={theme === 'dark' ? 'default' : 'outline'}
+                className="flex items-center gap-2 bg-slate-900/80 border-white/10 text-white hover:bg-slate-800"
+                onClick={() => setTheme('dark')}
+              >
+                <Moon className="w-4 h-4" />
+                Dark
+              </Button>
+              <Button
+                variant={theme === 'light' ? 'default' : 'outline'}
+                className="flex items-center gap-2 bg-white text-slate-900 border-white/40 hover:bg-slate-100"
+                onClick={() => setTheme('light')}
+              >
+                <Sun className="w-4 h-4" />
+                Light
+              </Button>
+            </div>
+          </div>
           
           {isAdmin && (
             <div className="border-t border-gray-700 pt-4 mt-4">

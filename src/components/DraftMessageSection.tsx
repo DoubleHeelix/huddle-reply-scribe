@@ -30,13 +30,17 @@ export const DraftMessageSection: React.FC<DraftMessageSectionProps> = ({
   }, [transcript, onUserDraftChange]);
 
   return (
-    <Card className="bg-gray-800 border-gray-700" data-section="draft">
-      <CardContent className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-white text-lg font-medium font-sans">Your Draft Message</h3>
+    <Card className="bg-slate-900/70 border-white/5 glass-surface" data-section="draft">
+      <CardContent className="p-5 sm:p-6 md:p-7 space-y-4">
+        <div className="flex justify-between items-start sm:items-center gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 2</p>
+            <h3 className="text-white text-lg font-display">Your draft message</h3>
+            <p className="text-sm text-slate-400 mt-1">Type or speak the intent; we’ll keep the tone aligned.</p>
+          </div>
           <Button
             onClick={startRecording}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+            className="bg-gradient-to-r from-purple-500 to-cyan-400 text-white font-medium px-4 py-2 h-10 rounded-lg hover:brightness-110 transition disabled:opacity-50"
             disabled={connectionStatus !== 'idle'}
           >
             {connectionStatus === 'connecting' ? 'Connecting...' : 'Record Voice'}
@@ -47,7 +51,7 @@ export const DraftMessageSection: React.FC<DraftMessageSectionProps> = ({
           value={userDraft}
           onChange={(e) => onUserDraftChange(e.target.value)}
           rows={6}
-          className="bg-purple-500/5 border-2 border-dashed border-purple-500 text-white placeholder:text-slate-400 resize-none font-sans text-base p-4 rounded-lg"
+          className="bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-400 resize-none font-sans text-base p-4 rounded-xl focus-visible:ring-2 focus-visible:ring-purple-400/60"
           disabled={connectionStatus !== 'idle'}
         />
         <RecordingModal

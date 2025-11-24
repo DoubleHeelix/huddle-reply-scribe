@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Sparkles, Mail, Lock, UserPlus, LogIn } from "lucide-react";
+import { ArrowRight, Sparkles, Mail, Lock, UserPlus, LogIn, CheckCircle2, ShieldCheck, Bot } from "lucide-react";
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -68,77 +68,119 @@ const LandingPage = () => {
     setIsSubmitting(false);
   };
 
+  const features = [
+    { icon: Sparkles, title: "Sharper replies", copy: "AI suggestions tuned for empathy and clarity." },
+    { icon: ShieldCheck, title: "Context aware", copy: "Grounded by your huddles and documents." },
+    { icon: Bot, title: "Voice to text", copy: "Draft by speaking, refine in seconds." },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
+    <div className="min-h-screen relative overflow-hidden bg-slate-950 text-white">
+      <div className="absolute inset-0 pointer-events-none opacity-60">
+        <div className="pattern-grid absolute inset-0" />
+        <div className="absolute -left-24 top-10 w-64 h-64 sm:w-80 sm:h-80 rounded-full blur-3xl bg-purple-600/25" />
+        <div className="absolute right-[-6rem] bottom-10 w-72 h-72 sm:w-96 sm:h-96 rounded-full blur-3xl bg-cyan-400/20" />
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 text-center max-w-4xl mx-auto px-6">
-        {/* Logo/Icon */}
-        <div className="mb-8 animate-fade-in">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mb-6 animate-scale-in">
-            <Sparkles className="w-10 h-10 text-white" />
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16">
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 uppercase tracking-[0.2em] mb-6 sm:mb-8">
+          <span className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-cyan-200" />
+          </span>
+          Huddle Assistant
+        </div>
+
+        <div className="grid gap-6 md:gap-12 lg:gap-16 md:grid-cols-[1.05fr_0.95fr] items-start">
+          <div className="space-y-6 sm:space-y-8">
+            <div className="space-y-3">
+              <p className="text-xs sm:text-sm text-cyan-200/90 font-medium flex items-center gap-2">
+                <span className="h-px w-8 bg-cyan-300/60 rounded-full" />
+                AI that keeps your conversations human
+              </p>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-semibold leading-tight">
+                Confident replies, <span className="gradient-text">without the guesswork.</span>
+              </h1>
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
+                Upload a screenshot, speak your draft, and let Huddle Assistant craft responses that feel personal, concise, and aligned with your team’s voice.
+              </p>
+            </div>
+
+            {/* Compact highlights on mobile, full cards on md+ */}
+            <div className="flex gap-2 overflow-x-auto pb-1 md:hidden">
+              {features.map(({ title }) => (
+                <span
+                  key={title}
+                  className="px-3 py-2 rounded-full bg-white/10 border border-white/10 text-xs text-slate-200 whitespace-nowrap"
+                >
+                  {title}
+                </span>
+              ))}
+            </div>
+            <div className="hidden md:grid gap-3 sm:grid-cols-2">
+              {features.map(({ icon: Icon, title, copy }) => (
+                <div
+                  key={title}
+                  className="glass-surface rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition-transform duration-500"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-cyan-200" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-display text-base">{title}</p>
+                    <p className="text-sm text-slate-300">{copy}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-4 text-sm text-slate-300 flex-wrap">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              Verified accounts get a streamlined handoff to your huddles.
+            </div>
           </div>
-        </div>
 
-        {/* Animated title */}
-        <div className="mb-8 space-y-4">
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent animate-pulse">
-              Huddle
-            </span>
-            <span className="block text-3xl md:text-4xl mt-2 text-gray-300 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-              Assistant
-            </span>
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            AI-powered conversation suggestions that help you communicate with
-            <span className="text-purple-400 font-semibold"> clarity</span>,
-            <span className="text-blue-400 font-semibold"> connection</span>, and
-            <span className="text-pink-400 font-semibold"> empathy</span>
-          </p>
-        </div>
-
-        {/* Auth Form */}
-        <div className="mt-8 animate-fade-in" style={{ animationDelay: '1s' }}>
-          <div className="max-w-md mx-auto bg-gray-800/50 backdrop-blur-sm p-8 rounded-2xl shadow-2xl">
-            <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
-              <div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-gray-900/70 border-gray-600 text-white font-sans"
-                    required
-                  />
-                </div>
+          <div className="glass-surface rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-md border border-white/10 order-last md:order-none">
+            <div className="flex items-center justify-center mb-6">
+              <div className="text-center">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Get started</p>
+                <h2 className="text-xl font-display">Sign {authMode === 'signin' ? 'in' : 'up'} to continue</h2>
               </div>
-              <div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 bg-gray-900/70 border-gray-600 text-white font-sans"
-                    required
-                  />
-                </div>
+            </div>
+
+            <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  Work email
+                </label>
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
+                  <Lock className="w-4 h-4 text-slate-400" />
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
+                  required
+                />
+                <p className="text-xs text-slate-400 text-center">We’ll keep you signed in on this device.</p>
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 font-sans"
+                className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 hover:brightness-110 text-white font-display text-sm h-12 rounded-xl"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -155,16 +197,20 @@ const LandingPage = () => {
               </Button>
             </form>
 
-            <div className="mt-4 text-center">
+            <div className="mt-6 flex items-center justify-between text-sm text-slate-300">
               <button
                 onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                className="text-purple-400 hover:text-purple-300 font-sans text-sm"
+                className="hover:text-white transition-colors underline-offset-4"
               >
                 {authMode === 'signin'
                   ? "Don't have an account? Sign up"
                   : "Already have an account? Sign in"
                 }
               </button>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                Email verification required
+              </div>
             </div>
           </div>
         </div>

@@ -2,7 +2,8 @@ import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, Users, MessageCircle, Calendar } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { RefreshCcw, Users, MessageCircle, Calendar, Search } from 'lucide-react';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
@@ -236,6 +237,7 @@ export const PeopleTab = () => {
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showInfo, setShowInfo] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load overrides from localStorage and persist changes.
   useEffect(() => {
@@ -325,6 +327,15 @@ export const PeopleTab = () => {
     );
   }, [applyOverride, filteredPlays]);
 
+  const visibleGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groupedByPerson;
+    return groupedByPerson.filter((group) => {
+      if (group.name.toLowerCase().includes(q)) return true;
+      return Array.from(group.rawNames).some((raw) => raw.toLowerCase().includes(q));
+    });
+  }, [groupedByPerson, searchQuery]);
+
   if (isLoading) {
     return (
       <div className="space-y-3 pt-2">
@@ -391,7 +402,31 @@ export const PeopleTab = () => {
           </div>
         </div>
       )}
-      {groupedByPerson.map((group) => (
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-gray-300 font-sans">
+          Search or browse people grouped by extracted names.
+        </div>
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or handle"
+            className="pl-9 bg-white text-slate-900 border border-gray-200 placeholder:text-gray-500 dark:bg-gray-900/80 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-400"
+          />
+        </div>
+      </div>
+
+      {visibleGroups.length === 0 && (
+        <Card className="bg-gray-800/70 border border-gray-700/70 rounded-xl">
+          <CardContent className="p-5 text-center text-sm text-gray-300 font-sans">
+            No matches found for “{searchQuery.trim()}”.
+          </CardContent>
+        </Card>
+      )}
+
+      {visibleGroups.map((group) => (
         <Card
           key={group.name}
           className="bg-gray-800/70 border border-gray-700/70 rounded-xl overflow-hidden"

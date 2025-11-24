@@ -34,64 +34,87 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   if (!generatedReply) return null;
 
   return (
-    <Card className="bg-gray-800 border-gray-700" data-section="generated-reply">
-      <CardContent className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-white text-lg font-medium font-sans">Generated Reply</h3>
+    <Card className="bg-white dark:bg-slate-900/70 border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm dark:shadow-none glass-surface" data-section="generated-reply">
+      <CardContent className="p-5 sm:p-6 md:p-7 space-y-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Step 3</p>
+            <h3 className="text-slate-900 dark:text-white text-lg font-display">Your crafted reply</h3>
+          </div>
           <Button
             onClick={onCopyReply}
             variant="outline"
             size="sm"
-            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 font-sans"
+            className="bg-white border border-gray-200 text-slate-900 hover:bg-gray-50 dark:bg-white/10 dark:border-white/20 dark:text-white dark:hover:bg-white/20 font-sans"
           >
             <Copy className="w-4 h-4 mr-2" />
             Copy
           </Button>
         </div>
 
-        <div className="bg-gray-900 p-4 rounded-lg border border-gray-600 min-h-[120px] flex items-center justify-center">
-          <pre className="whitespace-pre-wrap text-white text-sm font-normal font-sans leading-relaxed text-center">
-            {displayedReply}
-            <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1"></span>
-          </pre>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <ToneSelector
-            selectedTone={selectedTone}
-            onToneChange={onToneChange}
-            onApplyTone={onApplyTone}
-            isAdjusting={isAdjustingTone}
-            disabled={!generatedReply || isGenerating}
-          />
-        </div>
-
-        {isAdjustingTone && (
-          <div className="text-center py-2">
-            <div className="inline-flex items-center gap-2 text-purple-400">
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
-              <span className="text-sm font-sans">Adjusting tone...</span>
+        {isGenerating && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400" />
+              <span>AI is shaping the perfect reply...</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-100 dark:bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, #a855f7, #22d3ee, #a855f7)",
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 1.6s linear infinite"
+                }}
+              />
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            onClick={onRegenerate}
-            variant="outline"
-            className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
-            disabled={isGenerating}
-          >
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            {isGenerating ? "Regenerating..." : "Regenerate"}
-          </Button>
-          <Button
-            onClick={onReset}
-            variant="outline"
-            className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-12 font-sans"
-          >
-            New Huddle
-          </Button>
+        <div className="grid gap-4 md:gap-6 items-start md:grid-cols-[1.2fr_0.8fr]">
+          <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-950/80 dark:to-slate-900/60 p-5 rounded-xl border border-gray-200 dark:border-white/10 shadow-inner flex">
+            <pre className="whitespace-pre-wrap text-center text-slate-900 dark:text-white text-sm font-normal font-sans leading-relaxed mx-auto">
+              {displayedReply}
+            </pre>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <ToneSelector
+                selectedTone={selectedTone}
+                onToneChange={onToneChange}
+                onApplyTone={onApplyTone}
+                isAdjusting={isAdjustingTone}
+                disabled={!generatedReply || isGenerating}
+              />
+
+              {isAdjustingTone && (
+                <div className="text-left py-1 text-sm text-purple-200 flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
+                  Adjusting tone...
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 max-w-xl mx-auto w-full">
+              <Button
+                onClick={onRegenerate}
+                variant="outline"
+                className="w-full bg-gray-100 border border-gray-200 text-slate-900 hover:bg-gray-200 dark:bg-white/10 dark:border-white/15 dark:text-white dark:hover:bg-white/20 h-11 font-sans"
+                disabled={isGenerating}
+              >
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                {isGenerating ? "Regenerating..." : "Regenerate"}
+              </Button>
+              <Button
+                onClick={onReset}
+                variant="outline"
+                className="w-full bg-gray-100 border border-gray-200 text-slate-900 hover:bg-gray-200 dark:bg-slate-900 dark:border-white/15 dark:text-white dark:hover:bg-white/10 h-11 font-sans"
+              >
+                New Huddle
+              </Button>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -133,6 +133,12 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     }
     
     const screenshotText = getScreenshotText();
+
+    // Scroll to Step 3 immediately on click so the user sees the output area.
+    const replySection = document.querySelector('[data-section="generated-reply"]');
+    if (replySection) {
+      replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     
     const result = await generateReply(screenshotText, userDraft, false);
     

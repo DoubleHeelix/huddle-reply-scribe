@@ -7,7 +7,7 @@ const Index = () => {
   const { user } = useAuth();
 
   return (
-    <main className="bg-gray-900 min-h-screen">
+    <main className="bg-slate-950 min-h-screen">
       {user ? <MainApp /> : <LandingPage />}
     </main>
   );
