@@ -501,8 +501,20 @@ export const PastHuddlesTab = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white pl-10 w-full rounded-full focus:ring-2 focus:ring-purple-500 shadow-sm"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-900 dark:text-white pl-10 pr-10 w-full rounded-full focus:ring-2 focus:ring-purple-500 shadow-sm"
             />
+            {searchTerm && (
+              <button
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSearchResults(null);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <Button
             onClick={handleAnalyzeStyle}

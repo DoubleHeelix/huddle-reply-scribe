@@ -82,140 +82,132 @@ const LandingPage = () => {
         <div className="absolute right-[-6rem] bottom-10 w-72 h-72 sm:w-96 sm:h-96 rounded-full blur-3xl bg-cyan-400/20" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 uppercase tracking-[0.2em] mb-6 sm:mb-8">
-          <span className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-cyan-200" />
-          </span>
-          Huddle Assistant
-        </div>
-
-        <div className="grid gap-6 md:gap-12 lg:gap-16 md:grid-cols-[1.05fr_0.95fr] items-start">
-          <div className="space-y-6 sm:space-y-8">
-            <div className="space-y-3">
-              <p className="text-xs sm:text-sm text-cyan-200/90 font-medium flex items-center gap-2">
-                <span className="h-px w-8 bg-cyan-300/60 rounded-full" />
-                AI that keeps your conversations human
-              </p>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-semibold leading-tight">
-                Confident replies, <span className="gradient-text">without the guesswork.</span>
-              </h1>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
-                Upload a screenshot, speak your draft, and let Huddle Assistant craft responses that feel personal, concise, and aligned with your team’s voice.
-              </p>
-            </div>
-
-            {/* Compact highlights on mobile, full cards on md+ */}
-            <div className="flex gap-2 overflow-x-auto pb-1 md:hidden">
-              {features.map(({ title }) => (
-                <span
-                  key={title}
-                  className="px-3 py-2 rounded-full bg-white/10 border border-white/10 text-xs text-slate-200 whitespace-nowrap"
-                >
-                  {title}
-                </span>
-              ))}
-            </div>
-            <div className="hidden md:grid gap-3 sm:grid-cols-2">
-              {features.map(({ icon: Icon, title, copy }) => (
-                <div
-                  key={title}
-                  className="glass-surface rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition-transform duration-500"
-                >
-                  <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-cyan-200" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-display text-base">{title}</p>
-                    <p className="text-sm text-slate-300">{copy}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-4 text-sm text-slate-300 flex-wrap">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              Verified accounts get a streamlined handoff to your huddles.
-            </div>
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-16 text-center">
+          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-slate-300 uppercase tracking-[0.2em] mb-6 sm:mb-8">
+            <span className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-cyan-200" />
+            </span>
+            Huddle Assistant
           </div>
 
-          <div className="glass-surface rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-md border border-white/10 order-last md:order-none">
-            <div className="flex items-center justify-center mb-6">
-              <div className="text-center">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Get started</p>
-                <h2 className="text-xl font-display">Sign {authMode === 'signin' ? 'in' : 'up'} to continue</h2>
+          <div className="grid gap-6 md:gap-12 lg:gap-16 md:grid-cols-[1.05fr_0.95fr] items-start">
+            <div className="space-y-6 sm:space-y-8">
+              <div className="space-y-3">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-semibold leading-tight">
+                  Confident replies, <span className="gradient-text">without the guesswork.</span>
+                </h1>
+                <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
+                  Upload a screenshot, draft your message, get replies that stay unique.
+                </p>
+              </div>
+
+              {/* Compact highlights on mobile, full cards on md+ */}
+              <div className="flex gap-2 overflow-x-auto pb-1 md:hidden justify-center">
+                {features.map(({ title }) => (
+                  <span
+                    key={title}
+                    className="px-3 py-2 rounded-full bg-white/10 border border-white/10 text-xs text-slate-200 whitespace-nowrap dark:bg-white/10 dark:text-slate-200 bg-slate-100 text-slate-800 border-slate-200"
+                  >
+                    {title}
+                  </span>
+                ))}
+              </div>
+              <div className="hidden md:grid gap-3 sm:grid-cols-2">
+                {features.map(({ icon: Icon, title, copy }) => (
+                  <div
+                    key={title}
+                    className="glass-surface rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition-transform duration-500"
+                  >
+                    <div className="h-10 w-10 rounded-lg bg-white/10 dark:bg-white/10 bg-slate-100 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-200" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-display text-base text-slate-900 dark:text-white">{title}</p>
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{copy}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-4 text-sm text-slate-300 flex-wrap justify-center">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                Verified accounts get a streamlined handoff to your huddles.
               </div>
             </div>
 
-            <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  Work email
-                </label>
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
-                  <Lock className="w-4 h-4 text-slate-400" />
-                  Password
-                </label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
-                  required
-                />
-                <p className="text-xs text-slate-400 text-center">We’ll keep you signed in on this device.</p>
+            <div className="glass-surface rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-md border border-white/10 order-last md:order-none">
+              <div className="flex items-center justify-center mb-6">
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Get started</p>
+                  <h2 className="text-xl font-display">Sign {authMode === 'signin' ? 'in' : 'up'} to continue</h2>
+                </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 hover:brightness-110 text-white font-display text-sm h-12 rounded-xl"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    {authMode === 'signin' ? 'Signing in...' : 'Creating account...'}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 justify-center">
-                    {authMode === 'signin' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                    {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                  </div>
-                )}
-              </Button>
-            </form>
+              <form onSubmit={authMode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
+                    <Mail className="w-4 h-4 text-slate-400" />
+                    Work email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
+                    <Lock className="w-4 h-4 text-slate-400" />
+                    Password
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="bg-slate-900/70 border-white/10 text-white h-12 text-center"
+                    required
+                  />
+                  <p className="text-xs text-slate-400 text-center">We’ll keep you signed in on this device.</p>
+                </div>
 
-            <div className="mt-6 flex items-center justify-between text-sm text-slate-300">
-              <button
-                onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                className="hover:text-white transition-colors underline-offset-4"
-              >
-                {authMode === 'signin'
-                  ? "Don't have an account? Sign up"
-                  : "Already have an account? Sign in"
-                }
-              </button>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Email verification required
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 hover:brightness-110 text-white font-display text-sm h-12 rounded-xl"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      {authMode === 'signin' ? 'Signing in...' : 'Creating account...'}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 justify-center">
+                      {authMode === 'signin' ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                      {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                    </div>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 flex items-center justify-center text-sm text-slate-300">
+                <button
+                  onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                  className="hover:text-white transition-colors underline-offset-4"
+                >
+                  {authMode === 'signin'
+                    ? "Don't have an account? Sign up"
+                    : "Already have an account? Sign in"
+                  }
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

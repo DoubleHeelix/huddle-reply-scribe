@@ -32,15 +32,15 @@ export const DraftMessageSection: React.FC<DraftMessageSectionProps> = ({
   return (
     <Card className="bg-slate-900/70 border-white/5 glass-surface" data-section="draft">
       <CardContent className="p-5 sm:p-6 md:p-7 space-y-4">
-        <div className="flex justify-between items-start sm:items-center gap-3">
-          <div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-full text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 2</p>
             <h3 className="text-white text-lg font-display">Your draft message</h3>
             <p className="text-sm text-slate-400 mt-1">Type or speak the intent; we’ll keep the tone aligned.</p>
           </div>
           <Button
             onClick={startRecording}
-            className="bg-gradient-to-r from-purple-500 to-cyan-400 text-white font-medium px-4 py-2 h-10 rounded-lg hover:brightness-110 transition disabled:opacity-50"
+            className="bg-gradient-to-r from-purple-500 to-cyan-400 text-white font-medium px-3 py-2 h-9 rounded-full hover:brightness-110 transition disabled:opacity-50 text-sm"
             disabled={connectionStatus !== 'idle'}
           >
             {connectionStatus === 'connecting' ? 'Connecting...' : 'Record Voice'}
