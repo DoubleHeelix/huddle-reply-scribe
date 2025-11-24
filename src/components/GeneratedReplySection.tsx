@@ -16,6 +16,7 @@ interface GeneratedReplySectionProps {
   onCopyReply: () => void;
   onRegenerate: () => void;
   onReset: () => void;
+  copiedFeedback?: boolean;
 }
 
 export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
@@ -27,7 +28,8 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   onApplyTone,
   onCopyReply,
   onRegenerate,
-  onReset
+  onReset,
+  copiedFeedback
 }) => {
   const displayedReply = useTypingEffect(generatedReply, 20);
 
@@ -48,7 +50,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
             className="bg-white border border-gray-200 text-slate-900 hover:bg-gray-50 dark:bg-white/10 dark:border-white/20 dark:text-white dark:hover:bg-white/20 font-sans rounded-full px-4"
           >
             <Copy className="w-4 h-4 mr-2" />
-            Copy
+            {copiedFeedback ? "Copied" : "Copy"}
           </Button>
         </div>
 

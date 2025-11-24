@@ -6,6 +6,7 @@ import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
+import { useEffect, useCallback, useState } from 'react';
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
@@ -45,6 +46,22 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     setLastUsedDocuments,
     setAutoCroppingEnabled,
   } = huddleState;
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
+
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('draft_message');
+    if (saved) setUserDraft(saved);
+  }, [setUserDraft]);
+
+  // Persist draft as user types
+  useEffect(() => {
+    if (userDraft) {
+      localStorage.setItem('draft_message', userDraft);
+    } else {
+      localStorage.removeItem('draft_message');
+    }
+  }, [userDraft]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -232,6 +249,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         title: "Copied!",
         description: "Reply copied to clipboard.",
       });
+      setCopiedFeedback(true);
+      setTimeout(() => setCopiedFeedback(false), 1500);
     } catch (err) {
       toast({
         title: "Copy failed",
@@ -240,6 +259,30 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       });
     }
   };
+
+  // Keyboard shortcuts: Cmd/Ctrl+Enter to generate, Cmd/Ctrl+C to copy reply
+  const handleShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      const isMeta = event.metaKey || event.ctrlKey;
+      if (!isMeta) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!isGenerating) {
+          handleGenerateReply();
+        }
+      }
+      if (event.key.toLowerCase() === 'c' && generatedReply) {
+        event.preventDefault();
+        handleCopyReply();
+      }
+    },
+    [generatedReply, handleCopyReply, handleGenerateReply, isGenerating]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [handleShortcut]);
 
   return (
     <div className="space-y-6">
@@ -284,6 +327,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         onCopyReply={handleCopyReply}
         onRegenerate={handleRegenerate}
         onReset={resetHuddle}
+        copiedFeedback={copiedFeedback}
       />
 
       {/* AI Knowledge Sources Section - Show if we have any knowledge data */}

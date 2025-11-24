@@ -413,8 +413,17 @@ export const PeopleTab = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name or handle"
-            className="pl-9 bg-white text-slate-900 border border-gray-200 placeholder:text-gray-500 dark:bg-gray-900/80 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-400"
+            className="pl-9 pr-9 bg-white text-slate-900 border border-gray-200 placeholder:text-gray-500 dark:bg-gray-900/80 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-400"
           />
+          {searchQuery && (
+            <button
+              aria-label="Clear search"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 

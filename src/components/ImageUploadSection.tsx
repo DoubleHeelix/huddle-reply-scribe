@@ -19,19 +19,19 @@ export const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
   return (
     <Card className="bg-slate-900/70 border-white/5 glass-surface">
       <CardContent className="p-5 sm:p-6 md:p-7">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="w-full text-center">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 1</p>
-              <p className="text-lg font-display">Upload your screenshot</p>
-            </div>
+          <div className="space-y-3 text-center">
+            <div className="flex items-center justify-center">
+              <div className="w-full text-center">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Step 1</p>
+                <p className="text-lg font-display">Upload your screenshot</p>
+              </div>
             {isOCRProcessing && (
               <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-100 border border-cyan-500/20">
                 Processing OCR...
               </Badge>
             )}
           </div>
-          <p className="text-sm text-slate-400">PNG or JPG, up to 10MB. We’ll auto-read the text so you don’t have to retype context.</p>
+          <p className="text-sm text-slate-400">PNG or JPG, up to 10MB.</p>
         </div>
 
         {!uploadedImage && (
