@@ -112,7 +112,7 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     const styleInstruction = styleProfile?.style_description
-      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. All other guidelines are secondary to this style.${
+      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. Mirror the user's phrasing and cadence; if this conflicts with other rules, prefer this style.${
           fingerprintSummary ? ` Cadence notes: ${fingerprintSummary}` : ""
         }`
       : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
@@ -124,34 +124,34 @@ serve(async (req: Request): Promise<Response> => {
     const systemPrompt = {
       system: styleInstruction,
       version: styleProfile ? "Custom" : "Default",
+      stylePath: styleProfile ? "custom" : "default",
     };
 
     const userPromptHeader = "A friend posted an Instagram story.";
     const storyContentLine =
       storyText && storyText.trim()
         ? `Story Content: ${storyText.trim()}`
-        : "Story Content: This is an IMAGE. Before replying, list to yourself the main objects, scene, or food you *see*. Your reply must mention or ask about one of these visible elements.";
+        : "Story Content: This is an IMAGE. First, silently list 3-5 visible objects or activities, pick one, then write the reply anchored to that visible element.";
 
-    const userPrompt = `A friend posted this on their story:
-- Story Content: ${storyContentLine}
+    const baseUserPrompt = `A friend posted this on their story:
+- ${storyContentLine}
 
-Your Task: Write ONE unique, short, and warm reply that sounds like a real and curious friend.
+Your goal is to spark a short back-and-forth (not just praise) and end with a natural, specific question about the visible element.
 
-**Style Guide:**
-- The user's tone and personality should come through in the reply.
-- Write in the user's natural style:
-  ${contextFromStyleProfile}
+Style: Write in the user's natural style. ${contextFromStyleProfile}
 
-The reply must:
-- Be a single, complete message.
+Rules:
+- Keep it 1 sentence (or 2 very short), 5–18 words, friendly not gushy, never salesy.
 - Be based strictly on visible details (text or image). Never guess what’s not shown.
-- If the image is unclear, keep it positive and simple.
-- End with a natural, open-ended question that invites conversation.
-- Feel human and authentic—avoid being overly dramatic, cutesy, or overly witty.
+- If the image is unclear, keep it simple and positive.
+- If content is too vague to anchor on something visible, ask a gentle clarifying question about what they're up to.
+- For images: before writing, silently list 3–5 visible objects/activities, pick one, and reference it.
+- Emoji discipline: use zero emojis unless clearly additive; if used, only one and avoid 🚀🥳🔥.
+- End with a natural, specific, open-ended question about the visible element.
+- Avoid references to bodies/appearance, politics, religion, sponsorships, or asking for DMs.
 - Use straightforward terms for pets (e.g., "your dog" not "fur baby").
-- Use at most one emoji—only if it adds natural warmth.
 - Ignore overlays, UI elements, or music tags.
-- Get straight to the message (no quotes, no intros, no numbered lists).`;
+- Output one plain-text reply (no lists, numbering, quotes, or markdown).`;
     // Prepare messages for API
     type Message = {
       role: "system" | "user";
@@ -160,29 +160,47 @@ The reply must:
         | { type: string; text?: string; image_url?: { url: string } }[];
     };
 
-    const messages: Message[] = [
-      { role: "system", content: systemPrompt.system },
+    // Generic angle buckets to encourage distinct takes without hardcoding visuals
+    const angleBuckets = [
+      "Setting/location vibe (e.g., vantage point, scenery, backdrop).",
+      "People/interaction/action happening.",
+      "Sensory details (temperature, light, sound, texture).",
+      "Time/weather/mood of the moment.",
+      "Usage or next move with what's visible."
     ];
 
-    // Add user message with image if provided
-    if (imageUrl) {
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: userPrompt.trim() },
-          { type: "image_url", image_url: { url: imageUrl } },
-        ],
-      });
-    } else {
-      messages.push({
-        role: "user",
-        content: userPrompt.trim(),
-      });
-    }
+    const angleHints = Array.from({ length: count }, (_, i) => angleBuckets[i % angleBuckets.length]);
+
+    const buildMessages = (angleHint: string): Message[] => {
+      const angleInstruction = `Angle: ${angleHint} Make this reply distinct from the other suggestions—use different opening words, verbs, and question topics. Avoid boilerplate like "looks amazing" or repeating the same question. Anchor strictly to visible elements; no guessing. Keep it natural and curious.`;
+      const userPrompt = `${baseUserPrompt}
+- ${angleInstruction}`;
+
+      const messages: Message[] = [
+        { role: "system", content: systemPrompt.system },
+      ];
+
+      if (imageUrl) {
+        messages.push({
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt.trim() },
+            { type: "image_url", image_url: { url: imageUrl } },
+          ],
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: userPrompt.trim(),
+        });
+      }
+
+      return messages;
+    };
 
     console.log(`Calling OpenAI API ${count} times in parallel with model gpt-5...`);
 
-    const apiCall = async () => {
+    const apiCall = async (angleHint: string) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
@@ -195,10 +213,12 @@ The reply must:
           },
           body: JSON.stringify({
             model: "gpt-4o",
-            messages,
+            messages: buildMessages(angleHint),
             max_completion_tokens: 150,
             n: 1, // Always request ONE choice
-            temperature: 0.7, // Slightly higher temp for more variety
+            temperature: 0.7, // Slightly higher for variety
+            presence_penalty: 0.6, // Push away from repeats
+            frequency_penalty: 0.5,
           }),
           signal: controller.signal,
         });
@@ -226,16 +246,24 @@ The reply must:
       }
     };
 
-    // Create an array of promises
-    const promises = Array(count).fill(null).map(() => apiCall());
+    // Create an array of promises with distinct angles
+    const promises = angleHints.map((angle) => apiCall(angle));
 
     // Await all promises to resolve
     const rawStarters = await Promise.all(promises);
 
     // Deduplicate the starters to ensure uniqueness, as parallel calls might still yield similar results
-    const uniqueStarters = [...new Set(rawStarters)];
-
-    const conversationStarters = uniqueStarters;
+    const seen = new Set<string>();
+    const conversationStarters = rawStarters.filter((starter) => {
+      const key = starter.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      const firstWords = key.split(/\s+/).slice(0, 5).join(" ");
+      if ([...seen].some(existing => existing.startsWith(firstWords))) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
 
     console.log("Generated conversation starters:", conversationStarters);
 
@@ -243,6 +271,7 @@ The reply must:
       JSON.stringify({
         conversationStarters,
         promptVersion: systemPrompt.version,
+        stylePath: systemPrompt.stylePath,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
