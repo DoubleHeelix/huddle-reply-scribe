@@ -13,6 +13,8 @@ interface GenerateReplyResult {
   documentKnowledge?: DocumentKnowledge[];
 }
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 export const useEnhancedAISuggestions = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
@@ -25,7 +27,8 @@ export const useEnhancedAISuggestions = () => {
     userDraft: string,
     isRegeneration: boolean = false,
     existingDocumentKnowledge: DocumentKnowledge[] = [],
-    existingPastHuddles: PastHuddleWithSimilarity[] = []
+    existingPastHuddles: PastHuddleWithSimilarity[] = [],
+    onToken?: (partial: string) => void
   ): Promise<GenerateReplyResult | null> => {
     try {
       setIsGenerating(true);
@@ -49,40 +52,74 @@ export const useEnhancedAISuggestions = () => {
 
       console.log('🚀 DEBUG: Calling enhanced-ai-suggestions function...');
 
-      const { data, error } = await supabase.functions.invoke('enhanced-ai-suggestions', {
-        body: {
+      if (!SUPABASE_URL) {
+        throw new Error('SUPABASE_URL is not configured.');
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/enhanced-ai-suggestions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
           action: 'generateReply',
           screenshotText,
           userDraft,
           isRegeneration,
           documentKnowledge,
-        },
+        }),
       });
 
-      if (error) {
-        throw new Error(`Function Error: ${error.message}`);
+      if (!response.ok || !response.body) {
+        const errorText = await response.text();
+        throw new Error(`Function Error: ${response.status} ${response.statusText}: ${errorText}`);
       }
 
-      console.log('✅ DEBUG: AI Function response received:', {
-        replyLength: data.reply?.length || 0,
-        pastHuddlesCount: data.pastHuddles?.length || 0,
-        documentKnowledgeCount: documentKnowledge.length
-      });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let reply = '';
+      let pastHuddles: PastHuddleWithSimilarity[] = isRegeneration ? existingPastHuddles : [];
+      let documentKnowledgeUsed: DocumentKnowledge[] = documentKnowledge;
 
-      const pastHuddles: PastHuddleWithSimilarity[] = isRegeneration
-        ? existingPastHuddles
-        : (data.pastHuddles || []);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      console.log('📊 DEBUG: Final response summary:', {
-        replyGenerated: !!data.reply,
-        pastHuddlesUsed: pastHuddles.length,
-        documentsUsed: documentKnowledge.length
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const payload = JSON.parse(line);
+            if (payload.type === 'meta') {
+              pastHuddles = isRegeneration ? existingPastHuddles : (payload.pastHuddles || []);
+              documentKnowledgeUsed = payload.documentKnowledge || documentKnowledge;
+            } else if (payload.type === 'token') {
+              reply += payload.text || '';
+              if (onToken) onToken(reply);
+            }
+          } catch (err) {
+            console.error('❌ DEBUG: Error parsing stream payload:', err, line);
+          }
+        }
+      }
+
+      console.log('✅ DEBUG: AI Function stream complete:', {
+        replyLength: reply.length,
+        pastHuddlesCount: pastHuddles.length,
+        documentKnowledgeCount: documentKnowledgeUsed.length
       });
 
       return {
-        reply: data.reply || '',
+        reply,
         pastHuddles,
-        documentKnowledge
+        documentKnowledge: documentKnowledgeUsed
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
