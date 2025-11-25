@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Sparkles, Mail, Lock, UserPlus, LogIn, CheckCircle2, ShieldCheck, Bot } from "lucide-react";
+import { Sparkles, Mail, Lock, UserPlus, LogIn, ShieldCheck, Bot } from "lucide-react";
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -96,9 +96,6 @@ const LandingPage = () => {
                 <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-semibold leading-tight">
                   Confident replies, <span className="gradient-text">without the guesswork.</span>
                 </h1>
-                <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-                  Upload a screenshot, draft your message, get replies that stay unique.
-                </p>
               </div>
 
               {/* Compact highlights on mobile, full cards on md+ */}
@@ -127,11 +124,6 @@ const LandingPage = () => {
                     </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="flex items-center gap-4 text-sm text-slate-300 flex-wrap justify-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Verified accounts get a streamlined handoff to your huddles.
               </div>
             </div>
 

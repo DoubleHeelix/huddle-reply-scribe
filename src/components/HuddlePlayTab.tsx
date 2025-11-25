@@ -130,6 +130,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
   const handleGenerateReply = async () => {
     console.log('Generate reply clicked. Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
+    setGeneratedReply("");
     
     if (!userDraft.trim()) {
       toast({
@@ -157,7 +158,9 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
-    const result = await generateReply(screenshotText, userDraft, false);
+    const result = await generateReply(screenshotText, userDraft, false, [], [], (partial) => {
+      setGeneratedReply(partial);
+    });
     
     if (result) {
       setGeneratedReply(result.reply);
@@ -196,7 +199,16 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     if (!userDraft.trim() || !uploadedImage) return;
     
     const screenshotText = getScreenshotText();
-    const result = await generateReply(screenshotText, userDraft, true, lastUsedDocuments, lastUsedHuddles);
+    const result = await generateReply(
+      screenshotText,
+      userDraft,
+      true,
+      lastUsedDocuments,
+      lastUsedHuddles,
+      (partial) => {
+        setGeneratedReply(partial);
+      }
+    );
     
     if (result) {
       setGeneratedReply(result.reply);
