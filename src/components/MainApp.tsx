@@ -68,6 +68,13 @@ export const MainApp = () => {
     });
   };
 
+  const navTabs = [
+    { value: "huddle-play", label: "Huddle", icon: MessageSquare },
+    { value: "interruptions", label: "Interruptions", icon: Camera },
+    { value: "people", label: "People", icon: Users },
+    { value: "past-huddles", label: "History", icon: History },
+  ];
+
   const tabContentVariants = {
     hidden: (direction: number) => ({
       x: direction > 0 ? '100%' : '-100%',
@@ -86,9 +93,9 @@ export const MainApp = () => {
   };
 
   const handleTabChange = (newTab: string) => {
-    const tabs = ["huddle-play", "interruptions", "people", "past-huddles"];
-    const oldIndex = tabs.indexOf(activeTab);
-    const newIndex = tabs.indexOf(newTab);
+    const tabOrder = navTabs.map(tab => tab.value);
+    const oldIndex = tabOrder.indexOf(activeTab);
+    const newIndex = tabOrder.indexOf(newTab);
     setDirection(newIndex - oldIndex);
     setActiveTab(newTab);
   };
@@ -149,39 +156,32 @@ export const MainApp = () => {
               )}
             </div>
 
-            <div className="relative w-full">
-              <TabsList className="flex gap-2 overflow-x-auto bg-white/80 dark:bg-slate-900/80 border border-gray-200 dark:border-white/10 rounded-full p-1.5 backdrop-blur-md scrollbar-none relative shadow-md shadow-black/10 dark:shadow-black/30">
-                <TabsTrigger
-                  value="huddle-play"
-                  className="flex items-center gap-2 text-slate-700 dark:text-white data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white/10 rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3.5 sm:px-4.5 py-2 shadow-sm data-[state=active]:shadow-lg"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Huddle
-                </TabsTrigger>
-                <TabsTrigger
-                  value="interruptions"
-                  className="flex items-center gap-2 text-slate-700 dark:text-white data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white/10 rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3.5 sm:px-4.5 py-2 shadow-sm data-[state=active]:shadow-lg"
-                >
-                  <Camera className="w-4 h-4" />
-                  Interruptions
-                </TabsTrigger>
-                <TabsTrigger
-                  value="people"
-                  className="flex items-center gap-2 text-slate-700 dark:text-white data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white/10 rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3.5 sm:px-4.5 py-2 shadow-sm data-[state=active]:shadow-lg"
-                >
-                  <Users className="w-4 h-4" />
-                  People
-                </TabsTrigger>
-                <TabsTrigger
-                  value="past-huddles"
-                  className="flex items-center gap-2 text-slate-700 dark:text-white data-[state=active]:bg-slate-900 data-[state=active]:text-white dark:data-[state=active]:bg-white/10 rounded-full transition-all duration-200 font-sans text-xs sm:text-sm px-3.5 sm:px-4.5 py-2 shadow-sm data-[state=active]:shadow-lg"
-                >
-                  <History className="w-4 h-4" />
-                  History
-                </TabsTrigger>
+            <div className="relative w-full max-w-5xl mx-auto">
+              <div className="absolute inset-0 -z-10 rounded-[26px] bg-gradient-to-r from-cyan-400/25 via-indigo-500/20 to-purple-500/25 blur-xl" aria-hidden />
+              <TabsList className="group relative grid w-full grid-cols-4 overflow-hidden rounded-[22px] bg-slate-950/80 border border-white/10 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_15px_50px_-28px_rgba(0,0,0,0.8)]">
+                <div className="pointer-events-none absolute inset-0 rounded-[22px] bg-gradient-to-r from-white/10 via-white/0 to-white/10" aria-hidden />
+                {navTabs.map(({ value, label, icon: Icon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="group relative overflow-hidden rounded-full px-3 sm:px-4 py-2 text-[13px] sm:text-sm font-medium tracking-tight text-slate-200/80 hover:text-white transition-all duration-300 focus-visible:ring-0 focus-visible:outline-none data-[state=active]:text-white"
+                  >
+                    {activeTab === value && (
+                      <motion.div
+                        layoutId="tab-pill"
+                        className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500/80 via-cyan-500/70 to-emerald-400/70 shadow-lg shadow-cyan-500/30"
+                        transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2 px-0.5 group-hover:-translate-y-px transition-transform duration-150 ease-out">
+                      <Icon className="w-4 h-4" />
+                      <span>{label}</span>
+                    </span>
+                  </TabsTrigger>
+                ))}
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent rounded-l-[22px]" aria-hidden />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent rounded-r-[22px]" aria-hidden />
               </TabsList>
-              <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-l-full hidden dark:block" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white via-white/60 to-transparent dark:from-slate-950 dark:via-slate-950/60 rounded-r-full hidden dark:block" />
             </div>
           </div>
         </div>

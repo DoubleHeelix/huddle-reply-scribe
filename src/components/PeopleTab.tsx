@@ -40,7 +40,6 @@ export const PeopleTab = () => {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [showInfo, setShowInfo] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Load overrides from localStorage and persist changes.
@@ -78,21 +77,6 @@ export const PeopleTab = () => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('people_overrides', JSON.stringify(overrides));
   }, [overrides]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const dismissed = localStorage.getItem('people_info_dismissed');
-    if (dismissed === 'true') {
-      setShowInfo(false);
-    }
-  }, []);
-
-  const dismissInfo = () => {
-    setShowInfo(false);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('people_info_dismissed', 'true');
-    }
-  };
 
   const applyOverride = useCallback(
     (rawName: string) => overrides[rawName] || rawName,
@@ -214,21 +198,6 @@ export const PeopleTab = () => {
 
   return (
     <div className="space-y-4 relative">
-      {showInfo && (
-        <div className="fixed top-20 right-4 z-30 w-72 max-w-[90vw] bg-gray-900/90 border border-gray-700 shadow-xl rounded-lg p-3 text-xs text-gray-200 font-sans">
-          <div className="flex items-start justify-between gap-2">
-            <p>Names come from the screenshot text; grouping happens only when the extracted name matches exactly.</p>
-            <button
-              aria-label="Close info"
-              className="text-gray-400 hover:text-white"
-              onClick={dismissInfo}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-gray-300 font-sans">
           Search or browse people grouped by extracted names.

@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Zap } from "lucide-react";
 import { ImageUploadSection } from './ImageUploadSection';
@@ -6,7 +7,6 @@ import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
-import { cn } from "@/lib/utils";
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
@@ -296,36 +296,42 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     return () => window.removeEventListener('keydown', handleShortcut);
   }, [handleShortcut]);
 
-  const progressActive = isOCRProcessing || isGenerating || isAdjustingTone;
-  const progressPercent = isGenerating ? 80 : isAdjustingTone ? 90 : isOCRProcessing ? 40 : 0;
-  const progressLabel = isGenerating
-    ? "Generating reply..."
+  const overlayMessage = isOCRProcessing
+    ? "The assistant is reading your screenshot text..."
+    : isGenerating
+    ? "The assistant is crafting your perfect reply..."
     : isAdjustingTone
-    ? "Adjusting tone..."
-    : "Processing image...";
+    ? "The assistant is polishing your tone..."
+    : null;
+
+  const progressActive = Boolean(overlayMessage);
+
+  const hasScreenshot = Boolean(uploadedImage);
 
   return (
     <div className="space-y-6 relative">
-      {progressActive && (
-        <div className="sticky top-0 z-20">
-          <div className="h-1.5 bg-slate-800/60 rounded-full overflow-hidden border border-slate-700/60">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400",
-              )}
-              style={{ width: `${progressPercent}%` }}
-              role="progressbar"
-              aria-label={progressLabel}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progressPercent}
-            />
-          </div>
-          <p className="text-xs text-slate-400 mt-1" aria-live="polite">
-            {progressLabel}
-          </p>
-        </div>
-      )}
+      <AnimatePresence>
+        {progressActive && (
+          <motion.div
+            key="progress-overlay"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            <motion.div
+              className="rounded-xl border border-white/10 bg-slate-900/95 px-5 py-4 shadow-2xl shadow-black/50 text-sm text-slate-100"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              {overlayMessage}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ImageUploadSection
         uploadedImage={uploadedImage}
@@ -333,52 +339,71 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         onImageUpload={handleImageUpload}
       />
 
-      <DraftMessageSection
-        userDraft={userDraft}
-        onUserDraftChange={setUserDraft}
-      />
-
-      {/* Generate Button */}
-      <Button 
-        onClick={handleGenerateReply}
-        disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-        className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
-      >
-        <Zap className="w-5 h-5 mr-2" />
-        {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
-      </Button>
-
-      {/* Loading state for AI generation */}
-      {isGenerating && (
-        <div className="text-center py-8">
-          <div className="inline-flex items-center gap-2 text-purple-400">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-            <span className="font-sans">AI is crafting your perfect reply...</span>
-          </div>
+      {!hasScreenshot && (
+        <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-900/40 p-4 text-center text-sm text-slate-400">
+          Step 2 (draft + generate) unlocks after you drop a screenshot above.
         </div>
       )}
 
-      <GeneratedReplySection
-        generatedReply={generatedReply}
-        selectedTone={selectedTone}
-        isGenerating={isGenerating}
-        isAdjustingTone={isAdjustingTone}
-        onToneChange={setSelectedTone}
-        onApplyTone={handleApplyTone}
-        onCopyReply={handleCopyReply}
-        onRegenerate={handleRegenerate}
-        onReset={resetHuddle}
-        copiedFeedback={copiedFeedback}
-      />
+      <AnimatePresence>
+        {hasScreenshot && (
+          <motion.div
+            key="step-2"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="space-y-6"
+          >
+          <DraftMessageSection
+            userDraft={userDraft}
+            onUserDraftChange={setUserDraft}
+          />
 
-      {/* AI Knowledge Sources Section - Show if we have any knowledge data */}
-      {showKnowledgeSources && (lastUsedHuddles.length > 0 || lastUsedDocuments.length > 0) && (
-        <AIKnowledgeSources
-          pastHuddles={lastUsedHuddles}
-          documentKnowledge={lastUsedDocuments}
-          isVisible={true}
-        />
-      )}
+          {/* Generate Button */}
+          <Button 
+            onClick={handleGenerateReply}
+            disabled={isGenerating || !userDraft.trim() || !uploadedImage}
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
+          >
+            <Zap className="w-5 h-5 mr-2" />
+            {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
+          </Button>
+
+          {/* Loading state for AI generation */}
+          {isGenerating && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center gap-2 text-purple-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
+                <span className="font-sans">AI is crafting your perfect reply...</span>
+              </div>
+            </div>
+          )}
+
+          <GeneratedReplySection
+            generatedReply={generatedReply}
+            selectedTone={selectedTone}
+            isGenerating={isGenerating}
+            isAdjustingTone={isAdjustingTone}
+            onToneChange={setSelectedTone}
+            onApplyTone={handleApplyTone}
+            onCopyReply={handleCopyReply}
+            onRegenerate={handleRegenerate}
+            onReset={resetHuddle}
+            copiedFeedback={copiedFeedback}
+          />
+
+          {/* AI Knowledge Sources Section - Show if we have any knowledge data */}
+              {showKnowledgeSources && (lastUsedHuddles.length > 0 || lastUsedDocuments.length > 0) && (
+                <AIKnowledgeSources
+                  pastHuddles={lastUsedHuddles}
+                  documentKnowledge={lastUsedDocuments}
+                  isVisible={true}
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
     </div>
   );
 };
