@@ -198,9 +198,6 @@ Rules:
       return messages;
     };
 
-      return messages;
-    };
-
     console.log(`Calling OpenAI API ${count} times in parallel with model gpt-5-mini...`);
 
     const apiCall = async (angleHint: string) => {

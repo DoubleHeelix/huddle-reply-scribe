@@ -70,7 +70,7 @@ export const MainApp = () => {
 
   const navTabs = [
     { value: "huddle-play", label: "Huddle", icon: MessageSquare },
-    { value: "interruptions", label: "Interruptions", icon: Camera },
+    { value: "interruptions", label: "Interruption", icon: Camera },
     { value: "people", label: "People", icon: Users },
     { value: "past-huddles", label: "History", icon: History },
   ];
