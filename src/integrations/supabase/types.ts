@@ -90,6 +90,30 @@ export type Database = {
         }
         Relationships: []
       }
+      people_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          override: string
+          raw_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          override: string
+          raw_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          override?: string
+          raw_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_style_profiles: {
         Row: {
           avg_sentence_length: number | null
