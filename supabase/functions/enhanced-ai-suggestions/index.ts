@@ -664,13 +664,13 @@ Refine this draft to make it better without inventing missing details.`;
         },
       });
 
-      // Lightweight default model; upgrade when context is heavy so style/continuity stay accurate.
+      // Use gpt-5-mini; bump token budget when context is heavy so style/continuity stay accurate.
       const contextIsHeavy =
         contextFromDocuments.length > 0 ||
         contextFromPastHuddles.length > 0 ||
         continuityContext.length > 0 ||
         systemPrompt.length + userPrompt.length > 7000;
-      const chatModel = contextIsHeavy ? "gpt-4o" : "gpt-4o-mini";
+      const chatModel = "gpt-5-mini";
       const maxTokens = contextIsHeavy ? 500 : 350;
 
       console.log("🧠 DEBUG: Model selection:", {
@@ -1035,7 +1035,7 @@ Refine this draft to make it better without inventing missing details.`;
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "gpt-5-mini",
             messages: [
               {
                 role: "system",
