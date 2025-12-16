@@ -4,6 +4,7 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type HuddlePlay = Tables<'huddle_plays'>;
 export type HuddlePlayInsert = TablesInsert<'huddle_plays'>;
+type PeopleOverrideInsert = TablesInsert<'people_overrides'>;
 
 export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id'>): Promise<HuddlePlay | null> => {
   try {
@@ -79,6 +80,61 @@ export const updateHuddlePlayFinalReply = async (id: string, finalReply: string)
     return true;
   } catch (error) {
     console.error('Error in updateHuddlePlayFinalReply:', error);
+    return false;
+  }
+};
+
+export const getPeopleOverrides = async (): Promise<Record<string, string>> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return {};
+
+    const { data, error } = await supabase
+      .from('people_overrides')
+      .select('raw_name, override')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error fetching people overrides:', error);
+      return {};
+    }
+
+    return (data || []).reduce<Record<string, string>>((acc, row) => {
+      acc[row.raw_name] = row.override;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error('Error in getPeopleOverrides:', error);
+    return {};
+  }
+};
+
+export const savePeopleOverrides = async (
+  overrides: { raw_name: string; override: string }[]
+): Promise<boolean> => {
+  if (!overrides.length) return true;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const payload: PeopleOverrideInsert[] = overrides.map((entry) => ({
+      user_id: user.id,
+      raw_name: entry.raw_name,
+      override: entry.override,
+    }));
+
+    const { error } = await supabase
+      .from('people_overrides')
+      .upsert(payload, { onConflict: 'user_id,raw_name' });
+
+    if (error) {
+      console.error('Error saving people overrides:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in savePeopleOverrides:', error);
     return false;
   }
 };
