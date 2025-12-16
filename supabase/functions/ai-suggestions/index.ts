@@ -135,7 +135,7 @@ You have provided a suggestion before for this scenario. Provide a *significantl
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5',
+        model: 'gpt-5-mini',
         messages,
         temperature,
         max_tokens: 400
