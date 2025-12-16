@@ -1,3 +1,4 @@
+import { encode } from 'gpt-tokenizer';
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentSummary } from '@/types/document';
 import { pdfProcessor } from './pdfProcessor';
@@ -53,8 +54,8 @@ export const documentService = {
         throw new Error('Could not extract sufficient text from PDF.');
       }
 
-      // 2. Chunk the text on the client using a recursive strategy
-      const textChunks = this.splitTextIntoChunks(text, 500, 50);
+      // 2. Chunk the text on the client using token-aware, structure-first splitting
+      const textChunks = this.splitTextIntoChunks(text);
       console.log(`📝 Text split into ${textChunks.length} chunks on the client.`);
 
       // 3. Process each chunk individually
@@ -92,46 +93,136 @@ export const documentService = {
     }
   },
 
-  // A robust chunking function that prevents infinite loops.
-  splitTextIntoChunks(text: string, chunkSize: number, chunkOverlap: number): string[] {
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    if (cleanedText.length <= chunkSize) {
-        return [cleanedText];
-    }
+  // Token-aware, structure-first chunking to keep coherent paragraphs/sentences.
+  splitTextIntoChunks(text: string, targetTokens = 450, overlapTokens = 60): string[] {
+    const normalized = text.replace(/\r\n/g, '\n').trim();
+    if (!normalized) return [];
 
+    type Part = { text: string; tokens: number };
     const chunks: string[] = [];
-    let startIndex = 0;
+    const paragraphList = this.splitIntoParagraphs(normalized);
+    if (!paragraphList.length) return [normalized];
 
-    while (startIndex < cleanedText.length) {
-        // Determine the end of the current chunk
-        let endIndex = Math.min(startIndex + chunkSize, cleanedText.length);
+    let currentParts: Part[] = [];
+    let currentTokenCount = 0;
 
-        // If this is not the last chunk, backtrack to the last space to avoid splitting a word
-        if (endIndex < cleanedText.length) {
-            const lastSpace = cleanedText.lastIndexOf(' ', endIndex);
-            if (lastSpace > startIndex) {
-                endIndex = lastSpace;
+    const flushChunk = (preserveOverlap: boolean) => {
+      if (!currentParts.length) return;
+      const chunkText = currentParts.map((part) => part.text).join('\n\n');
+      chunks.push(chunkText);
+
+      if (preserveOverlap && overlapTokens > 0) {
+        let overlapCount = 0;
+        const overlapParts: Part[] = [];
+
+        for (let i = currentParts.length - 1; i >= 0 && overlapCount < overlapTokens; i--) {
+          overlapParts.unshift(currentParts[i]);
+          overlapCount += currentParts[i].tokens;
+        }
+
+        currentParts = overlapParts;
+        currentTokenCount = overlapCount;
+      } else {
+        currentParts = [];
+        currentTokenCount = 0;
+      }
+    };
+
+    const addPart = (partText: string) => {
+      const tokens = this.countTokens(partText);
+      if (tokens === 0) return;
+
+      if (tokens > targetTokens) {
+        const smallerPieces = this.splitLongText(partText, targetTokens);
+        smallerPieces.forEach((piece) => addPart(piece));
+        return;
+      }
+
+      if (currentTokenCount + tokens > targetTokens) {
+        flushChunk(true);
+      }
+
+      currentParts.push({ text: partText, tokens });
+      currentTokenCount += tokens;
+    };
+
+    paragraphList.forEach((paragraph) => {
+      const paragraphTokens = this.countTokens(paragraph);
+
+      if (paragraphTokens > targetTokens) {
+        const sentences = this.splitIntoSentences(paragraph);
+
+        if (sentences.length > 1) {
+          sentences.forEach((sentence) => {
+            const trimmed = sentence.trim();
+            if (trimmed) {
+              addPart(trimmed);
             }
+          });
+          return;
         }
+      }
 
-        const chunk = cleanedText.slice(startIndex, endIndex);
-        if (chunk) {
-          chunks.push(chunk);
-        }
+      addPart(paragraph);
+    });
 
-        // Determine the start of the next chunk
-        const nextStartIndex = endIndex - chunkOverlap;
-
-        // Failsafe: ensure we always move forward. If the overlap is too large
-        // or chunks are too small, this prevents an infinite loop.
-        if (nextStartIndex <= startIndex) {
-            startIndex = endIndex; // Jump to the end of the current chunk
-        } else {
-            startIndex = nextStartIndex;
-        }
-    }
-
+    flushChunk(false);
     return chunks;
+  },
+
+  splitIntoParagraphs(text: string): string[] {
+    return text
+      .split(/\n\s*\n+/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+  },
+
+  splitIntoSentences(paragraph: string): string[] {
+    return paragraph
+      .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+      .flatMap((sentence) => sentence.split(/(?<=\.)\s+(?=[•-])/)) // catch bullet-like separators
+      .map((sentence) => sentence.trim())
+      .filter(Boolean);
+  },
+
+  splitLongText(text: string, targetTokens: number): string[] {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) return [text];
+
+    const pieces: string[] = [];
+    let buffer: string[] = [];
+    let bufferTokens = 0;
+
+    const flushBuffer = () => {
+      if (!buffer.length) return;
+      const combined = buffer.join(' ');
+      pieces.push(combined);
+      buffer = [];
+      bufferTokens = 0;
+    };
+
+    words.forEach((word) => {
+      const proposed = buffer.length ? `${buffer.join(' ')} ${word}` : word;
+      const proposedTokens = this.countTokens(proposed);
+
+      if (proposedTokens > targetTokens && buffer.length) {
+        flushBuffer();
+      }
+
+      buffer.push(word);
+      bufferTokens = this.countTokens(buffer.join(' '));
+
+      if (bufferTokens >= targetTokens) {
+        flushBuffer();
+      }
+    });
+
+    flushBuffer();
+    return pieces.length ? pieces : [text];
+  },
+
+  countTokens(text: string): number {
+    return encode(text).length;
   },
 
   async processUploadedFile(): Promise<never> {
