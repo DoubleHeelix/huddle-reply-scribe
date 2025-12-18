@@ -128,18 +128,27 @@ You have provided a suggestion before for this scenario. Provide a *significantl
       throw new Error('Invalid action specified');
     }
 
+    // Note: Some newer models (e.g. gpt-5-*) only support default sampling params.
+    // Avoid sending non-default temperature to prevent 400s.
+    const chatModel = 'gpt-5-mini';
+    const requestBody: Record<string, unknown> = {
+      model: chatModel,
+      messages,
+      max_completion_tokens: 400,
+    };
+    if (!chatModel.startsWith('gpt-5')) {
+      requestBody.temperature = temperature;
+      requestBody.max_tokens = 400;
+      delete requestBody.max_completion_tokens;
+    }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages,
-        temperature,
-        max_tokens: 400
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

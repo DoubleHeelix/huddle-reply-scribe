@@ -205,21 +205,28 @@ Rules:
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       try {
+        // Note: Some newer models (e.g. gpt-5-*) only support default sampling params.
+        // Avoid sending non-default temperature/penalties to prevent 400s.
+        const chatModel = "gpt-5-mini";
+        const requestBody: Record<string, unknown> = {
+          model: chatModel,
+          messages: buildMessages(angleHint),
+          max_completion_tokens: 150,
+          n: 1, // Always request ONE choice
+        };
+        if (!chatModel.startsWith("gpt-5")) {
+          requestBody.temperature = 0.7; // Slightly higher for variety
+          requestBody.presence_penalty = 0.6; // Push away from repeats
+          requestBody.frequency_penalty = 0.5;
+        }
+
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${openAIApiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model: "gpt-5-mini",
-            messages: buildMessages(angleHint),
-            max_completion_tokens: 150,
-            n: 1, // Always request ONE choice
-            temperature: 0.7, // Slightly higher for variety
-            presence_penalty: 0.6, // Push away from repeats
-            frequency_penalty: 0.5,
-          }),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
 

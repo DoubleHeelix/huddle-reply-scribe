@@ -692,22 +692,29 @@ Refine this draft to make it better without inventing missing details.`;
         }) + "\n"
       );
 
+      // Note: Some newer models (e.g. gpt-5-*) only support default sampling params.
+      // Avoid sending non-default temperature to prevent 400s.
+      const openAIRequestBody: Record<string, unknown> = {
+        model: chatModel,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_completion_tokens: maxTokens,
+        stream: true,
+      };
+
+      if (!chatModel.startsWith("gpt-5")) {
+        openAIRequestBody.temperature = 0.65;
+      }
+
       const openAIResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openaiApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: chatModel,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.65,
-          max_completion_tokens: maxTokens,
-          stream: true,
-        }),
+        body: JSON.stringify(openAIRequestBody),
       });
 
       if (!openAIResponse.ok || !openAIResponse.body) {
@@ -1026,31 +1033,34 @@ Refine this draft to make it better without inventing missing details.`;
         });
       }
 
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiApiKey}`,
-            "Content-Type": "application/json",
+      const toneModel = "gpt-5-mini";
+      const toneRequestBody: Record<string, unknown> = {
+        model: toneModel,
+        messages: [
+          {
+            role: "system",
+            content: `${instruction}. Keep the core message and meaning intact, just adjust the tone. Respond with only the adjusted message, no explanations.`,
           },
-          body: JSON.stringify({
-            model: "gpt-5-mini",
-            messages: [
-              {
-                role: "system",
-                content: `${instruction}. Keep the core message and meaning intact, just adjust the tone. Respond with only the adjusted message, no explanations.`,
-              },
-              {
-                role: "user",
-                content: originalReply,
-              },
-            ],
-            temperature: 0.55,
-            max_completion_tokens: 500,
-          }),
-        }
-      );
+          {
+            role: "user",
+            content: originalReply,
+          },
+        ],
+        max_completion_tokens: 500,
+      };
+
+      if (!toneModel.startsWith("gpt-5")) {
+        toneRequestBody.temperature = 0.55;
+      }
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openaiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(toneRequestBody),
+      });
 
       const data = await response.json();
       const adjustedReply = extractMessageContent(data.choices?.[0]) || originalReply;
