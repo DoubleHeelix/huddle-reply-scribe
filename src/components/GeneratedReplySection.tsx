@@ -11,6 +11,7 @@ interface GeneratedReplySectionProps {
   selectedTone: string;
   isGenerating: boolean;
   isAdjustingTone: boolean;
+  showInlineLoader?: boolean;
   onToneChange: (tone: string) => void;
   onApplyTone: () => void;
   onCopyReply: () => void;
@@ -24,6 +25,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   selectedTone,
   isGenerating,
   isAdjustingTone,
+  showInlineLoader = true,
   onToneChange,
   onApplyTone,
   onCopyReply,
@@ -32,8 +34,10 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   copiedFeedback
 }) => {
   const displayedReply = useTypingEffect(generatedReply, 20);
+  const showGenerationLoader = showInlineLoader && isGenerating && !isAdjustingTone;
 
-  if (!generatedReply) return null;
+  // Keep the section visible while generating or adjusting, even before text arrives.
+  if (!generatedReply && !isGenerating && !isAdjustingTone) return null;
 
   return (
     <Card className="bg-white dark:bg-slate-900/70 border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm dark:shadow-none glass-surface" data-section="generated-reply">
@@ -57,7 +61,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
           </Button>
         </div>
 
-        {isGenerating && (
+        {showGenerationLoader && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-slate-300">
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400" />

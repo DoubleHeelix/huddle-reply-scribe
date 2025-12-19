@@ -7,6 +7,7 @@ import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
+import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
@@ -159,12 +160,11 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     }
     
     const result = await generateReply(screenshotText, userDraft, false, [], [], (partial) => {
-      setGeneratedReply(partial);
+      setGeneratedReply(sanitizeHumanReply(partial));
     });
     
     if (result) {
-      setGeneratedReply(result.reply);
-      setSelectedTone("none");
+      setGeneratedReply(sanitizeHumanReply(result.reply));
       
       // Store the knowledge sources used for this generation
       setLastUsedHuddles(result.pastHuddles || []);
@@ -206,13 +206,12 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       lastUsedDocuments,
       lastUsedHuddles,
       (partial) => {
-        setGeneratedReply(partial);
+        setGeneratedReply(sanitizeHumanReply(partial));
       }
     );
     
     if (result) {
-      setGeneratedReply(result.reply);
-      setSelectedTone("none");
+      setGeneratedReply(sanitizeHumanReply(result.reply));
       
       setLastUsedHuddles(result.pastHuddles || []);
       setLastUsedDocuments(result.documentKnowledge || []);
@@ -234,22 +233,22 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
   };
 
   const handleApplyTone = async () => {
-    if (!generatedReply || selectedTone === 'none') return;
-    
+    if (selectedTone === 'none' || !generatedReply) return;
+
     const adjustedReply = await adjustTone(generatedReply, selectedTone);
-    
-    if (adjustedReply && adjustedReply !== generatedReply) {
-      setGeneratedReply(adjustedReply);
-      
-      if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, adjustedReply);
-      }
-      
-      toast({
-        title: "Tone adjusted!",
-        description: `Reply updated with ${selectedTone} tone and saved.`,
-      });
+    const cleanAdjusted = adjustedReply ? sanitizeHumanReply(adjustedReply) : "";
+    if (!cleanAdjusted || cleanAdjusted === generatedReply) return;
+
+    setGeneratedReply(cleanAdjusted);
+
+    if (currentHuddleId) {
+      await updateFinalReply(currentHuddleId, cleanAdjusted);
     }
+
+    toast({
+      title: "Tone adjusted!",
+      description: `Reply updated with ${selectedTone} tone.`,
+    });
   };
 
   const handleCopyReply = async () => {
@@ -305,6 +304,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     : null;
 
   const progressActive = Boolean(overlayMessage);
+  // Hide inline loaders whenever the overlay is active to prevent duplicate spinners underneath.
+  const showGenerationLoader = isGenerating && !progressActive;
 
   const hasScreenshot = Boolean(uploadedImage);
 
@@ -371,7 +372,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
           </Button>
 
           {/* Loading state for AI generation */}
-          {isGenerating && (
+          {showGenerationLoader && (
             <div className="text-center py-8">
               <div className="inline-flex items-center gap-2 text-purple-400">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
@@ -385,6 +386,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
             selectedTone={selectedTone}
             isGenerating={isGenerating}
             isAdjustingTone={isAdjustingTone}
+            showInlineLoader={showGenerationLoader}
             onToneChange={setSelectedTone}
             onApplyTone={handleApplyTone}
             onCopyReply={handleCopyReply}
