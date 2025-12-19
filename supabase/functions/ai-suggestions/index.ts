@@ -23,14 +23,10 @@ Core directives:
 3. Invite response with a light, open-ended question when momentum is low.
 4. Sense openness to opportunities gently; do not sell or pressure.
 5. Mirror tone while staying warm, casual, and grounded. Match punctuation/emoji cadence to the user's style.
-6. If the user's draft contradicts the conversation context, prioritize replying appropriately to the conversation context while preserving the user's intent.
-7. Avoid generic corporate/LinkedIn-speak (e.g., "circle back", "touch base", "leverage") unless the user's draft uses it.
 
 Output rules:
 - 2–4 sentences max. No greetings/closings unless already in the draft. No emojis unless the draft used them.
-- Respond with ONLY the refined message—no prefaces, quotes, or labels.
-- Plain text only: no markdown, no bullets, no arrows/checkmarks, no unusual symbols, no fancy quotes/dashes. Use simple ASCII punctuation.
-- Never use numbered lists or bullet formatting in the output, even if asked.`;
+- Respond with ONLY the refined message—no prefaces, quotes, or labels.`;
 
 const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
@@ -116,8 +112,7 @@ You have provided a suggestion before for this scenario. Provide a *significantl
 1.  **Preserve Core Message:** The fundamental meaning and key information must remain unchanged.
 2.  **Maintain Authentic Voice:** The message should still sound like the original author wrote it.
 3.  **Subtle Adjustment:** Focus on word choice, phrasing, and sentence structure to gently shift the tone.
-4.  **No Preamble:** Respond with only the adjusted message.
-5.  **Plain Text Only:** No markdown, no bullets/arrows/checkmarks, no unusual symbols; use simple ASCII punctuation.`;
+4.  **No Preamble:** Respond with only the adjusted message.`;
 
       const toneUserPrompt = `Adjust the tone of this message to be more **${selectedTone.toLowerCase()}**.
 
