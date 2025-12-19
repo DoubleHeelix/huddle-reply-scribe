@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -12,6 +13,102 @@ const allowedOrigins = [
   "https://huddle-reply-scribe-production.up.railway.app",
   // Add your mobile device's local IP if needed, e.g., 'http://192.168.1.100:8080'
 ];
+
+const OPENAI_IMAGE_FETCH_TIMEOUT_MS = 15_000;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+async function fetchImageAsDataUrl(imageUrl: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(imageUrl);
+  } catch {
+    throw new Error("Invalid imageUrl (must be a valid URL).");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Invalid imageUrl (must be http/https).");
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_IMAGE_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(imageUrl, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download image (${response.status} ${response.statusText}).`);
+    }
+
+    const contentTypeRaw = response.headers.get("content-type") || "";
+    const headerContentType = contentTypeRaw.split(";")[0].trim().toLowerCase();
+    const urlPath = parsed.pathname.toLowerCase();
+    const inferredContentType = urlPath.endsWith(".png")
+      ? "image/png"
+      : urlPath.endsWith(".jpg") || urlPath.endsWith(".jpeg")
+        ? "image/jpeg"
+        : urlPath.endsWith(".webp")
+          ? "image/webp"
+          : urlPath.endsWith(".gif")
+            ? "image/gif"
+            : "";
+    const contentType = headerContentType.startsWith("image/")
+      ? headerContentType
+      : inferredContentType;
+    if (!contentType) {
+      throw new Error(`Unsupported content-type for image: ${contentTypeRaw || "unknown"}.`);
+    }
+
+    const lengthHeader = response.headers.get("content-length");
+    const contentLength = lengthHeader ? Number(lengthHeader) : NaN;
+    if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BYTES) {
+      throw new Error(`Image too large (${contentLength} bytes).`);
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > MAX_IMAGE_BYTES) {
+      throw new Error(`Image too large (${bytes.byteLength} bytes).`);
+    }
+
+    return `data:${contentType};base64,${encodeBase64(bytes)}`;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Timed out while downloading the story image.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+type StyleProfileRow = {
+  formality: string | null;
+  sentiment: string | null;
+  common_topics: string[] | null;
+  avg_sentence_length: number | null;
+  common_phrases: { bigrams?: string[]; trigrams?: string[] } | null;
+  style_fingerprint: Record<string, unknown> | null;
+};
+
+function buildStyleDescription(profile?: StyleProfileRow | null): string | null {
+  if (!profile) return null;
+
+  const parts: string[] = [];
+  if (profile.formality) parts.push(`Formality: ${profile.formality}`);
+  if (profile.sentiment) parts.push(`Sentiment: ${profile.sentiment}`);
+  if (profile.avg_sentence_length) parts.push(`Avg sentence length: ${profile.avg_sentence_length} words`);
+  if (profile.common_topics?.length) parts.push(`Common topics: ${profile.common_topics.slice(0, 5).join(", ")}`);
+
+  const bigrams = profile.common_phrases?.bigrams?.slice(0, 6) || [];
+  const trigrams = profile.common_phrases?.trigrams?.slice(0, 4) || [];
+  const phraseHints = [...bigrams, ...trigrams].filter(Boolean);
+  if (phraseHints.length) parts.push(`Common phrasing: ${phraseHints.join(", ")}`);
+
+  return parts.length ? parts.join(". ") + "." : null;
+}
 
 function formatStyleFingerprintSummary(
   fingerprint?: {
@@ -98,34 +195,52 @@ serve(async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     const { data: styleProfile, error: styleError } = await supabase
       .from("user_style_profiles")
-      .select("style_description, style_fingerprint")
+      .select(
+        "formality, sentiment, common_topics, avg_sentence_length, common_phrases, style_fingerprint"
+      )
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (styleError) {
       console.error("Error fetching user style profile:", styleError);
       // Continue without style profile for now, or handle error as needed
     }
 
+    const styleDescription = buildStyleDescription(styleProfile as StyleProfileRow | null);
+
     const fingerprintSummary = formatStyleFingerprintSummary(
-      styleProfile?.style_fingerprint as Record<string, unknown> | undefined
+      (styleProfile as StyleProfileRow | null)?.style_fingerprint || undefined
     );
 
-    const styleInstruction = styleProfile?.style_description
-      ? `Your primary instruction is to adopt the following writing style: ${styleProfile.style_description}. Mirror the user's phrasing and cadence; if this conflicts with other rules, prefer this style.${
+    const styleInstruction = styleDescription
+      ? `Your primary instruction is to adopt the following writing style: ${styleDescription} Mirror the user's phrasing and cadence; if this conflicts with other rules, prefer this style.${
           fingerprintSummary ? ` Cadence notes: ${fingerprintSummary}` : ""
         }`
       : "You are an observant and thoughtful friend crafting Instagram story replies. Your goal is to start genuine, warm, and curious conversations based strictly on the visible content. Always reference what's actually there—no guessing or speculation. Keep replies authentic, friendly, and simple. Use at most one emoji, only if it fits naturally.";
 
-    const contextFromStyleProfile = styleProfile?.style_description
-      ? `${styleProfile.style_description}${fingerprintSummary ? `\n${fingerprintSummary}` : ""}`
+    const contextFromStyleProfile = styleDescription
+      ? `${styleDescription}${fingerprintSummary ? `\n${fingerprintSummary}` : ""}`
       : "Default: Be observant, thoughtful, and curious. Keep it simple and authentic.";
 
     const systemPrompt = {
       system: styleInstruction,
-      version: styleProfile ? "Custom" : "Default",
-      stylePath: styleProfile ? "custom" : "default",
+      version: styleDescription ? "Custom" : "Default",
+      stylePath: styleDescription ? "custom" : "default",
     };
+
+    let openAIImageUrl: string | null = null;
+    if (imageUrl) {
+      try {
+        openAIImageUrl = await fetchImageAsDataUrl(imageUrl);
+      } catch (error) {
+        console.error("Failed to fetch story image for OpenAI:", error);
+        if (!storyText || !storyText.trim()) {
+          throw error instanceof Error
+            ? error
+            : new Error("Failed to download the story image.");
+        }
+      }
+    }
 
     const userPromptHeader = "A friend posted an Instagram story.";
     const storyContentLine =
@@ -133,7 +248,7 @@ serve(async (req: Request): Promise<Response> => {
         ? `Story Content: ${storyText.trim()}`
         : "Story Content: This is an IMAGE. First, silently list 3-5 visible objects or activities, pick one, then write the reply anchored to that visible element.";
 
-    const baseUserPrompt = `A friend posted this on their story:
+    const baseUserPrompt = `${userPromptHeader}
 - ${storyContentLine}
 
 Your goal is to spark a short back-and-forth (not just praise) and end with a natural, specific question about the visible element.
@@ -151,7 +266,7 @@ Rules:
 - Avoid references to bodies/appearance, politics, religion, sponsorships, or asking for DMs.
 - Use straightforward terms for pets (e.g., "your dog" not "fur baby").
 - Ignore overlays, UI elements, or music tags.
-- Output one plain-text reply (no lists, numbering, quotes, or markdown).`;
+- Each reply must be plain text (no lists, numbering, quotes, or markdown).`;
     // Prepare messages for API
     type Message = {
       role: "system" | "user";
@@ -171,36 +286,35 @@ Rules:
 
     const angleHints = Array.from({ length: count }, (_, i) => angleBuckets[i % angleBuckets.length]);
 
-    const buildMessages = (angleHint: string): Message[] => {
-      const angleInstruction = `Angle: ${angleHint} Make this reply distinct from the other suggestions—use different opening words, verbs, and question topics. Avoid boilerplate like "looks amazing" or repeating the same question. Anchor strictly to visible elements; no guessing. Keep it natural and curious.`;
-      const userPrompt = `${baseUserPrompt}
-- ${angleInstruction}`;
+    const buildMessages = (): Message[] => {
+      const angleSection = angleHints
+        .map((hint, i) => `${i + 1}) ${hint}`)
+        .join("\n");
 
-      const messages: Message[] = [
-        { role: "system", content: systemPrompt.system },
-      ];
+      const multiOutputInstruction = `Generate exactly ${count} distinct replies. Each reply should use a different angle from this list:\n${angleSection}\n\nReturn ONLY valid JSON: an array of ${count} strings. No extra keys, no markdown, no commentary.`;
 
-      if (imageUrl) {
+      const userPrompt = `${baseUserPrompt}\n\n${multiOutputInstruction}`.trim();
+
+      const messages: Message[] = [{ role: "system", content: systemPrompt.system }];
+
+      if (openAIImageUrl) {
         messages.push({
           role: "user",
           content: [
-            { type: "text", text: userPrompt.trim() },
-            { type: "image_url", image_url: { url: imageUrl } },
+            { type: "text", text: userPrompt },
+            { type: "image_url", image_url: { url: openAIImageUrl } },
           ],
         });
       } else {
-        messages.push({
-          role: "user",
-          content: userPrompt.trim(),
-        });
+        messages.push({ role: "user", content: userPrompt });
       }
 
       return messages;
     };
 
-    console.log(`Calling OpenAI API ${count} times in parallel with model gpt-5-mini...`);
+    console.log(`Calling OpenAI API once with model gpt-5-mini (count=${count})...`);
 
-    const apiCall = async (angleHint: string) => {
+    const apiCall = async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
@@ -210,9 +324,9 @@ Rules:
         const chatModel = "gpt-5-mini";
         const requestBody: Record<string, unknown> = {
           model: chatModel,
-          messages: buildMessages(angleHint),
-          max_completion_tokens: 150,
-          n: 1, // Always request ONE choice
+          messages: buildMessages(),
+          max_completion_tokens: 350,
+          n: 1,
         };
         if (!chatModel.startsWith("gpt-5")) {
           requestBody.temperature = 0.7; // Slightly higher for variety
@@ -233,31 +347,41 @@ Rules:
         if (!response.ok) {
           const errorData = await response.text();
           console.error("OpenAI API error:", errorData);
-          throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+          throw new Error(
+            `OpenAI API error: ${response.status} ${response.statusText}${errorData ? ` - ${errorData}` : ""}`
+          );
         }
 
         const data = await response.json();
-        let content = data.choices[0].message.content.trim();
+        const content = String(data?.choices?.[0]?.message?.content || "").trim();
 
-        // Aggressive sanitization: If the AI returns a list, take only the first item.
-        if (content.match(/^\s*1\./)) {
-          // Split by any subsequent numbered list markers (e.g., "2.", "3.")
-          const parts = content.split(/\s\d\./);
-          // Take the first part and remove the "1." prefix.
-          content = parts[0].replace(/^\s*1\.\s*/, '').trim();
+        // Expect JSON array. If the model includes extra text, try to extract the first JSON array.
+        const start = content.indexOf("[");
+        const end = content.lastIndexOf("]");
+        const jsonSlice = start !== -1 && end !== -1 && end > start ? content.slice(start, end + 1) : content;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(jsonSlice);
+        } catch {
+          parsed = null;
         }
-        
-        return content;
+
+        if (Array.isArray(parsed)) {
+          return parsed.map((x) => String(x)).filter(Boolean);
+        }
+
+        // Fallback: split lines and strip numbering/bullets.
+        return content
+          .split("\n")
+          .map((line) => line.replace(/^\s*[-*]\s+/, "").replace(/^\s*\d+\.\s+/, "").trim())
+          .filter(Boolean);
       } finally {
         clearTimeout(timeoutId);
       }
     };
 
-    // Create an array of promises with distinct angles
-    const promises = angleHints.map((angle) => apiCall(angle));
-
-    // Await all promises to resolve
-    const rawStarters = await Promise.all(promises);
+    const rawStarters = await apiCall();
 
     // Deduplicate the starters to ensure uniqueness, as parallel calls might still yield similar results
     const seen = new Set<string>();
@@ -270,7 +394,7 @@ Rules:
       }
       seen.add(key);
       return true;
-    });
+    }).slice(0, count);
 
     console.log("Generated conversation starters:", conversationStarters);
 
@@ -295,6 +419,19 @@ Rules:
         errorMessage =
           "The request to the AI service timed out. Please try again.";
         statusCode = 504; // Gateway Timeout
+      } else if (error.message.startsWith("Invalid imageUrl")) {
+        errorMessage = error.message;
+        statusCode = 400; // Bad Request
+      } else if (error.message.includes("Timed out while downloading the story image")) {
+        errorMessage = error.message;
+        statusCode = 504; // Gateway Timeout
+      } else if (
+        error.message.startsWith("Failed to download image") ||
+        error.message.startsWith("Unsupported content-type for image") ||
+        error.message.startsWith("Image too large")
+      ) {
+        errorMessage = error.message;
+        statusCode = 502; // Bad Gateway (upstream image fetch)
       } else {
         errorMessage = error.message;
       }
