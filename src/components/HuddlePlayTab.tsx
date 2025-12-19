@@ -7,7 +7,6 @@ import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { useHuddleState } from '@/hooks/useHuddleState';
-import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
@@ -164,7 +163,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     });
     
     if (result) {
-      setGeneratedReply(sanitizeHumanReply(result.reply));
+      setGeneratedReply(result.reply);
       setSelectedTone("none");
       
       // Store the knowledge sources used for this generation
@@ -212,7 +211,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     );
     
     if (result) {
-      setGeneratedReply(sanitizeHumanReply(result.reply));
+      setGeneratedReply(result.reply);
       setSelectedTone("none");
       
       setLastUsedHuddles(result.pastHuddles || []);
@@ -236,21 +235,21 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
   const handleApplyTone = async () => {
     if (!generatedReply || selectedTone === 'none') return;
-
+    
     const adjustedReply = await adjustTone(generatedReply, selectedTone);
-    const nextReply = sanitizeHumanReply(adjustedReply ?? generatedReply);
-
-    if (nextReply !== generatedReply) {
-      setGeneratedReply(nextReply);
+    
+    if (adjustedReply && adjustedReply !== generatedReply) {
+      setGeneratedReply(adjustedReply);
+      
       if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, nextReply);
+        await updateFinalReply(currentHuddleId, adjustedReply);
       }
+      
+      toast({
+        title: "Tone adjusted!",
+        description: `Reply updated with ${selectedTone} tone and saved.`,
+      });
     }
-
-    toast({
-      title: 'Tone applied!',
-      description: `Updated reply to ${selectedTone} tone.`,
-    });
   };
 
   const handleCopyReply = async () => {

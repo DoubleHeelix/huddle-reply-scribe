@@ -611,17 +611,11 @@ Guardrails:
 - No greetings/closings unless already present. No emojis unless the user's style profile or draft uses them.
 
 Your Goal:
-- Produce the exact message the user should send in response to the conversation context.
-- Use the user's draft as the base intent and rough wording, but ensure the final message fits the conversation context.
-- Keep the user’s intent and voice; do not introduce new claims or details.
-- If the user's draft contradicts the conversation context, prioritize replying appropriately to the conversation context while preserving the user's intent.
+- Refine the user’s draft so it’s clearer, more engaging, and more effective—without changing their original intent or voice.
 
 Style Guidance (Very Important):
 - Match the user's tone, phrasing, and personality using their style profile below.
-- Prefer the user's typical phrases (bigrams/trigrams) only when they fit naturally; never force them or overuse them. If they feel awkward, omit them.
-- If phrases are provided, use at most 1-2 total across the whole reply.
-- Do not repeat any exact phrase from the style profile unless it appears verbatim in the user's draft. You may borrow cadence and wording patterns without copying exact phrases.
-- Avoid generic corporate/LinkedIn-speak (e.g., "circle back", "touch base", "leverage") unless the user's draft uses it.
+- Prefer the user's typical phrases (bigrams/trigrams) when they fit naturally; do not force or overuse them. If they feel awkward, omit them.
 
 Context Tools:
 1) Style Profile:
@@ -642,22 +636,19 @@ Context Tools:
 Output Rules:
 - 2–4 sentences max. Only return the final, refined message—no commentary, no quotation marks.
 - The result should feel organic and human, not over-engineered.
-- Prioritize clarity, connection, and authenticity.
-- Plain text only: no markdown, no bullet points, no arrows, no checkmarks, no unusual symbols, no fancy quotes/dashes. Use simple ASCII punctuation.
-- Never use numbered lists or bullet formatting in the output, even if asked.`;
+- Prioritize clarity, connection, and authenticity.`;
 
-      const userPrompt = `Conversation context (message you're replying to):
----
+      const userPrompt = `Conversation context:
+\`\`\`
 ${screenshotText}
----
+\`\`\`
 
-User's draft message (intent + rough wording):
----
+User's draft message:
+\`\`\`
 ${userDraft}
----
+\`\`\`
 
-Task:
-Rewrite the user's draft into the final message they should send, grounded in the conversation context. Improve clarity and flow without inventing missing details.`;
+Refine this draft to make it better without inventing missing details.`;
 
       console.log("🤖 DEBUG: Sending request to OpenAI with context lengths:", {
         systemPromptLength: systemPrompt.length,
@@ -1048,7 +1039,7 @@ Rewrite the user's draft into the final message they should send, grounded in th
         messages: [
           {
             role: "system",
-            content: `${instruction}. Keep the core message and meaning intact; only adjust tone and phrasing. Plain text only (no markdown, no bullets, no arrows, no unusual symbols). Use simple ASCII punctuation and keep the message length similar. Respond with only the adjusted message, no explanations.`,
+            content: `${instruction}. Keep the core message and meaning intact, just adjust the tone. Respond with only the adjusted message, no explanations.`,
           },
           {
             role: "user",
