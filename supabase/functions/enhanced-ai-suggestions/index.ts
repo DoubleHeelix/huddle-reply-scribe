@@ -172,6 +172,28 @@ function topItems(map: Map<string, number>, limit: number): string[] {
     .map(([key]) => key);
 }
 
+// Remove control characters and odd symbols that occasionally appear in model output.
+function sanitizeReply(
+  text: string,
+  options: { trim?: boolean } = {}
+): string {
+  if (!text) return "";
+  let cleaned = text
+    // Strip control characters
+    .replace(/[\u0000-\u001F\u007F-\u009F]+/g, "")
+    // Keep letters, numbers, punctuation, spaces, line breaks, and emoji; drop other symbols
+    .replace(
+      /[^\p{L}\p{N}\p{P}\p{Zs}\n\r\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
+      ""
+    )
+    // Normalize runs of spaces/tabs
+    .replace(/[ \t]+/g, " ")
+    // Limit excessive blank lines
+    .replace(/\n{3,}/g, "\n\n");
+
+  return options.trim ? cleaned.trim() : cleaned;
+}
+
 function computeStyleFingerprint(drafts: string[]): StyleFingerprint {
   let emojiTotal = 0;
   let messagesWithEmoji = 0;
@@ -762,8 +784,10 @@ Refine this draft to make it better without inventing missing details.`;
                 const parsed = JSON.parse(payloadText);
                 const delta = parsed.choices?.[0]?.delta?.content;
                 if (delta) {
-                  fullReply += delta;
-                  controller.enqueue(encoder.encode(JSON.stringify({ type: "token", text: delta }) + "\n"));
+                  const cleanedDelta = sanitizeReply(delta);
+                  if (!cleanedDelta) continue;
+                  fullReply += cleanedDelta;
+                  controller.enqueue(encoder.encode(JSON.stringify({ type: "token", text: cleanedDelta }) + "\n"));
                 }
               } catch (err) {
                 console.error("❌ DEBUG: Error parsing OpenAI stream chunk:", err, payloadText);
@@ -811,11 +835,12 @@ Refine this draft to make it better without inventing missing details.`;
           }
 
           console.log("💾 DEBUG: Storing huddle with shared embedding.");
+          const cleanedReplyForStorage = sanitizeReply(fullReply, { trim: true });
           const huddleToInsert = {
             user_id: userId,
             screenshot_text: screenshotText,
             user_draft: userDraft,
-            generated_reply: fullReply,
+            generated_reply: cleanedReplyForStorage,
             principles: principles || "",
             embedding,
           };
@@ -1063,7 +1088,10 @@ Refine this draft to make it better without inventing missing details.`;
       });
 
       const data = await response.json();
-      const adjustedReply = extractMessageContent(data.choices?.[0]) || originalReply;
+      const adjustedReply = sanitizeReply(
+        extractMessageContent(data.choices?.[0]) || originalReply,
+        { trim: true }
+      );
 
       return new Response(JSON.stringify({ reply: adjustedReply }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
