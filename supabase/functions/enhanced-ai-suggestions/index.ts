@@ -339,6 +339,26 @@ function extractMessageContent(choice: { message?: { content?: unknown } } | nul
   return "";
 }
 
+// Some OpenAI streaming models send delta content as an array of text chunks.
+function extractDeltaText(delta: unknown): string {
+  if (!delta) return "";
+  if (typeof delta === "string") return delta;
+  if (Array.isArray(delta)) {
+    return delta
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object" && "text" in part) {
+          const maybeText = (part as { text?: string }).text;
+          if (typeof maybeText === "string") return maybeText;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("");
+  }
+  return "";
+}
+
 interface RequestBody {
   action:
     | "generateReply"
@@ -782,7 +802,8 @@ Refine this draft to make it better without inventing missing details.`;
               const payloadText = trimmed.startsWith("data:") ? trimmed.replace(/^data:\s*/, "") : trimmed;
               try {
                 const parsed = JSON.parse(payloadText);
-                const delta = parsed.choices?.[0]?.delta?.content;
+                const deltaRaw = parsed.choices?.[0]?.delta?.content;
+                const delta = extractDeltaText(deltaRaw);
                 if (delta) {
                   const cleanedDelta = sanitizeReply(delta);
                   if (!cleanedDelta) continue;

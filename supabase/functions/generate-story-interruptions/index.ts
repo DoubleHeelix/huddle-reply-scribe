@@ -1,6 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -10,12 +9,37 @@ const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const allowedOrigins = [
   "http://localhost:8080",
   "https://localhost:8080",
+  "http://localhost:8081",
+  "https://localhost:8081",
   "https://huddle-reply-scribe-production.up.railway.app",
   // Add your mobile device's local IP if needed, e.g., 'http://192.168.1.100:8080'
 ];
 
 const OPENAI_IMAGE_FETCH_TIMEOUT_MS = 15_000;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+const BASE64_CHUNK_SIZE = 0x8000; // avoid stack overflows when encoding
+
+function extractMessageText(content: unknown): string {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const maybeText =
+            (part as { text?: string }).text ??
+            (part as { content?: string }).content;
+          if (typeof maybeText === "string") return maybeText;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+  }
+  return "";
+}
 
 async function fetchImageAsDataUrl(imageUrl: string): Promise<string> {
   let parsed: URL;
@@ -73,7 +97,13 @@ async function fetchImageAsDataUrl(imageUrl: string): Promise<string> {
       throw new Error(`Image too large (${bytes.byteLength} bytes).`);
     }
 
-    return `data:${contentType};base64,${encodeBase64(bytes)}`;
+    let binary = "";
+    // Build the binary string in chunks so we don't blow the argument limit for fromCharCode.
+    for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
+    }
+
+    return `data:${contentType};base64,${btoa(binary)}`;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("Timed out while downloading the story image.");
@@ -312,7 +342,8 @@ Rules:
       return messages;
     };
 
-    console.log(`Calling OpenAI API once with model gpt-5-mini (count=${count})...`);
+    const chatModel = "gpt-4o-mini";
+    console.log(`Calling OpenAI API once with model ${chatModel} (count=${count})...`);
 
     const apiCall = async () => {
       const controller = new AbortController();
@@ -321,7 +352,6 @@ Rules:
       try {
         // Note: Some newer models (e.g. gpt-5-*) only support default sampling params.
         // Avoid sending non-default temperature/penalties to prevent 400s.
-        const chatModel = "gpt-5-mini";
         const requestBody: Record<string, unknown> = {
           model: chatModel,
           messages: buildMessages(),
@@ -353,7 +383,8 @@ Rules:
         }
 
         const data = await response.json();
-        const content = String(data?.choices?.[0]?.message?.content || "").trim();
+        const content = extractMessageText(data?.choices?.[0]?.message?.content);
+        console.log("OpenAI content raw (truncated):", content.slice(0, 400));
 
         // Expect JSON array. If the model includes extra text, try to extract the first JSON array.
         const start = content.indexOf("[");
@@ -368,7 +399,12 @@ Rules:
         }
 
         if (Array.isArray(parsed)) {
-          return parsed.map((x) => String(x)).filter(Boolean);
+          const parsedClean = parsed.map((x) => String(x)).filter(Boolean);
+          if (parsedClean.length === 0) {
+            console.warn("Parsed JSON array was empty; falling back to line parsing.");
+          } else {
+            return parsedClean;
+          }
         }
 
         // Fallback: split lines and strip numbering/bullets.
@@ -396,11 +432,32 @@ Rules:
       return true;
     }).slice(0, count);
 
-    console.log("Generated conversation starters:", conversationStarters);
+    let finalStarters = conversationStarters;
+
+    if (finalStarters.length === 0) {
+      console.warn("No conversation starters parsed; using safe fallbacks.");
+      const fallbackTopic = (storyText || "").trim();
+      const fallbackAnchor =
+        fallbackTopic &&
+        !/no text detected/i.test(fallbackTopic) &&
+        !/text extracted/i.test(fallbackTopic)
+          ? fallbackTopic.slice(0, 80)
+          : "";
+      finalStarters = [
+        `Looks great—what was happening here?`,
+        `This caught my eye. Where is this?`,
+        `Love the vibe—what's the story behind it?`,
+      ];
+      if (fallbackAnchor) {
+        finalStarters[0] = `This about "${fallbackAnchor}" is cool—what's the backstory?`;
+      }
+    }
+
+    console.log("Generated conversation starters:", finalStarters);
 
     return new Response(
       JSON.stringify({
-        conversationStarters,
+        conversationStarters: finalStarters,
         promptVersion: systemPrompt.version,
         stylePath: systemPrompt.stylePath,
       }),
