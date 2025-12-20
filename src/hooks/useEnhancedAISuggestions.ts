@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
+import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
 import type { DocumentKnowledge } from '@/types/document';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
 
@@ -132,6 +133,25 @@ export const useEnhancedAISuggestions = () => {
         documentKnowledgeCount: documentKnowledgeUsed.length
       });
 
+      // If the model returned nothing, provide a safe fallback so the UI is never blank.
+      const getFallbackReply = () => {
+        const cleanedDraft = sanitizeHumanReply(userDraft || "");
+        if (cleanedDraft) {
+          return `Here’s a tightened version of what you shared: ${cleanedDraft}`;
+        }
+        return "I couldn't craft that one just now—try Generate again.";
+      };
+
+      if (!reply.trim()) {
+        const fallback = getFallbackReply();
+        if (onToken) onToken(fallback);
+        return {
+          reply: fallback,
+          pastHuddles,
+          documentKnowledge: documentKnowledgeUsed
+        };
+      }
+
       // Ensure UI sees the final reply even if no tokens were streamed.
       if (reply && onToken) onToken(reply);
 
@@ -141,10 +161,17 @@ export const useEnhancedAISuggestions = () => {
         documentKnowledge: documentKnowledgeUsed
       };
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate reply';
-      setError(errorMessage);
       console.error('❌ DEBUG: Enhanced AI error:', err);
-      return null;
+      const fallback = sanitizeHumanReply(userDraft || "");
+      const safeReply = fallback
+        ? `Here’s a tightened version of what you shared: ${fallback}`
+        : "I couldn't craft that one just now—try Generate again.";
+      if (onToken) onToken(safeReply);
+      return {
+        reply: safeReply,
+        pastHuddles: [],
+        documentKnowledge: [],
+      };
     } finally {
       setIsGenerating(false);
     }

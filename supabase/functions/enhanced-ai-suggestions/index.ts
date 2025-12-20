@@ -772,6 +772,8 @@ Refine this draft to make it better without inventing missing details.`;
         rejectStreamComplete = reject;
       });
 
+      let fallbackEnsured = false;
+
       const stream = new ReadableStream({
         start(controller) {
           // send meta first
@@ -780,7 +782,23 @@ Refine this draft to make it better without inventing missing details.`;
           const reader = openAIResponse.body!.getReader();
           let buffer = "";
 
+          const ensureFallback = () => {
+            if (fallbackEnsured) return;
+            if (!fullReply.trim()) {
+              const fallback = sanitizeReply(
+                `Here’s a concise version of your draft: ${userDraft || "Thanks for sharing."}`,
+                { trim: true }
+              );
+              fullReply = fallback;
+              controller.enqueue(
+                encoder.encode(JSON.stringify({ type: "token", text: fallback }) + "\n")
+              );
+            }
+            fallbackEnsured = true;
+          };
+
           const pushDone = () => {
+            ensureFallback();
             controller.enqueue(encoder.encode(JSON.stringify({ type: "done" }) + "\n"));
             controller.close();
             resolveStreamComplete?.();

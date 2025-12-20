@@ -133,8 +133,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
   const handleGenerateReply = async () => {
     console.log('Generate reply clicked. Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
-    setGeneratedReply("");
-    
+
     if (!userDraft.trim()) {
       toast({
         title: "Draft required",
