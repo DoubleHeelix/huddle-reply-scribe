@@ -48,6 +48,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     setAutoCroppingEnabled,
   } = huddleState;
   const [copiedFeedback, setCopiedFeedback] = useState(false);
+  const [forceShowReplySection, setForceShowReplySection] = useState(false);
 
   // Restore draft from localStorage on mount
   useEffect(() => {
@@ -68,6 +69,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     const file = event.target.files?.[0];
     if (file) {
       // Reset the state for a new huddle before processing the new image
+      setForceShowReplySection(false);
       resetHuddle();
 
       const reader = new FileReader();
@@ -150,14 +152,12 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       });
       return;
     }
+
+    // Ensure Step 3 is shown as soon as generation starts.
+    setForceShowReplySection(true);
+    scrollToReplySection();
     
     const screenshotText = getScreenshotText();
-
-    // Scroll to Step 3 immediately on click so the user sees the output area.
-    const replySection = document.querySelector('[data-section="generated-reply"]');
-    if (replySection) {
-      replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
     
     const result = await generateReply(screenshotText, userDraft, false, [], [], (partial) => {
       setGeneratedReply(sanitizeHumanReply(partial));
@@ -185,18 +185,13 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         description: `Your optimized response is ready. Used ${huddleCount} past huddles and ${documentCount} documents.`,
       });
 
-      // Auto-scroll to generated reply section
-      setTimeout(() => {
-        const replySection = document.querySelector('[data-section="generated-reply"]');
-        if (replySection) {
-          replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 500);
     }
   };
 
   const handleRegenerate = async () => {
     if (!userDraft.trim() || !uploadedImage) return;
+    setForceShowReplySection(true);
+    scrollToReplySection();
     
     const screenshotText = getScreenshotText();
     const result = await generateReply(
@@ -295,45 +290,27 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     return () => window.removeEventListener('keydown', handleShortcut);
   }, [handleShortcut]);
 
-  const overlayMessage = isOCRProcessing
-    ? "The assistant is reading your screenshot text..."
-    : isGenerating
-    ? "The assistant is crafting your perfect reply..."
-    : isAdjustingTone
-    ? "The assistant is polishing your tone..."
-    : null;
+  const handleResetHuddle = () => {
+    setForceShowReplySection(false);
+    resetHuddle();
+  };
 
-  const progressActive = Boolean(overlayMessage);
-  // Hide inline loaders whenever the overlay is active to prevent duplicate spinners underneath.
-  const showGenerationLoader = isGenerating && !progressActive;
+  const scrollToReplySection = () => {
+    requestAnimationFrame(() => {
+      const replySection = document.querySelector('[data-section="generated-reply"]');
+      if (replySection) {
+        replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  };
+
+  // Keep inline loaders visible during generation/tone adjustment; no overlay needed.
+  const showGenerationLoader = isGenerating;
 
   const hasScreenshot = Boolean(uploadedImage);
 
   return (
     <div className="space-y-6 relative">
-      <AnimatePresence>
-        {progressActive && (
-          <motion.div
-            key="progress-overlay"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            <motion.div
-              className="rounded-xl border border-white/10 bg-slate-900/95 px-5 py-4 shadow-2xl shadow-black/50 text-sm text-slate-100"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              {overlayMessage}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <ImageUploadSection
         uploadedImage={uploadedImage}
         isOCRProcessing={isOCRProcessing}
@@ -371,27 +348,18 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
             {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
           </Button>
 
-          {/* Loading state for AI generation */}
-          {showGenerationLoader && (
-            <div className="text-center py-8">
-              <div className="inline-flex items-center gap-2 text-purple-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-                <span className="font-sans">AI is crafting your perfect reply...</span>
-              </div>
-            </div>
-          )}
-
           <GeneratedReplySection
             generatedReply={generatedReply}
             selectedTone={selectedTone}
             isGenerating={isGenerating}
             isAdjustingTone={isAdjustingTone}
             showInlineLoader={showGenerationLoader}
+            forceShow={forceShowReplySection}
             onToneChange={setSelectedTone}
             onApplyTone={handleApplyTone}
             onCopyReply={handleCopyReply}
             onRegenerate={handleRegenerate}
-            onReset={resetHuddle}
+            onReset={handleResetHuddle}
             copiedFeedback={copiedFeedback}
           />
 

@@ -110,11 +110,30 @@ export const useEnhancedAISuggestions = () => {
         }
       }
 
+      // Process any trailing buffer content that wasn't newline-terminated.
+      if (buffer.trim()) {
+        try {
+          const payload = JSON.parse(buffer);
+          if (payload.type === 'meta') {
+            pastHuddles = isRegeneration ? existingPastHuddles : (payload.pastHuddles || []);
+            documentKnowledgeUsed = payload.documentKnowledge || documentKnowledge;
+          } else if (payload.type === 'token') {
+            reply += payload.text || '';
+            if (onToken) onToken(reply);
+          }
+        } catch (err) {
+          console.error('❌ DEBUG: Error parsing trailing stream payload:', err, buffer);
+        }
+      }
+
       console.log('✅ DEBUG: AI Function stream complete:', {
         replyLength: reply.length,
         pastHuddlesCount: pastHuddles.length,
         documentKnowledgeCount: documentKnowledgeUsed.length
       });
+
+      // Ensure UI sees the final reply even if no tokens were streamed.
+      if (reply && onToken) onToken(reply);
 
       return {
         reply,
