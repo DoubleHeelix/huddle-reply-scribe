@@ -48,6 +48,36 @@ export type Database = {
         }
         Relationships: []
       }
+      huddle_person_overrides: {
+        Row: {
+          created_at: string
+          huddle_play_id: string
+          id: string
+          override: string
+          raw_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          huddle_play_id: string
+          id?: string
+          override: string
+          raw_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          huddle_play_id?: string
+          id?: string
+          override?: string
+          raw_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       huddle_plays: {
         Row: {
           created_at: string

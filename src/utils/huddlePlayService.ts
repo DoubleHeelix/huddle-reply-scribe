@@ -5,6 +5,7 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 export type HuddlePlay = Tables<'huddle_plays'>;
 export type HuddlePlayInsert = TablesInsert<'huddle_plays'>;
 type PeopleOverrideInsert = TablesInsert<'people_overrides'>;
+type HuddlePersonOverrideInsert = TablesInsert<'huddle_person_overrides'>;
 
 export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id'>): Promise<HuddlePlay | null> => {
   try {
@@ -135,6 +136,87 @@ export const savePeopleOverrides = async (
     return true;
   } catch (error) {
     console.error('Error in savePeopleOverrides:', error);
+    return false;
+  }
+};
+
+export const getHuddlePersonOverrides = async (): Promise<Record<string, string>> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return {};
+
+    const { data, error } = await supabase
+      .from('huddle_person_overrides')
+      .select('huddle_play_id, override')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error fetching huddle person overrides:', error);
+      return {};
+    }
+
+    return (data || []).reduce<Record<string, string>>((acc, row) => {
+      acc[row.huddle_play_id] = row.override;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error('Error in getHuddlePersonOverrides:', error);
+    return {};
+  }
+};
+
+export const saveHuddlePersonOverride = async (
+  huddlePlayId: string,
+  override: string,
+  rawName?: string
+): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const payload: HuddlePersonOverrideInsert = {
+      user_id: user.id,
+      huddle_play_id: huddlePlayId,
+      override,
+      raw_name: rawName ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('huddle_person_overrides')
+      .upsert(payload, { onConflict: 'user_id,huddle_play_id' });
+
+    if (error) {
+      console.error('Error saving huddle person override:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in saveHuddlePersonOverride:', error);
+    return false;
+  }
+};
+
+export const clearHuddlePersonOverride = async (huddlePlayId: string): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('huddle_person_overrides')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('huddle_play_id', huddlePlayId);
+
+    if (error) {
+      console.error('Error clearing huddle person override:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in clearHuddlePersonOverride:', error);
     return false;
   }
 };
