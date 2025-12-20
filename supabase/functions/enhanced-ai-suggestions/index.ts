@@ -786,7 +786,7 @@ Refine this draft to make it better without inventing missing details.`;
             if (fallbackEnsured) return;
             if (!fullReply.trim()) {
               const fallback = sanitizeReply(
-                `Here’s a concise version of your draft: ${userDraft || "Thanks for sharing."}`,
+                `Generation did not work, please click Regenerate."}`,
                 { trim: true }
               );
               fullReply = fallback;
