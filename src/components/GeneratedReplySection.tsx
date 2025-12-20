@@ -18,6 +18,7 @@ interface GeneratedReplySectionProps {
   onRegenerate: () => void;
   onReset: () => void;
   copiedFeedback?: boolean;
+  forceShow?: boolean;
 }
 
 export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
@@ -31,13 +32,14 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
   onCopyReply,
   onRegenerate,
   onReset,
-  copiedFeedback
+  copiedFeedback,
+  forceShow = false
 }) => {
   const displayedReply = useTypingEffect(generatedReply, 20);
   const showGenerationLoader = showInlineLoader && isGenerating && !isAdjustingTone;
 
   // Keep the section visible while generating or adjusting, even before text arrives.
-  if (!generatedReply && !isGenerating && !isAdjustingTone) return null;
+  if (!forceShow && !generatedReply && !isGenerating && !isAdjustingTone) return null;
 
   return (
     <Card className="bg-white dark:bg-slate-900/70 border border-gray-200 dark:border-white/5 rounded-2xl shadow-sm dark:shadow-none glass-surface" data-section="generated-reply">
@@ -63,7 +65,7 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
 
         {showGenerationLoader && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-slate-300">
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-300 text-center">
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400" />
               <span>AI is shaping the perfect reply...</span>
             </div>
