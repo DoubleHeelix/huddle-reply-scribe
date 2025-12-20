@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,76 @@ import { useToast } from '@/hooks/use-toast';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
 
 type Fingerprint = Record<string, unknown> | null;
+
+type StyleFingerprintDetails = {
+  emoji_rate_per_message?: number;
+  emoji_message_share?: number;
+  exclamation_per_sentence?: number;
+  question_per_sentence?: number;
+  uppercase_word_ratio?: number;
+  typical_word_count?: number;
+  typical_char_count?: number;
+  slang_examples?: string[];
+  greetings?: string[];
+  closings?: string[];
+};
+
+type AnalysisResult = {
+  huddle_count?: number;
+  common_topics?: string[];
+  common_phrases?: { bigrams?: string[]; trigrams?: string[] };
+  style_fingerprint?: StyleFingerprintDetails;
+};
+
+const capitalizeWord = (input?: string) => {
+  if (!input) return '';
+  return input.charAt(0).toUpperCase() + input.slice(1);
+};
+
+const diffList = (initial: string[], current: string[]) => {
+  const initialClean = initial.map((v) => v.trim()).filter(Boolean);
+  const currentClean = current.map((v) => v.trim()).filter(Boolean);
+  return {
+    added: currentClean.filter((item) => !initialClean.includes(item)),
+    removed: initialClean.filter((item) => !currentClean.includes(item)),
+    kept: currentClean.filter((item) => initialClean.includes(item)),
+  };
+};
+
+const pickFromList = (list: string[] | undefined, seed: number, fallback = '') => {
+  if (!list || list.length === 0) return fallback;
+  const index = Math.abs(seed) % list.length;
+  return list[index];
+};
+
+const buildStylePreview = ({
+  topics,
+  bigrams,
+  trigrams,
+  fingerprint,
+  seed,
+}: {
+  topics: string[];
+  bigrams: string[];
+  trigrams: string[];
+  fingerprint?: StyleFingerprintDetails;
+  seed: number;
+}) => {
+  const safeSeed = seed || Date.now();
+  const topic = pickFromList(topics, safeSeed, 'your update');
+  const phrase = pickFromList([...trigrams, ...bigrams], safeSeed + 1, '');
+  const greeting = capitalizeWord(pickFromList(fingerprint?.greetings, safeSeed + 2, ''));
+  const closing = capitalizeWord(pickFromList(fingerprint?.closings, safeSeed + 3, ''));
+  const emojiLikely =
+    (fingerprint?.emoji_rate_per_message ?? 0) > 0.2 ||
+    (fingerprint?.emoji_message_share ?? 0) > 0.3;
+  const emoji = emojiLikely ? ' 😊' : '';
+  const punctuationLean = (fingerprint?.exclamation_per_sentence ?? 0) > 0.6 ? '!' : '.';
+  const cadence = phrase ? `Quick note on ${topic}: ${phrase}${punctuationLean}` : `Quick note on ${topic}${punctuationLean}`;
+  const closingLine = closing ? ` ${closing}.` : '';
+  const greetLine = greeting ? `${greeting}, ` : '';
+  return `${greetLine}${cadence}${emoji}${closingLine}`.trim();
+};
 
 const formatFingerprintValue = (
   analysisResult: Fingerprint,
@@ -124,12 +194,16 @@ export const PastHuddlesTab = () => {
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
   const [editableKeywords, setEditableKeywords] = useState<string[]>([]);
+  const [initialKeywords, setInitialKeywords] = useState<string[]>([]);
   // NEW: editable bigrams/trigrams state
   const [editableBigrams, setEditableBigrams] = useState<string[]>([]);
   const [editableTrigrams, setEditableTrigrams] = useState<string[]>([]);
+  const [initialBigrams, setInitialBigrams] = useState<string[]>([]);
+  const [initialTrigrams, setInitialTrigrams] = useState<string[]>([]);
   // NEW: local inputs to add phrases
   const [newBigram, setNewBigram] = useState("");
   const [newTrigram, setNewTrigram] = useState("");
+  const [previewSeed, setPreviewSeed] = useState<number>(Date.now());
   const [isConfirmingAnalysis, setIsConfirmingAnalysis] = useState(false);
   const { toast } = useToast();
 
@@ -147,11 +221,15 @@ export const PastHuddlesTab = () => {
 
       setAnalysisResult(data);
       setEditableKeywords(data.common_topics || []);
+      setInitialKeywords(data.common_topics || []);
       // Initialize editable phrases from analysis
       const bi = data?.common_phrases?.bigrams ?? [];
       const tri = data?.common_phrases?.trigrams ?? [];
       setEditableBigrams(bi);
       setEditableTrigrams(tri);
+      setInitialBigrams(bi);
+      setInitialTrigrams(tri);
+      setPreviewSeed(Date.now());
       setIsConfirmingAnalysis(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to analyze style';
@@ -167,14 +245,22 @@ export const PastHuddlesTab = () => {
 
   const handleConfirmAnalysis = async () => {
     if (!analysisResult) return;
+    if (!hasMinimumData) {
+      toast({
+        title: 'Add a bit more signal',
+        description: 'Add at least 3 topics or 2 phrases before saving your style.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const updatedAnalysisData = {
       ...analysisResult,
-      common_topics: editableKeywords,
+      common_topics: topicsClean,
       // NEW: persist edited phrases
       common_phrases: {
-        bigrams: editableBigrams.filter(Boolean),
-        trigrams: editableTrigrams.filter(Boolean),
+        bigrams: bigramsClean,
+        trigrams: trigramsClean,
       },
     };
 
@@ -211,8 +297,12 @@ export const PastHuddlesTab = () => {
       setEditableKeywords([]);
       setEditableBigrams([]);
       setEditableTrigrams([]);
+      setInitialKeywords([]);
+      setInitialBigrams([]);
+      setInitialTrigrams([]);
       setNewBigram("");
       setNewTrigram("");
+      setPreviewSeed(Date.now());
     }
   };
 
@@ -257,6 +347,15 @@ export const PastHuddlesTab = () => {
     if (!v) return;
     setEditableTrigrams((prev) => Array.from(new Set([...prev, v])));
     setNewTrigram("");
+  };
+
+  const resetEditsToDetected = () => {
+    setEditableKeywords(initialKeywords);
+    setEditableBigrams(initialBigrams);
+    setEditableTrigrams(initialTrigrams);
+    setNewBigram("");
+    setNewTrigram("");
+    setPreviewSeed(Date.now());
   };
 
   const handleSearch = async () => {
@@ -339,6 +438,39 @@ export const PastHuddlesTab = () => {
       </CardContent>
     </Card>
   );
+
+  const analysisData = (analysisResult || {}) as AnalysisResult;
+  const topicsClean = editableKeywords.map((v) => v.trim()).filter(Boolean);
+  const bigramsClean = editableBigrams.map((v) => v.trim()).filter(Boolean);
+  const trigramsClean = editableTrigrams.map((v) => v.trim()).filter(Boolean);
+  const phraseTotal = bigramsClean.length + trigramsClean.length;
+
+  const topicDiff = useMemo(
+    () => diffList(initialKeywords, editableKeywords),
+    [editableKeywords, initialKeywords]
+  );
+  const phraseDiff = useMemo(
+    () => diffList([...initialBigrams, ...initialTrigrams], [...editableBigrams, ...editableTrigrams]),
+    [editableBigrams, editableTrigrams, initialBigrams, initialTrigrams]
+  );
+
+  const hasMinimumData = topicsClean.length >= 3 || phraseTotal >= 2;
+  const readinessLabel = hasMinimumData
+    ? 'Ready to apply'
+    : 'Add at least 3 topics or 2 phrases to strengthen your profile';
+  const previewText = useMemo(
+    () =>
+      buildStylePreview({
+        topics: topicsClean,
+        bigrams: bigramsClean,
+        trigrams: trigramsClean,
+        fingerprint: analysisData.style_fingerprint,
+        seed: previewSeed,
+      }),
+    [analysisData.style_fingerprint, bigramsClean, previewSeed, topicsClean, trigramsClean]
+  );
+  const addedCount = topicDiff.added.length + phraseDiff.added.length;
+  const removedCount = topicDiff.removed.length + phraseDiff.removed.length;
 
   if (isLoading) {
     return (
@@ -429,29 +561,139 @@ export const PastHuddlesTab = () => {
             <AlertDialogHeader className="p-0 m-0">
               <AlertDialogTitle className="text-xl sm:text-2xl font-bold text-white">Confirm Your Style Profile</AlertDialogTitle>
               <AlertDialogDescription className="text-sm sm:text-base text-gray-400 mt-1">
-                We've analyzed your past huddles and identified common topics and phrases. Review and edit them before saving to refine your personalized style profile.
+                We use this profile to draft replies that sound like you. Review what is changing, preview it, then apply.
               </AlertDialogDescription>
             </AlertDialogHeader>
           </div>
           {/* Scrollable body — flex-1 ensures it fills between sticky header and sticky footer */}
           <div className="px-4 py-4 sm:p-8 overflow-y-auto flex-1 custom-scrollbar">
             <div className="mb-6 rounded-2xl bg-gradient-to-r from-[#5b6bfa]/15 via-[#9c6bfa]/15 to-[#5b6bfa]/10 border border-[#1f2330] px-4 py-4 sm:px-6 sm:py-5 shadow-lg">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.15em] text-gray-400 font-semibold">Review your style</p>
-                  <p className="text-white text-lg font-semibold">Edit topics, phrases, and cadence before saving.</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.15em] text-gray-300 font-semibold">Review your style</p>
+                    <p className="text-white text-lg font-semibold">We will apply these signals to every draft. Adjust or reset before saving.</p>
+                  </div>
+                  <div className="flex gap-3 text-sm text-gray-100 flex-wrap">
+                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                      {topicsClean.length || 0} topics
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                      {analysisData.huddle_count ?? '—'} drafts scanned
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                      {phraseTotal} phrases
+                    </span>
+                  </div>
                 </div>
-                <div className="flex gap-3 text-sm text-gray-300 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                    {editableKeywords.length || 0} topics
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                    {(analysisResult as { huddle_count?: number })?.huddle_count || '—'} drafts scanned
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                    {(analysisResult as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })?.common_phrases?.bigrams?.length || 0} bigrams • {(analysisResult as { common_phrases?: { bigrams?: string[]; trigrams?: string[] } })?.common_phrases?.trigrams?.length || 0} trigrams
-                  </span>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-gray-300 font-semibold">Why it matters</p>
+                    <p className="text-sm text-gray-100 mt-1">We use this profile to keep replies sounding like you.</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-gray-300 font-semibold">Detected signals</p>
+                    <p className="text-sm text-white mt-1">{analysisData.huddle_count ?? '—'} drafts • {topicsClean.length} topics • {phraseTotal} phrases</p>
+                    <p className="text-xs text-gray-200 mt-1">Changes: +{addedCount} / -{removedCount}</p>
+                  </div>
+                  <div className={`${hasMinimumData ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-amber-500/10 border-amber-500/30'} rounded-xl p-3 border`}>
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-gray-200 font-semibold">Readiness</p>
+                    <p className={`${hasMinimumData ? 'text-emerald-100' : 'text-amber-100'} text-sm font-semibold mt-1`}>{readinessLabel}</p>
+                    <p className="text-xs text-gray-100 mt-1">Use preview below, then save with one tap.</p>
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2 mb-6">
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h4 className="text-gray-100 text-lg font-semibold font-sans">What's changing</h4>
+                    <p className="text-sm text-gray-400">See the deltas before you save. Added items are highlighted.</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-700 text-gray-200 hover:bg-gray-800"
+                    onClick={resetEditsToDetected}
+                  >
+                    Reset to detected
+                  </Button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-[#131824] border border-[#1f2330] p-3">
+                    <p className="text-xs uppercase tracking-[0.1em] text-gray-400 mb-2">Topics</p>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {topicDiff.added.length > 0 ? (
+                          topicDiff.added.map((item, idx) => (
+                            <span key={`t-add-${idx}`} className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-200">
+                              + {item}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-500">No new topics added.</p>
+                        )}
+                      </div>
+                      {topicDiff.removed.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {topicDiff.removed.map((item, idx) => (
+                            <span key={`t-rem-${idx}`} className="px-3 py-1 text-xs rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                              - {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-[#131824] border border-[#1f2330] p-3">
+                    <p className="text-xs uppercase tracking-[0.1em] text-gray-400 mb-2">Phrases</p>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {phraseDiff.added.length > 0 ? (
+                          phraseDiff.added.map((item, idx) => (
+                            <span key={`p-add-${idx}`} className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-200">
+                              + {item}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-500">No new phrases added.</p>
+                        )}
+                      </div>
+                      {phraseDiff.removed.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {phraseDiff.removed.map((item, idx) => (
+                            <span key={`p-rem-${idx}`} className="px-3 py-1 text-xs rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                              - {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h4 className="text-gray-100 text-lg font-semibold font-sans">Preview before saving</h4>
+                    <p className="text-sm text-gray-400">See a quick sample of how your replies will read with these settings.</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-200 hover:text-white hover:bg-gray-800"
+                    onClick={() => setPreviewSeed(Date.now())}
+                  >
+                    Regenerate
+                  </Button>
+                </div>
+                <div className="bg-[#131824] border border-[#1f2330] rounded-xl p-4 text-gray-100 text-sm leading-relaxed">
+                  {previewText || 'Add a few topics or phrases to generate a preview of your style.'}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Based on {topicsClean.length} topics, {phraseTotal} phrases, and your cadence fingerprint.</p>
               </div>
             </div>
 
@@ -564,14 +806,23 @@ export const PastHuddlesTab = () => {
                   setEditableKeywords([]);
                   setEditableBigrams([]);
                   setEditableTrigrams([]);
+                  setInitialKeywords([]);
+                  setInitialBigrams([]);
+                  setInitialTrigrams([]);
                   setNewBigram("");
                   setNewTrigram("");
+                  setPreviewSeed(Date.now());
+                  setIsConfirmingAnalysis(false);
                 }}
               >
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction className="w-full sm:w-auto px-6 py-2.5 text-base rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors" onClick={handleConfirmAnalysis}>
-                Confirm & Save Style
+              <AlertDialogAction
+                className="w-full sm:w-auto px-6 py-2.5 text-base rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={handleConfirmAnalysis}
+                disabled={isAnalyzing || !hasMinimumData}
+              >
+                {hasMinimumData ? 'Use this style' : 'Add more signals to save'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </div>
