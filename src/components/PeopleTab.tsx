@@ -8,8 +8,11 @@ import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { formatDistanceToNow } from 'date-fns';
 import { extractPersonName } from '@/utils/extractPersonName';
 import {
+  clearHuddlePersonOverride,
   getPeopleOverrides,
+  getHuddlePersonOverrides,
   savePeopleOverrides,
+  saveHuddlePersonOverride,
   type HuddlePlay,
 } from '@/utils/huddlePlayService';
 
@@ -38,7 +41,9 @@ interface PersonGroup {
 export const PeopleTab = () => {
   const { huddlePlays, isLoading, error, refetch } = useHuddlePlays();
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [messageOverrides, setMessageOverrides] = useState<Record<string, string>>({});
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
+  const [messageRenameDrafts, setMessageRenameDrafts] = useState<Record<string, string>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -51,6 +56,19 @@ export const PeopleTab = () => {
         setOverrides(JSON.parse(stored));
       } catch {
         setOverrides({});
+      }
+    }
+  }, []);
+
+  // Load per-message overrides from localStorage.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('huddle_person_overrides');
+    if (stored) {
+      try {
+        setMessageOverrides(JSON.parse(stored));
+      } catch {
+        setMessageOverrides({});
       }
     }
   }, []);
@@ -74,13 +92,41 @@ export const PeopleTab = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadRemoteMessageOverrides = async () => {
+      try {
+        const remote = await getHuddlePersonOverrides();
+        if (!cancelled && remote) {
+          setMessageOverrides((prev) => ({ ...remote, ...prev }));
+        }
+      } catch (err) {
+        console.error('Error loading huddle person overrides', err);
+      }
+    };
+    loadRemoteMessageOverrides();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('people_overrides', JSON.stringify(overrides));
   }, [overrides]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('huddle_person_overrides', JSON.stringify(messageOverrides));
+  }, [messageOverrides]);
+
   const applyOverride = useCallback(
-    (rawName: string) => overrides[rawName] || rawName,
-    [overrides]
+    (rawName: string, huddleId?: string) => {
+      if (huddleId && messageOverrides[huddleId]) {
+        return messageOverrides[huddleId];
+      }
+      return overrides[rawName] || rawName;
+    },
+    [messageOverrides, overrides]
   );
 
   const saveRename = (group: PersonGroup, newNameRaw: string) => {
@@ -104,6 +150,37 @@ export const PeopleTab = () => {
     );
   };
 
+  const saveMessageRename = (huddle: HuddlePlay, newNameRaw: string) => {
+    const newName = newNameRaw.trim();
+    if (!newName) return;
+    const rawName = extractPersonName(huddle.screenshot_text);
+    setMessageOverrides((prev) => ({ ...prev, [huddle.id]: newName }));
+    setMessageRenameDrafts((prev) => {
+      const next = { ...prev };
+      delete next[huddle.id];
+      return next;
+    });
+    saveHuddlePersonOverride(huddle.id, newName, rawName).catch((err) =>
+      console.error('Error saving huddle person override', err)
+    );
+  };
+
+  const resetMessageRename = (huddleId: string) => {
+    setMessageOverrides((prev) => {
+      const next = { ...prev };
+      delete next[huddleId];
+      return next;
+    });
+    setMessageRenameDrafts((prev) => {
+      const next = { ...prev };
+      delete next[huddleId];
+      return next;
+    });
+    clearHuddlePersonOverride(huddleId).catch((err) =>
+      console.error('Error clearing huddle person override', err)
+    );
+  };
+
   const filteredPlays = useMemo(
     () => huddlePlays.filter((h) => !isWhatsAppText(h.screenshot_text)),
     [huddlePlays]
@@ -114,7 +191,7 @@ export const PeopleTab = () => {
 
     filteredPlays.forEach((huddle) => {
       const rawName = extractPersonName(huddle.screenshot_text);
-      const name = applyOverride(rawName);
+      const name = applyOverride(rawName, huddle.id);
       const existing = groups.get(name);
       const createdAt = new Date(huddle.created_at).getTime();
 
@@ -327,31 +404,85 @@ export const PeopleTab = () => {
                         new Date(b.created_at).getTime() -
                         new Date(a.created_at).getTime()
                     )
-                    .map((huddle) => (
-                      <div
-                        key={huddle.id}
-                        className="bg-gray-900/70 border border-gray-700 rounded-lg p-3 space-y-2"
-                      >
-                        <div className="flex justify-between items-start text-xs text-gray-400 font-sans">
-                          <span>{formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}</span>
-                          {huddle.selected_tone && huddle.selected_tone !== 'none' && (
-                            <Badge variant="secondary" className="font-sans capitalize">
-                              {huddle.selected_tone}
-                            </Badge>
-                          )}
+                    .map((huddle) => {
+                      const detectedName = extractPersonName(huddle.screenshot_text);
+                      const appliedName = applyOverride(detectedName, huddle.id);
+                      const messageDraft =
+                        messageRenameDrafts[huddle.id] ??
+                        messageOverrides[huddle.id] ??
+                        appliedName;
+                      const hasMessageOverride = Boolean(messageOverrides[huddle.id]);
+
+                      return (
+                        <div
+                          key={huddle.id}
+                          className="bg-gray-900/70 border border-gray-700 rounded-lg p-3 space-y-2"
+                        >
+                          <div className="flex justify-between items-start text-xs text-gray-400 font-sans">
+                            <span>{formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}</span>
+                            {huddle.selected_tone && huddle.selected_tone !== 'none' && (
+                              <Badge variant="secondary" className="font-sans capitalize">
+                                {huddle.selected_tone}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-200 font-sans line-clamp-2">
+                            {huddle.user_draft}
+                          </div>
+                          <div className="flex items-start gap-2 text-xs text-gray-400 font-sans">
+                            <MessageCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <p className="line-clamp-3">{huddle.screenshot_text}</p>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-gray-800/60 border border-gray-700/60 rounded-md p-2">
+                            <div className="text-xs text-gray-300 font-sans">
+                              Linked to <span className="text-white font-semibold">{appliedName}</span>
+                              <span className="text-gray-500 ml-2">(detected: {detectedName})</span>
+                              {hasMessageOverride && (
+                                <span className="ml-2 text-purple-300">custom</span>
+                              )}
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <Input
+                                value={messageDraft}
+                                onChange={(e) =>
+                                  setMessageRenameDrafts((prev) => ({
+                                    ...prev,
+                                    [huddle.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Link this message to a person"
+                                className="bg-gray-900 border-gray-700 text-white text-xs"
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="bg-purple-600 hover:bg-purple-700 text-white font-sans"
+                                  onClick={() => saveMessageRename(huddle, messageDraft)}
+                                >
+                                  Save
+                                </Button>
+                                {hasMessageOverride && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-gray-300 font-sans"
+                                    onClick={() => resetMessageRename(huddle.id)}
+                                  >
+                                    Reset
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-800/60 border border-gray-700/60 rounded-md p-2 text-xs text-white font-sans">
+                            {huddle.final_reply || huddle.generated_reply}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-200 font-sans line-clamp-2">
-                          {huddle.user_draft}
-                        </div>
-                        <div className="flex items-start gap-2 text-xs text-gray-400 font-sans">
-                          <MessageCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <p className="line-clamp-3">{huddle.screenshot_text}</p>
-                        </div>
-                        <div className="bg-gray-800/60 border border-gray-700/60 rounded-md p-2 text-xs text-white font-sans">
-                          {huddle.final_reply || huddle.generated_reply}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </div>
             )}
