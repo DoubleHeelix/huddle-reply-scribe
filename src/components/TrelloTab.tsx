@@ -72,12 +72,14 @@ const createEmptyBoard = (cols: { id: ColumnId }[]): BoardState => {
 export const TrelloTab = () => {
   const { huddlePlays } = useHuddlePlays();
   const [mode, setMode] = useState<Mode>("convo");
+  const [modeTransition, setModeTransition] = useState<"idle" | "to-process" | "to-convo">("idle");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [messageOverrides, setMessageOverrides] = useState<Record<string, string>>({});
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [messageRenameDrafts, setMessageRenameDrafts] = useState<Record<string, string>>({});
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<ColumnId, boolean>>({});
+  const [collapsing, setCollapsing] = useState<Record<ColumnId, boolean>>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -101,6 +103,21 @@ export const TrelloTab = () => {
     process: loadBoardForMode("process"),
   }));
 
+  const handleModeChange = useCallback(
+    (nextMode: Mode) => {
+      if (nextMode === mode) return;
+      setModeTransition(nextMode === "process" ? "to-process" : "to-convo");
+      setMode(nextMode);
+    },
+    [mode]
+  );
+
+  useEffect(() => {
+    if (modeTransition === "idle") return;
+    const timer = setTimeout(() => setModeTransition("idle"), 700);
+    return () => clearTimeout(timer);
+  }, [modeTransition]);
+
   const board = useMemo(() => {
     const base = boards[mode] ?? createEmptyBoard(columnSets[mode]);
     const filled: BoardState = { ...base };
@@ -118,6 +135,12 @@ export const TrelloTab = () => {
   );
 
   const columns = columnSets[mode];
+  const modeAnimationClass =
+    modeTransition === "to-process"
+      ? "trello-mode-to-process"
+      : modeTransition === "to-convo"
+      ? "trello-mode-to-convo"
+      : "";
   const allColumns = useMemo(() => {
     const map = new Map<ColumnId, ColumnConfig & { mode: Mode }>();
     columnSets.convo.forEach((c) => map.set(c.id, { ...c, mode: "convo" }));
@@ -366,10 +389,11 @@ export const TrelloTab = () => {
     setCollapsed((prev) => {
       const next: Record<ColumnId, boolean> = {};
       cols.forEach((col) => {
-        next[col.id] = prev[col.id] ?? false;
+        next[col.id] = prev[col.id] ?? true;
       });
       return next;
     });
+    setCollapsing({});
     setDrafts((prev) => {
       const next: Record<ColumnId, string> = {};
       cols.forEach((col) => {
@@ -384,6 +408,32 @@ export const TrelloTab = () => {
       return next;
     });
   }, [mode, persistBoards]);
+
+  const setColumnCollapsed = useCallback(
+    (columnId: ColumnId, shouldCollapse: boolean) => {
+      if (shouldCollapse) {
+        setCollapsed((prev) => ({ ...prev, [columnId]: true }));
+        setCollapsing((prev) => ({ ...prev, [columnId]: true }));
+        setTimeout(() => {
+          setCollapsing((prev) => {
+            if (!prev[columnId]) return prev;
+            const next = { ...prev };
+            delete next[columnId];
+            setCollapsed((prevCollapsed) => ({ ...prevCollapsed, [columnId]: true }));
+            return next;
+          });
+        }, 380);
+      } else {
+        setCollapsed((prev) => ({ ...prev, [columnId]: false }));
+        setCollapsing((prev) => {
+          const next = { ...prev };
+          delete next[columnId];
+          return next;
+        });
+      }
+    },
+    []
+  );
 
   const addName = (column: ColumnId) => {
     const value = (drafts[column] || "").trim();
@@ -543,10 +593,6 @@ export const TrelloTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-full bg-slate-800/70 px-3 py-1 text-xs text-slate-200">
-        <Columns3 className="h-4 w-4 text-cyan-300" />
-        Trello-style board for quick sorting
-      </div>
 
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
@@ -576,14 +622,14 @@ export const TrelloTab = () => {
       <div className="flex justify-center gap-3 pt-2">
         <Button
                   variant={mode === "convo" ? "default" : "outline"}
-                  onClick={() => setMode("convo")}
+                  onClick={() => handleModeChange("convo")}
                   className={mode === "convo" ? "bg-cyan-600 text-white" : "border-slate-700 bg-slate-900 text-slate-200"}
                 >
                   Convo
         </Button>
         <Button
           variant={mode === "process" ? "default" : "outline"}
-          onClick={() => setMode("process")}
+          onClick={() => handleModeChange("process")}
                   className={mode === "process" ? "bg-cyan-600 text-white" : "border-slate-700 bg-slate-900 text-slate-200"}
                 >
                   Process
@@ -599,9 +645,11 @@ export const TrelloTab = () => {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 ${modeAnimationClass}`}>
         {columns.map((column) => {
           const isCollapsed = collapsed[column.id] ?? false;
+          const isCollapsing = Boolean(collapsing[column.id]);
+          const shouldShowContent = !isCollapsed || isCollapsing;
           return (
             <Card key={column.id} className="border-slate-800/70 bg-slate-900/70 backdrop-blur">
             <CardHeader className="space-y-2 pb-3">
@@ -609,9 +657,7 @@ export const TrelloTab = () => {
                 <CardTitle className="text-lg text-white flex items-center gap-2">
                   {column.label}
                   <button
-                    onClick={() =>
-                      setCollapsed((prev) => ({ ...prev, [column.id]: !isCollapsed }))
-                    }
+                    onClick={() => setColumnCollapsed(column.id, !isCollapsed)}
                     className="text-slate-300 hover:text-white transition-colors"
                     aria-label={isCollapsed ? "Expand column" : "Collapse column"}
                   >
@@ -630,8 +676,12 @@ export const TrelloTab = () => {
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {!isCollapsed && (
-                <>
+              {shouldShowContent && (
+                <div
+                  className={`space-y-3 ${
+                    isCollapsing ? "trello-column-collapse" : "trello-column-uncollapse"
+                  }`}
+                >
                   <div className="flex gap-2">
                     <Input
                       value={drafts[column.id] ?? ""}
@@ -739,7 +789,7 @@ export const TrelloTab = () => {
                       </div>
                     ))}
                   </div>
-                </>
+                </div>
               )}
             </CardContent>
             </Card>
