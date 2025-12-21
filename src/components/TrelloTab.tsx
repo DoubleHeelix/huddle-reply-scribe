@@ -685,7 +685,7 @@ export const TrelloTab = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="bg-slate-950 text-slate-100 border border-slate-800 shadow-lg shadow-black/40 min-w-[240px]"
+                              className="bg-slate-950 text-slate-100 border border-slate-800 shadow-lg shadow-black/40 min-w-[260px] max-h-[320px] overflow-y-auto"
                             >
                               <div className="px-3 py-2 text-[11px] uppercase tracking-[0.15em] text-slate-500">
                                 Convo columns
