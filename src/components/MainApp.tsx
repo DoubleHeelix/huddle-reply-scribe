@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, History, Camera, Users } from "lucide-react";
+import { MessageSquare, History, Camera, Kanban } from "lucide-react";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
 import { InterruptionsTab } from "@/components/InterruptionsTab";
 import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
-import { PeopleTab } from "@/components/PeopleTab";
+import { TrelloTab } from "@/components/TrelloTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
 import { useInterruptions } from "@/hooks/useInterruptions";
 import { useAuth } from '@/hooks/useAuth';
@@ -70,8 +70,8 @@ export const MainApp = () => {
 
   const navTabs = [
     { value: "huddle-play", label: "Huddle", icon: MessageSquare },
+    { value: "trello", label: "Trello", icon: Kanban },
     { value: "interruptions", label: "Interruption", icon: Camera },
-    { value: "people", label: "People", icon: Users },
     { value: "past-huddles", label: "History", icon: History },
   ];
 
@@ -200,15 +200,15 @@ export const MainApp = () => {
                 <TabsContent value="huddle-play" forceMount className={activeTab === 'huddle-play' ? 'block' : 'hidden'}>
                   <HuddlePlayTab huddleState={huddleState} />
                 </TabsContent>
+                <TabsContent value="trello" forceMount className={activeTab === 'trello' ? 'block' : 'hidden'}>
+                  <TrelloTab />
+                </TabsContent>
                 <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
                   <InterruptionsTab
                     stories={interruptionsState.stories}
                     processStories={interruptionsState.processStories}
                     clearStories={interruptionsState.clearStories}
                   />
-                </TabsContent>
-                <TabsContent value="people" forceMount className={activeTab === 'people' ? 'block' : 'hidden'}>
-                  <PeopleTab />
                 </TabsContent>
                 <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
                   <PastHuddlesTab />
