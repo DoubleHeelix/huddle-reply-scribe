@@ -48,9 +48,6 @@ export const GeneratedReplySection: React.FC<GeneratedReplySectionProps> = ({
           <div className="w-full text-center">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Step 3</p>
             <h3 className="text-slate-900 dark:text-white text-lg font-display">Your crafted reply</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Kept tight (2-4 sentences) with your tone—no extra greetings or emojis added.
-            </p>
           </div>
           <Button
             onClick={onCopyReply}

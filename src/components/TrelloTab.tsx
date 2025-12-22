@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, ArrowLeftRight, Columns3, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { Input as ShadInput } from "@/components/ui/input";
@@ -81,6 +81,7 @@ export const TrelloTab = () => {
   const [collapsed, setCollapsed] = useState<Record<ColumnId, boolean>>({});
   const [collapsing, setCollapsing] = useState<Record<ColumnId, boolean>>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ column: ColumnId; index: number; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const loadBoardForMode = (nextMode: Mode): BoardState => {
@@ -542,6 +543,16 @@ export const TrelloTab = () => {
     });
   };
 
+  const confirmAndRemoveName = (column: ColumnId, index: number, name: string) => {
+    setPendingDelete({ column, index, name });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    removeName(pendingDelete.column, pendingDelete.index);
+    setPendingDelete(null);
+  };
+
   const moveName = (from: ColumnId, name: string, to: ColumnId) => {
     const targetMeta = columnLookup[to];
     const targetMode = targetMeta?.mode ?? (columnSets.convo.some((c) => c.id === to) ? "convo" : "process");
@@ -571,7 +582,7 @@ export const TrelloTab = () => {
       (["convo", "process"] as Mode[]).forEach((m) => {
         const boardRef = nextBoards[m];
         Object.keys(boardRef).forEach((colId) => {
-          boardRef[colId] = (boardRef[colId] || []).filter((name) => name !== entry);
+          boardRef[colId] = (boardRef[colId] || []).filter((n) => n !== entry);
         });
       });
 
@@ -619,6 +630,30 @@ export const TrelloTab = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg">Remove this name?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-400">
+              {pendingDelete?.name
+                ? `Remove "${pendingDelete.name}" from the board.`
+                : "This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-900 border border-slate-700 text-slate-200 hover:bg-slate-800">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={handleConfirmDelete}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex justify-center gap-3 pt-2">
         <Button
                   variant={mode === "convo" ? "default" : "outline"}
@@ -644,6 +679,7 @@ export const TrelloTab = () => {
           className="bg-slate-900 border border-slate-800 text-white placeholder:text-slate-500"
         />
       </div>
+
 
       <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 ${modeAnimationClass}`}>
         {columns.map((column) => {
@@ -780,7 +816,7 @@ export const TrelloTab = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeName(column.id, idx)}
+                            onClick={() => confirmAndRemoveName(column.id, idx, name)}
                             className="h-8 w-8 text-rose-200 hover:bg-rose-900/40 hover:text-rose-100"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -837,6 +873,45 @@ export const TrelloTab = () => {
                           key={huddle.id}
                           className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 space-y-3"
                         >
+                          <div className="rounded-md border border-slate-800 bg-slate-950/60 p-2 space-y-2">
+                            <div className="text-xs text-slate-300">
+                              Linked to <span className="text-white font-semibold">{appliedName}</span>
+                              <span className="text-slate-500 ml-2">(detected: {detectedName})</span>
+                              {hasMessageOverride && <span className="ml-2 text-cyan-300">custom</span>}
+                            </div>
+                            <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
+                              <Input
+                                value={messageDraft}
+                                onChange={(e) =>
+                                  setMessageRenameDrafts((prev) => ({
+                                    ...prev,
+                                    [huddle.id]: e.target.value,
+                                  }))
+                                }
+                                className="flex-1 min-w-[140px] max-w-full sm:max-w-[260px] bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
+                                placeholder="Rename this conversation"
+                              />
+                              <div className="flex gap-2 justify-end sm:justify-start shrink-0">
+                                <Button
+                                  size="sm"
+                                  onClick={() => saveMessageRename(huddle, messageDraft)}
+                                >
+                                  Save
+                                </Button>
+                                {hasMessageOverride && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-slate-200"
+                                    onClick={() => resetMessageRename(huddle.id)}
+                                  >
+                                    Reset
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3 space-y-2">
                             <div className="text-[11px] uppercase tracking-wide text-slate-500">
                               Screenshot context
@@ -854,45 +929,6 @@ export const TrelloTab = () => {
                               {huddle.final_reply || huddle.generated_reply || "No generated reply yet."}
                             </div>
                           </div>
-
-                          <div className="rounded-md border border-slate-800 bg-slate-950/60 p-2 space-y-2">
-                            <div className="text-xs text-slate-300">
-                          Linked to <span className="text-white font-semibold">{appliedName}</span>
-                          <span className="text-slate-500 ml-2">(detected: {detectedName})</span>
-                          {hasMessageOverride && <span className="ml-2 text-cyan-300">custom</span>}
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            value={messageDraft}
-                            onChange={(e) =>
-                              setMessageRenameDrafts((prev) => ({
-                                ...prev,
-                                [huddle.id]: e.target.value,
-                              }))
-                            }
-                            className="bg-slate-900 border-slate-800 text-white text-xs"
-                            placeholder="Rename this conversation"
-                          />
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              size="sm"
-                              onClick={() => saveMessageRename(huddle, messageDraft)}
-                            >
-                              Save
-                            </Button>
-                            {hasMessageOverride && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-slate-200"
-                                onClick={() => resetMessageRename(huddle.id)}
-                              >
-                                Reset
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   );
                 })}
