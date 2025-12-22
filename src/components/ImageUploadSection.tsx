@@ -27,7 +27,7 @@ export const ImageUploadSection: React.FC<ImageUploadSectionProps> = ({
               </div>
             {isOCRProcessing && (
               <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-100 border border-cyan-500/20">
-                Processing OCR...
+                Extracting Text
               </Badge>
             )}
           </div>

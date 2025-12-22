@@ -786,7 +786,7 @@ Refine this draft to make it better without inventing missing details.`;
             if (fallbackEnsured) return;
             if (!fullReply.trim()) {
               const fallback = sanitizeReply(
-                `Generation did not work, please click Regenerate."}`,
+                "Generation failed. Please click re-generate",
                 { trim: true }
               );
               fullReply = fallback;
