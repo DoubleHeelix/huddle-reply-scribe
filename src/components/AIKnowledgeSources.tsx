@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ChevronDown, ChevronRight, FileText } from 'lucide-react';
@@ -6,15 +6,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { formatExtractedText } from '@/utils/textProcessing';
 import type { DocumentKnowledge } from '@/types/document';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PastHuddle {
   id: string;
-  screenshot_text: string;
-  user_draft: string;
-  generated_reply: string;
+  screenshot_text?: string;
+  user_draft?: string;
+  generated_reply?: string;
   final_reply?: string;
   created_at: string;
   similarity: number;
+  __preview?: boolean;
 }
 
 interface AIKnowledgeSourcesProps {
@@ -51,8 +53,43 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
   const [expandedHuddles, setExpandedHuddles] = useState<Set<string>>(new Set());
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
+  const [localHuddles, setLocalHuddles] = useState<PastHuddle[]>(pastHuddles);
+  const [localDocs, setLocalDocs] = useState<DocumentKnowledge[]>(documentKnowledge);
+  const [hydratingHuddles, setHydratingHuddles] = useState<Set<string>>(new Set());
+  const [hydratingDocs, setHydratingDocs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalHuddles(pastHuddles);
+  }, [pastHuddles]);
+
+  useEffect(() => {
+    setLocalDocs(documentKnowledge);
+  }, [documentKnowledge]);
 
   if (!isVisible) return null;
+
+  const hydrateHuddle = async (id: string) => {
+    if (!id || hydratingHuddles.has(id)) return;
+    const target = localHuddles.find((h) => h.id === id);
+    if (target && !target.__preview) return;
+    setHydratingHuddles((prev) => new Set(prev).add(id));
+    try {
+      const { data, error } = await supabase
+        .from('huddle_plays')
+        .select('id, created_at, screenshot_text, user_draft, generated_reply, final_reply')
+        .eq('id', id)
+        .single();
+      if (!error && data) {
+        setLocalHuddles((prev) => prev.map((h) => (h.id === id ? { ...h, ...data, __preview: false } : h)));
+      }
+    } finally {
+      setHydratingHuddles((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
 
   const toggleHuddleExpansion = (id: string) => {
     const newExpanded = new Set(expandedHuddles);
@@ -60,8 +97,33 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
       newExpanded.delete(id);
     } else {
       newExpanded.add(id);
+      void hydrateHuddle(id);
     }
     setExpandedHuddles(newExpanded);
+  };
+
+  const hydrateDocument = async (id: string) => {
+    if (!id || hydratingDocs.has(id)) return;
+    const target = localDocs.find((d) => d.id === id);
+    // @ts-expect-error __preview may exist on sanitized meta
+    if (target && !(target as any).__preview && target.content_chunk) return;
+    setHydratingDocs((prev) => new Set(prev).add(id));
+    try {
+      const { data, error } = await supabase
+        .from('document_knowledge')
+        .select('id, document_name, content_chunk, metadata, similarity')
+        .eq('id', id)
+        .single();
+      if (!error && data) {
+        setLocalDocs((prev) => prev.map((d) => (d.id === id ? { ...d, ...data } : d)));
+      }
+    } finally {
+      setHydratingDocs((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   const toggleDocumentExpansion = (id: string) => {
@@ -70,6 +132,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
       newExpanded.delete(id);
     } else {
       newExpanded.add(id);
+      void hydrateDocument(id);
     }
     setExpandedDocuments(newExpanded);
   };
@@ -88,7 +151,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
   return (
     <div className="space-y-4">
       {/* Document Knowledge Sources */}
-      {documentKnowledge.length > 0 && (
+      {localDocs.length > 0 && (
         <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -98,7 +161,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
               </h4>
             </div>
             <div className="space-y-3">
-              {documentKnowledge.map((doc, index) => {
+              {localDocs.map((doc, index) => {
                 const docId = doc.id || `doc-${index}`;
                 const isExpanded = expandedDocuments.has(docId);
                 const score = Math.round(doc.similarity * 100);
@@ -118,7 +181,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
                     ? doc.metadata.highlight
                     : undefined;
                 const url = typeof doc.metadata?.url === 'string' ? doc.metadata.url : undefined;
-                const snippet = formatExtractedText(doc.content_chunk);
+                const snippet = doc.content_chunk ? formatExtractedText(doc.content_chunk) : 'Loading snippet...';
                 const documentTime = getDocumentTimeLabel(doc.metadata);
                 const fallbackLineTextRaw = snippet
                   .split(/\r?\n/)
@@ -239,7 +302,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
       )}
 
       {/* Similar Past Huddle Plays */}
-      {pastHuddles.length > 0 && (
+      {localHuddles.length > 0 && (
         <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -249,7 +312,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
               </h4>
             </div>
             <div className="space-y-3">
-              {pastHuddles.map((huddle) => {
+              {localHuddles.map((huddle) => {
                 const isExpanded = expandedHuddles.has(huddle.id);
                 const score = Math.round(huddle.similarity * 100);
                 const relativeTime = formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true });
