@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -183,6 +183,150 @@ const ChipEditable = ({
     </Button>
   </div>
 );
+
+// Simple virtual windowing hook to avoid rendering all rows at once.
+const useVirtualWindow = (count: number, itemHeight = 320, overscan = 3) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  useEffect(() => {
+    const measure = () => setViewportHeight(containerRef.current?.clientHeight || 0);
+    measure();
+
+    const resizeObserver = new ResizeObserver(measure);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  };
+
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+  const endIndex = Math.min(
+    count - 1,
+    Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan
+  );
+
+  return {
+    containerRef,
+    onScroll,
+    startIndex,
+    endIndex,
+    offsetTop: startIndex * itemHeight,
+    totalHeight: count * itemHeight,
+  };
+};
+
+type VirtualizedHuddleListProps = {
+  huddles: HuddlePlay[];
+  isHuddleExpanded: (id: string) => boolean;
+  toggleHuddleExpansion: (id: string) => void;
+};
+
+const VirtualizedHuddleList = ({
+  huddles,
+  isHuddleExpanded,
+  toggleHuddleExpansion,
+}: VirtualizedHuddleListProps) => {
+  if (!huddles.length) return null;
+
+  const itemHeightEstimate = 320; // Approx height of one huddle card; adjust if layout changes.
+  const { containerRef, onScroll, startIndex, endIndex, offsetTop, totalHeight } =
+    useVirtualWindow(huddles.length, itemHeightEstimate);
+
+  const visibleHuddles = huddles.slice(startIndex, endIndex + 1);
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={onScroll}
+      className="max-h-[70vh] overflow-y-auto pr-1 custom-scrollbar"
+    >
+      <div style={{ height: totalHeight || 'auto' }} className="relative">
+        <div style={{ transform: `translateY(${offsetTop}px)` }} className="space-y-4">
+          {visibleHuddles.map((huddle) => (
+            <Card
+              key={huddle.id}
+              className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+            >
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span className="text-gray-600 dark:text-gray-400 text-sm font-sans">
+                      {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {huddle.selected_tone && huddle.selected_tone !== 'none' && (
+                      <Badge variant="secondary" className="font-sans">
+                        {huddle.selected_tone}
+                      </Badge>
+                    )}
+                    {huddle.final_reply && (
+                      <Badge variant="outline" className="text-green-400 border-green-400 font-sans">
+                        Tone Adjusted
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
+                      Context:
+                    </p>
+                    <p
+                      className={`text-gray-700 dark:text-gray-400 text-sm font-sans ${
+                        !isHuddleExpanded(huddle.id) && 'line-clamp-2'
+                      }`}
+                    >
+                      {huddle.screenshot_text}
+                    </p>
+                    {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-xs text-blue-600 dark:text-blue-400 hover:no-underline"
+                        onClick={() => toggleHuddleExpansion(huddle.id)}
+                      >
+                        {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
+                      Your Draft:
+                    </p>
+                    <p className="text-gray-800 dark:text-gray-200 text-sm font-sans line-clamp-2">
+                      {huddle.user_draft}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
+                      {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
+                    </p>
+                    <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <p className="text-gray-900 dark:text-white text-sm font-sans">
+                        {huddle.final_reply || huddle.generated_reply}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const PastHuddlesTab = () => {
   const { huddlePlays: initialHuddlePlays, isLoading, error, refetch } = useHuddlePlays();
@@ -905,77 +1049,11 @@ export const PastHuddlesTab = () => {
                   className="overflow-hidden"
                 >
                   <CardContent className="p-4 pt-0">
-                    <motion.div
-                      className="space-y-4"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      {categorizedHuddles[category].map((huddle) => (
-                        <motion.div key={huddle.id} variants={itemVariants}>
-                          <Card className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                            <CardContent className="p-4 space-y-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                <span className="text-gray-600 dark:text-gray-400 text-sm font-sans">
-                                  {formatDistanceToNow(new Date(huddle.created_at), { addSuffix: true })}
-                                </span>
-                              </div>
-                              <div className="flex gap-2">
-                                {huddle.selected_tone && huddle.selected_tone !== 'none' && (
-                                  <Badge variant="secondary" className="font-sans">
-                                    {huddle.selected_tone}
-                                  </Badge>
-                                )}
-                                {huddle.final_reply && (
-                                  <Badge variant="outline" className="text-green-400 border-green-400 font-sans">
-                                    Tone Adjusted
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div>
-                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">Context:</p>
-                                <p className={`text-gray-700 dark:text-gray-400 text-sm font-sans ${!isHuddleExpanded(huddle.id) && 'line-clamp-2'}`}>
-                                  {huddle.screenshot_text}
-                                </p>
-                                {huddle.screenshot_text && huddle.screenshot_text.length > 150 && (
-                                  <Button
-                                    variant="link"
-                                    className="p-0 h-auto text-xs text-blue-600 dark:text-blue-400 hover:no-underline"
-                                    onClick={() => toggleHuddleExpansion(huddle.id)}
-                                  >
-                                    {isHuddleExpanded(huddle.id) ? 'Show less' : 'Expand context'}
-                                  </Button>
-                                )}
-                              </div>
-
-                              <div>
-                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">Your Draft:</p>
-                                <p className="text-gray-800 dark:text-gray-200 text-sm font-sans line-clamp-2">
-                                  {huddle.user_draft}
-                                </p>
-                              </div>
-
-                              <div>
-                                <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
-                                  {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
-                                </p>
-                                <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                                  <p className="text-gray-900 dark:text-white text-sm font-sans">
-                                    {huddle.final_reply || huddle.generated_reply}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                      ))}
-                    </motion.div>
+                    <VirtualizedHuddleList
+                      huddles={categorizedHuddles[category]}
+                      isHuddleExpanded={isHuddleExpanded}
+                      toggleHuddleExpansion={toggleHuddleExpansion}
+                    />
                   </CardContent>
                 </motion.div>
               )}
