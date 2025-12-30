@@ -29,11 +29,14 @@ export const useEnhancedAISuggestions = () => {
     isRegeneration: boolean = false,
     existingDocumentKnowledge: DocumentKnowledge[] = [],
     existingPastHuddles: PastHuddleWithSimilarity[] = [],
-    onToken?: (partial: string) => void
+    onToken?: (partial: string) => void,
+    allowAutoRegenerate: boolean = true
   ): Promise<GenerateReplyResult | null> => {
     const errorMessage = "Generation failed. Please click re-generate";
     const maxAttempts = 2;
     let lastError: unknown = null;
+    let lastDocumentKnowledge = existingDocumentKnowledge;
+    let lastPastHuddles = existingPastHuddles;
 
     setIsGenerating(true);
     setError(null);
@@ -61,6 +64,7 @@ export const useEnhancedAISuggestions = () => {
               console.log(`📚 DEBUG: Re-using document knowledge on retry: ${documentKnowledge.length}`);
             }
           }
+          lastDocumentKnowledge = documentKnowledge;
 
           console.log('🚀 DEBUG: Calling enhanced-ai-suggestions function...');
 
@@ -112,6 +116,8 @@ export const useEnhancedAISuggestions = () => {
                 if (payload.type === 'meta') {
                   pastHuddles = isRegeneration ? existingPastHuddles : (payload.pastHuddles || []);
                   documentKnowledgeUsed = payload.documentKnowledge || documentKnowledge;
+                  lastPastHuddles = pastHuddles;
+                  lastDocumentKnowledge = documentKnowledgeUsed;
                 } else if (payload.type === 'token') {
                   reply += payload.text || '';
                   if (onToken) onToken(reply);
@@ -129,6 +135,8 @@ export const useEnhancedAISuggestions = () => {
               if (payload.type === 'meta') {
                 pastHuddles = isRegeneration ? existingPastHuddles : (payload.pastHuddles || []);
                 documentKnowledgeUsed = payload.documentKnowledge || documentKnowledge;
+                lastPastHuddles = pastHuddles;
+                lastDocumentKnowledge = documentKnowledgeUsed;
               } else if (payload.type === 'token') {
                 reply += payload.text || '';
                 if (onToken) onToken(reply);
@@ -144,8 +152,22 @@ export const useEnhancedAISuggestions = () => {
             documentKnowledgeCount: documentKnowledgeUsed.length
           });
 
-          if (!reply.trim()) {
+          const trimmedReply = reply.trim();
+          if (!trimmedReply) {
             throw new Error('Empty reply from AI function');
+          }
+
+          if (trimmedReply === errorMessage && allowAutoRegenerate) {
+            console.log('🔁 DEBUG: Auto-regenerating after fallback reply...');
+            return await generateReply(
+              screenshotText,
+              userDraft,
+              true,
+              documentKnowledgeUsed,
+              pastHuddles,
+              onToken,
+              false
+            );
           }
 
           // Ensure UI sees the final reply even if no tokens were streamed.
@@ -162,6 +184,19 @@ export const useEnhancedAISuggestions = () => {
           if (attempt === maxAttempts) break;
           console.log('🔁 DEBUG: Retrying generation...');
         }
+      }
+
+      if (allowAutoRegenerate) {
+        console.log('🔁 DEBUG: Auto-regenerating after repeated failures...');
+        return await generateReply(
+          screenshotText,
+          userDraft,
+          true,
+          lastDocumentKnowledge,
+          lastPastHuddles,
+          onToken,
+          false
+        );
       }
 
       if (onToken) onToken(errorMessage);
