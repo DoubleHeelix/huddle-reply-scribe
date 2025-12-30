@@ -225,7 +225,7 @@ const useVirtualWindow = (count: number, itemHeight = 320, overscan = 3) => {
 type VirtualizedHuddleListProps = {
   huddles: HuddlePlay[];
   isHuddleExpanded: (id: string) => boolean;
-  toggleHuddleExpansion: (id: string) => void;
+  toggleHuddleExpansion: (id: string) => void | Promise<void>;
 };
 
 const VirtualizedHuddleList = ({
@@ -329,7 +329,7 @@ const VirtualizedHuddleList = ({
 };
 
 export const PastHuddlesTab = () => {
-  const { huddlePlays: initialHuddlePlays, isLoading, error, refetch } = useHuddlePlays();
+  const { huddlePlays: initialHuddlePlays, isLoading, error, refetch, hasMore, loadMore, isLoadingMore, ensureHuddleDetail } = useHuddlePlays({ paginated: true, light: true });
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<HuddlePlay[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -532,10 +532,17 @@ export const PastHuddlesTab = () => {
     }
   };
 
-  const toggleHuddleExpansion = (id: string) => {
+  const toggleHuddleExpansion = async (id: string) => {
     setExpandedHuddles(prev =>
       prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
     );
+    // Hydrate full text on first open if we only have a preview
+    const target = (searchResults !== null ? searchResults : initialHuddlePlays).find(
+      (h) => h.id === id
+    );
+    if (target?.__preview) {
+      await ensureHuddleDetail(id);
+    }
   };
 
   const toggleCategoryExpansion = (category: string) => {
@@ -1060,6 +1067,25 @@ export const PastHuddlesTab = () => {
             </AnimatePresence>
           </Card>
         ))}
+        {hasMore && searchResults === null && (
+          <div className="flex justify-center pt-1">
+            <Button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              variant="outline"
+              className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading more
+                </>
+              ) : (
+                'Load more'
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
