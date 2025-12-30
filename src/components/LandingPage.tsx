@@ -48,7 +48,8 @@ const LandingPage = () => {
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        data: { role: 'user' },
       }
     });
 
