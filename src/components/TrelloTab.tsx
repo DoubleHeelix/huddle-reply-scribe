@@ -36,6 +36,7 @@ type ColumnId = string;
 type Mode = "convo" | "process";
 
 const STORAGE_KEY = "trello_board_state";
+const TOUCH_KEY = "trello_last_touched";
 
 type ColumnConfig = { id: ColumnId; label: string; description: string; badgeClass: string };
 
@@ -83,6 +84,18 @@ export const TrelloTab = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ column: ColumnId; index: number; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dragging, setDragging] = useState<{ name: string; from: ColumnId } | null>(null);
+  const [activeDrop, setActiveDrop] = useState<ColumnId | null>(null);
+  const [lastTouched, setLastTouched] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = localStorage.getItem(TOUCH_KEY);
+      if (stored) return JSON.parse(stored) as Record<string, number>;
+    } catch (err) {
+      console.warn("Unable to read touch timestamps from storage", err);
+    }
+    return {};
+  });
 
   const loadBoardForMode = (nextMode: Mode): BoardState => {
     const cols = columnSets[nextMode];
@@ -307,6 +320,15 @@ export const TrelloTab = () => {
     return entries;
   }, [groupedByName]);
 
+  const lastTimestampByName = useMemo(() => {
+    const map = new Map<string, number>();
+    groupedByName.forEach((value, key) => {
+      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
+      if (isFinite(last)) map.set(key, last);
+    });
+    return map;
+  }, [groupedByName]);
+
   const lastChattedByName = useMemo(() => {
     const map = new Map<string, string>();
     groupedByName.forEach((value, key) => {
@@ -379,6 +401,21 @@ export const TrelloTab = () => {
     });
     return next;
   }, [board, searchQuery]);
+  const orderNames = useCallback(
+    (names: string[]) =>
+      names
+        .slice()
+        .sort((a, b) => {
+          const lastA = lastTimestampByName.get(a) ?? 0;
+          const lastB = lastTimestampByName.get(b) ?? 0;
+          if (lastA !== lastB) return lastB - lastA;
+          const touchA = lastTouched[a] ?? 0;
+          const touchB = lastTouched[b] ?? 0;
+          if (touchA !== touchB) return touchB - touchA;
+          return a.localeCompare(b);
+        }),
+    [lastTimestampByName, lastTouched]
+  );
 
   const selectedGroup = useMemo(() => {
     if (!selectedName) return null;
@@ -390,7 +427,7 @@ export const TrelloTab = () => {
     setCollapsed((prev) => {
       const next: Record<ColumnId, boolean> = {};
       cols.forEach((col) => {
-        next[col.id] = prev[col.id] ?? true;
+        next[col.id] = prev[col.id] ?? false;
       });
       return next;
     });
@@ -409,6 +446,11 @@ export const TrelloTab = () => {
       return next;
     });
   }, [mode, persistBoards]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(TOUCH_KEY, JSON.stringify(lastTouched));
+  }, [lastTouched]);
 
   const setColumnCollapsed = useCallback(
     (columnId: ColumnId, shouldCollapse: boolean) => {
@@ -450,11 +492,13 @@ export const TrelloTab = () => {
         if (!boardRef[col.id]) boardRef[col.id] = [];
       });
 
-      boardRef[column] = [...(boardRef[column] || []), value];
+      // Newest names appear at the top of the list.
+      boardRef[column] = [value, ...(boardRef[column] || [])];
       persistBoards(next);
       return next;
     });
     setDrafts((prev) => ({ ...prev, [column]: "" }));
+    setLastTouched((prev) => ({ ...prev, [value]: Date.now() }));
   };
 
   const saveRename = async (groupName: string, rawNames: Set<string>, newNameRaw: string) => {
@@ -586,12 +630,13 @@ export const TrelloTab = () => {
         });
       });
 
-      // Add to target
-      nextBoards[targetMode][to] = [...(nextBoards[targetMode][to] || []), entry];
+      // Add to target (ordering handled by renderer)
+      nextBoards[targetMode][to] = [entry, ...(nextBoards[targetMode][to] || [])];
 
       persistBoards(nextBoards);
       return nextBoards;
     });
+    setLastTouched((prev) => ({ ...prev, [name]: Date.now() }));
   };
 
   const clearBoard = () => {
@@ -671,24 +716,55 @@ export const TrelloTab = () => {
                 </Button>
               </div>
 
-      <div className="max-w-3xl mx-auto">
+      <div className="w-full max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto px-2 lg:px-4">
         <ShadInput
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search names across columns"
-          className="bg-slate-900 border border-slate-800 text-white placeholder:text-slate-500"
+          className="bg-slate-900 border border-slate-800 text-white placeholder:text-slate-500 h-11 lg:h-12 lg:text-base"
         />
       </div>
 
 
-      <div className={`grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 ${modeAnimationClass}`}>
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 ${modeAnimationClass}`}
+      >
         {columns.map((column) => {
           const isCollapsed = collapsed[column.id] ?? false;
           const isCollapsing = Boolean(collapsing[column.id]);
           const shouldShowContent = !isCollapsed || isCollapsing;
           return (
-            <Card key={column.id} className="border-slate-800/70 bg-slate-900/70 backdrop-blur">
-            <CardHeader className="space-y-2 pb-3">
+            <Card
+              key={column.id}
+              className={`border-slate-800/70 bg-slate-900/70 backdrop-blur lg:min-h-[380px] lg:rounded-2xl lg:border-slate-800 lg:hover:border-slate-700 transition-colors ${
+                activeDrop === column.id ? "border-cyan-500/60 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]" : ""
+              }`}
+              onDragOver={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                setActiveDrop(column.id);
+              }}
+              onDragEnter={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                setActiveDrop(column.id);
+              }}
+              onDragLeave={() => {
+                if (activeDrop === column.id) {
+                  setActiveDrop(null);
+                }
+              }}
+              onDrop={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                setActiveDrop(null);
+                if (dragging.from !== column.id) {
+                  moveName(dragging.from, dragging.name, column.id);
+                }
+                setDragging(null);
+              }}
+            >
+            <CardHeader className="space-y-2 pb-3 lg:pb-4">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-lg text-white flex items-center gap-2">
                   {column.label}
@@ -708,7 +784,7 @@ export const TrelloTab = () => {
                   {(filteredBoard[column.id] || []).length} item{(filteredBoard[column.id] || []).length === 1 ? "" : "s"}
                 </Badge>
               </div>
-              <p className="text-sm text-slate-400">{column.description}</p>
+              <p className="text-sm text-slate-400 lg:text-[15px] lg:text-slate-300">{column.description}</p>
             </CardHeader>
 
             <CardContent className="space-y-3">
@@ -718,12 +794,12 @@ export const TrelloTab = () => {
                     isCollapsing ? "trello-column-collapse" : "trello-column-uncollapse"
                   }`}
                 >
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 lg:gap-3">
                     <Input
                       value={drafts[column.id] ?? ""}
                       onChange={(e) => setDrafts((prev) => ({ ...prev, [column.id]: e.target.value }))}
                       placeholder="Add a name"
-                      className="bg-slate-950/80 text-white placeholder:text-slate-500"
+                      className="bg-slate-950/80 text-white placeholder:text-slate-500 lg:h-11 lg:text-base"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -731,28 +807,37 @@ export const TrelloTab = () => {
                         }
                       }}
                     />
-                    <Button type="button" onClick={() => addName(column.id)} className="shrink-0">
-                      <Plus className="h-4 w-4 mr-1.5" />
+                    <Button type="button" onClick={() => addName(column.id)} className="shrink-0 lg:h-11 lg:px-4">
+                      <Plus className="h-4 w-4 mr-1.5 lg:h-5 lg:w-5" />
                       Add
                     </Button>
                   </div>
 
-                  <div className="space-y-2">
-                    {(filteredBoard[column.id] || []).length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/70 px-3 py-4 text-center text-sm text-slate-500">
-                        Nothing here yet. Add the first name.
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      {(filteredBoard[column.id] || []).length === 0 && (
+                        <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/70 px-3 py-4 text-center text-sm text-slate-500">
+                          Nothing here yet. Add the first name.
+                        </div>
+                      )}
 
-                    {(filteredBoard[column.id] || []).map((name, idx) => (
-                      <div
-                        key={`${column.id}-${idx}-${name}`}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-sm"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <button
-                            className="truncate text-left hover:text-cyan-200 w-full"
-                            onClick={() => setSelectedName(name)}
+                      {orderNames(filteredBoard[column.id] || []).map((name, idx) => (
+                        <div
+                          key={`${column.id}-${idx}-${name}`}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-sm"
+                          draggable
+                          onDragStart={() => {
+                            setDragging({ name, from: column.id });
+                            setActiveDrop(column.id);
+                          }}
+                          onDragEnd={() => {
+                            setDragging(null);
+                            setActiveDrop(null);
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <button
+                              className="truncate text-left hover:text-cyan-200 w-full"
+                              onClick={() => setSelectedName(name)}
                           >
                             {name}
                           </button>
