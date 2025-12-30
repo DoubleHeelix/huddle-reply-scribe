@@ -36,7 +36,7 @@ export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id
   }
 };
 
-export const getUserHuddlePlays = async (limit: number = 100): Promise<HuddlePlay[]> => {
+export const getUserHuddlePlays = async (limit: number = 500): Promise<HuddlePlay[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
