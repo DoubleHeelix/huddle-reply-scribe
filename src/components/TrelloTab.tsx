@@ -28,6 +28,7 @@ import {
   getHuddlePersonOverrides,
   saveHuddlePersonOverride,
   clearHuddlePersonOverride,
+  deletePersonAssociations,
   type HuddlePlay,
 } from "@/utils/huddlePlayService";
 import { formatDistanceToNow } from "date-fns";
@@ -37,6 +38,7 @@ type Mode = "convo" | "process";
 
 const STORAGE_KEY = "trello_board_state";
 const TOUCH_KEY = "trello_last_touched";
+const HIDDEN_KEY = "trello_hidden_names";
 
 type ColumnConfig = { id: ColumnId; label: string; description: string; badgeClass: string };
 
@@ -82,7 +84,17 @@ export const TrelloTab = () => {
   const [collapsed, setCollapsed] = useState<Record<ColumnId, boolean>>({});
   const [collapsing, setCollapsing] = useState<Record<ColumnId, boolean>>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<{ column: ColumnId; index: number; name: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ column: ColumnId; name: string } | null>(null);
+  const [hiddenNames, setHiddenNames] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem(HIDDEN_KEY);
+      if (stored) return new Set(JSON.parse(stored) as string[]);
+    } catch (err) {
+      console.warn("Unable to read hidden names from storage", err);
+    }
+    return new Set();
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [dragging, setDragging] = useState<{ name: string; from: ColumnId } | null>(null);
   const [activeDrop, setActiveDrop] = useState<ColumnId | null>(null);
@@ -313,12 +325,13 @@ export const TrelloTab = () => {
   const autoNameEntries = useMemo(() => {
     const entries: { name: string; last: number }[] = [];
     groupedByName.forEach((value, key) => {
+      if (hiddenNames.has(key)) return;
       const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
       entries.push({ name: key, last });
     });
     entries.sort((a, b) => b.last - a.last);
     return entries;
-  }, [groupedByName]);
+  }, [groupedByName, hiddenNames]);
 
   const lastTimestampByName = useMemo(() => {
     const map = new Map<string, number>();
@@ -394,13 +407,14 @@ export const TrelloTab = () => {
 
   const filteredBoard = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return board;
     const next: BoardState = {};
+    const include = (name: string) =>
+      !hiddenNames.has(name) && (!q || name.toLowerCase().includes(q));
     Object.keys(board).forEach((col) => {
-      next[col] = (board[col] || []).filter((name) => name.toLowerCase().includes(q));
+      next[col] = (board[col] || []).filter((name) => include(name));
     });
     return next;
-  }, [board, searchQuery]);
+  }, [board, hiddenNames, searchQuery]);
   const orderNames = useCallback(
     (names: string[]) =>
       names
@@ -447,10 +461,32 @@ export const TrelloTab = () => {
     });
   }, [mode, persistBoards]);
 
+  // Strip hidden names from existing board state whenever the hidden list changes.
+  useEffect(() => {
+    setBoards((prev) => {
+      const next: BoardByMode = {
+        convo: prev.convo ? { ...prev.convo } : createEmptyBoard(columnSets.convo),
+        process: prev.process ? { ...prev.process } : createEmptyBoard(columnSets.process),
+      };
+      (["convo", "process"] as Mode[]).forEach((m) => {
+        Object.keys(next[m]).forEach((colId) => {
+          next[m][colId] = (next[m][colId] || []).filter((name) => !hiddenNames.has(name));
+        });
+      });
+      persistBoards(next);
+      return next;
+    });
+  }, [hiddenNames, persistBoards]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(TOUCH_KEY, JSON.stringify(lastTouched));
   }, [lastTouched]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(hiddenNames)));
+  }, [hiddenNames]);
 
   const setColumnCollapsed = useCallback(
     (columnId: ColumnId, shouldCollapse: boolean) => {
@@ -499,6 +535,12 @@ export const TrelloTab = () => {
     });
     setDrafts((prev) => ({ ...prev, [column]: "" }));
     setLastTouched((prev) => ({ ...prev, [value]: Date.now() }));
+    setHiddenNames((prev) => {
+      if (!prev.has(value)) return prev;
+      const next = new Set(prev);
+      next.delete(value);
+      return next;
+    });
   };
 
   const saveRename = async (groupName: string, rawNames: Set<string>, newNameRaw: string) => {
@@ -571,7 +613,8 @@ export const TrelloTab = () => {
     );
   };
 
-  const removeName = (column: ColumnId, index: number) => {
+  const removeName = (column: ColumnId, targetName: string) => {
+    let removedName: string | null = null;
     setBoards((prev) => {
       const next: BoardByMode = {
         convo: prev.convo ? { ...prev.convo } : createEmptyBoard(columnSets.convo),
@@ -581,20 +624,46 @@ export const TrelloTab = () => {
       columnSets[mode].forEach((col) => {
         if (!current[col.id]) current[col.id] = [];
       });
-      current[column] = (current[column] || []).filter((_, i) => i !== index);
+      removedName = targetName;
+
+      // Remove from every column in every mode to avoid ghost reappearances.
+      (["convo", "process"] as Mode[]).forEach((m) => {
+        const boardRef = next[m];
+        Object.keys(boardRef).forEach((colId) => {
+          boardRef[colId] = (boardRef[colId] || []).filter((n) => n !== removedName);
+        });
+      });
+
       persistBoards(next);
       return next;
     });
+
+    if (removedName) {
+      setHiddenNames((prev) => new Set(prev).add(removedName));
+      setLastTouched((prev) => {
+        const next = { ...prev };
+        delete next[removedName];
+        return next;
+      });
+    }
+    return removedName;
   };
 
-  const confirmAndRemoveName = (column: ColumnId, index: number, name: string) => {
-    setPendingDelete({ column, index, name });
+  const confirmAndRemoveName = (column: ColumnId, name: string) => {
+    setPendingDelete({ column, name });
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!pendingDelete) return;
-    removeName(pendingDelete.column, pendingDelete.index);
+    const removed = removeName(pendingDelete.column, pendingDelete.name);
     setPendingDelete(null);
+    if (removed) {
+      try {
+        await deletePersonAssociations(removed);
+      } catch (err) {
+        console.error("Error deleting person associations from Supabase", err);
+      }
+    }
   };
 
   const moveName = (from: ColumnId, name: string, to: ColumnId) => {
@@ -637,6 +706,12 @@ export const TrelloTab = () => {
       return nextBoards;
     });
     setLastTouched((prev) => ({ ...prev, [name]: Date.now() }));
+    setHiddenNames((prev) => {
+      if (!prev.has(name)) return prev;
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
   };
 
   const clearBoard = () => {
@@ -901,7 +976,7 @@ export const TrelloTab = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => confirmAndRemoveName(column.id, idx, name)}
+                            onClick={() => confirmAndRemoveName(column.id, name)}
                             className="h-8 w-8 text-rose-200 hover:bg-rose-900/40 hover:text-rose-100"
                           >
                             <Trash2 className="h-4 w-4" />

@@ -7,6 +7,15 @@ export type HuddlePlayInsert = TablesInsert<'huddle_plays'>;
 type PeopleOverrideInsert = TablesInsert<'people_overrides'>;
 type HuddlePersonOverrideInsert = TablesInsert<'huddle_person_overrides'>;
 
+export type HuddlePlayPreview = Pick<
+  HuddlePlay,
+  'id' | 'created_at' | 'user_id' | 'final_reply' | 'selected_tone'
+> & {
+  screenshot_text?: string | null;
+  user_draft?: string | null;
+  generated_reply?: string | null;
+};
+
 export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id'>): Promise<HuddlePlay | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -36,7 +45,69 @@ export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id
   }
 };
 
-export const getUserHuddlePlays = async (limit: number = 500): Promise<HuddlePlay[]> => {
+export const getHuddlePlayDetail = async (id: string): Promise<HuddlePlay | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('huddle_plays')
+      .select('id, created_at, updated_at, user_id, screenshot_text, user_draft, generated_reply, final_reply, selected_tone')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching huddle play detail:', error);
+      return null;
+    }
+
+    return data as HuddlePlay;
+  } catch (error) {
+    console.error('Error in getHuddlePlayDetail:', error);
+    return null;
+  }
+};
+
+export const getHuddlePlayPreviews = async (
+  page: number = 0,
+  pageSize: number = 25,
+  maxRows: number = 100
+): Promise<HuddlePlayPreview[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const safePageSize = Math.max(1, Math.min(pageSize, maxRows));
+    const start = Math.max(0, page * safePageSize);
+    if (start >= maxRows) {
+      return [];
+    }
+    const end = Math.min(start + safePageSize - 1, maxRows - 1);
+
+    const { data, error } = await supabase
+      .from('huddle_plays')
+      .select('id, created_at, user_id, final_reply, selected_tone, screenshot_text, user_draft, generated_reply')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(start, end);
+
+    if (error) {
+      console.error('Error fetching huddle play previews:', error);
+      throw error;
+    }
+
+    return (data || []) as HuddlePlayPreview[];
+  } catch (error) {
+    console.error('Error in getHuddlePlayPreviews:', error);
+    return [];
+  }
+};
+
+export const getUserHuddlePlays = async (
+  page: number = 0,
+  pageSize: number = 25,
+  maxRows: number = 100
+): Promise<HuddlePlay[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -44,12 +115,19 @@ export const getUserHuddlePlays = async (limit: number = 500): Promise<HuddlePla
       throw new Error('User not authenticated');
     }
 
+    const safePageSize = Math.max(1, Math.min(pageSize, maxRows));
+    const start = Math.max(0, page * safePageSize);
+    if (start >= maxRows) {
+      return [];
+    }
+    const end = Math.min(start + safePageSize - 1, maxRows - 1);
+
     const { data, error } = await supabase
       .from('huddle_plays')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(start, end);
 
     if (error) {
       console.error('Error fetching huddle plays:', error);
@@ -162,6 +240,53 @@ export const getHuddlePersonOverrides = async (): Promise<Record<string, string>
   } catch (error) {
     console.error('Error in getHuddlePersonOverrides:', error);
     return {};
+  }
+};
+
+export const deletePersonAssociations = async (name: string): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Remove people_overrides entries where the raw name or override matches.
+    const { error: peopleRawError } = await supabase
+      .from('people_overrides')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('raw_name', name);
+    if (peopleRawError) {
+      console.error('Error deleting people overrides (raw_name) for name:', name, peopleRawError);
+    }
+
+    const { error: peopleOverrideError } = await supabase
+      .from('people_overrides')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('override', name);
+    if (peopleOverrideError) {
+      console.error('Error deleting people overrides (override) for name:', name, peopleOverrideError);
+    }
+
+    // Remove per-huddle overrides that match this name.
+    const { error: huddleOverrideError } = await supabase
+      .from('huddle_person_overrides')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('override', name);
+    if (huddleOverrideError) {
+      console.error('Error deleting huddle person overrides (override) for name:', name, huddleOverrideError);
+    }
+
+    const { error: huddleRawError } = await supabase
+      .from('huddle_person_overrides')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('raw_name', name);
+    if (huddleRawError) {
+      console.error('Error deleting huddle person overrides (raw_name) for name:', name, huddleRawError);
+    }
+  } catch (error) {
+    console.error('Error in deletePersonAssociations:', error);
   }
 };
 
