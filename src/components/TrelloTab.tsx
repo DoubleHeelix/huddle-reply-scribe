@@ -39,6 +39,7 @@ type Mode = "convo" | "process";
 const STORAGE_KEY = "trello_board_state";
 const TOUCH_KEY = "trello_last_touched";
 const HIDDEN_KEY = "trello_hidden_names";
+const TIMESTAMP_KEY = "trello_last_timestamp";
 
 type ColumnConfig = { id: ColumnId; label: string; description: string; badgeClass: string };
 
@@ -73,7 +74,9 @@ const createEmptyBoard = (cols: { id: ColumnId }[]): BoardState => {
 };
 
 export const TrelloTab = () => {
-  const { huddlePlays } = useHuddlePlays();
+  // Lazy-load conversations to reduce egress; user opts in via button.
+  const { huddlePlays, isLoading, refetch } = useHuddlePlays({ light: true, maxRows: 500, autoFetch: false });
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [mode, setMode] = useState<Mode>("convo");
   const [modeTransition, setModeTransition] = useState<"idle" | "to-process" | "to-convo">("idle");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -105,6 +108,16 @@ export const TrelloTab = () => {
       if (stored) return JSON.parse(stored) as Record<string, number>;
     } catch (err) {
       console.warn("Unable to read touch timestamps from storage", err);
+    }
+    return {};
+  });
+  const [cachedTimestamps, setCachedTimestamps] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = localStorage.getItem(TIMESTAMP_KEY);
+      if (stored) return JSON.parse(stored) as Record<string, number>;
+    } catch (err) {
+      console.warn("Unable to read last timestamps from storage", err);
     }
     return {};
   });
@@ -334,24 +347,42 @@ export const TrelloTab = () => {
   }, [groupedByName, hiddenNames]);
 
   const lastTimestampByName = useMemo(() => {
-    const map = new Map<string, number>();
+    // Start with cached timestamps to preserve recency ordering even before data is loaded.
+    const map = new Map<string, number>(Object.entries(cachedTimestamps));
     groupedByName.forEach((value, key) => {
       const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
       if (isFinite(last)) map.set(key, last);
     });
     return map;
-  }, [groupedByName]);
+  }, [cachedTimestamps, groupedByName]);
+
+  // Persist latest timestamps whenever fresh data is available.
+  useEffect(() => {
+    if (!huddlePlays.length || groupedByName.size === 0) return; // avoid wiping cached order when not loaded
+    const next: Record<string, number> = {};
+    groupedByName.forEach((value, key) => {
+      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
+      if (isFinite(last)) next[key] = last;
+    });
+    setCachedTimestamps(next);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(TIMESTAMP_KEY, JSON.stringify(next));
+      } catch (err) {
+        console.warn("Unable to persist last timestamps", err);
+      }
+    }
+  }, [groupedByName, huddlePlays.length]);
 
   const lastChattedByName = useMemo(() => {
     const map = new Map<string, string>();
-    groupedByName.forEach((value, key) => {
-      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
-      if (isFinite(last)) {
-        map.set(key, formatDistanceToNow(new Date(last), { addSuffix: true }));
+    lastTimestampByName.forEach((ts, name) => {
+      if (isFinite(ts)) {
+        map.set(name, formatDistanceToNow(new Date(ts), { addSuffix: true }));
       }
     });
     return map;
-  }, [groupedByName]);
+  }, [lastTimestampByName]);
 
   const autoSigRef = useRef<string>("");
 
@@ -430,6 +461,23 @@ export const TrelloTab = () => {
         }),
     [lastTimestampByName, lastTouched]
   );
+
+  // Keep stored board ordering in sync with recency so rendered lists and persisted state match.
+  useEffect(() => {
+    setBoards((prev) => {
+      const next: BoardByMode = {
+        convo: prev.convo ? { ...prev.convo } : createEmptyBoard(columnSets.convo),
+        process: prev.process ? { ...prev.process } : createEmptyBoard(columnSets.process),
+      };
+      (["convo", "process"] as Mode[]).forEach((m) => {
+        Object.keys(next[m]).forEach((colId) => {
+          next[m][colId] = orderNames(next[m][colId] || []);
+        });
+      });
+      persistBoards(next);
+      return next;
+    });
+  }, [orderNames, persistBoards]);
 
   const selectedGroup = useMemo(() => {
     if (!selectedName) return null;
@@ -722,8 +770,28 @@ export const TrelloTab = () => {
     );
   };
 
+  const handleLoadConversations = useCallback(async () => {
+    if (isLoading) return;
+    await refetch();
+    setHasLoadedOnce(true);
+  }, [isLoading, refetch]);
+
+  useEffect(() => {
+    if (huddlePlays.length) {
+      setHasLoadedOnce(true);
+    }
+  }, [huddlePlays.length]);
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center text-slate-200">
+        <div className="flex items-center gap-2">
+          <Button onClick={handleLoadConversations} disabled={isLoading}>
+            {isLoading && !hasLoadedOnce ? "Loading..." : "Load conversations"}
+          </Button>
+          {hasLoadedOnce && <span className="text-xs text-slate-400">Loaded</span>}
+        </div>
+      </div>
 
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
