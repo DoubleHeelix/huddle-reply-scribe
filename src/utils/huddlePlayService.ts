@@ -68,8 +68,7 @@ export const getHuddlePlayDetail = async (id: string): Promise<HuddlePlay | null
 export const getHuddlePlayPreviews = async (
   page: number = 0,
   pageSize: number = 25,
-  maxRows: number = 100,
-  screenshotSnippet?: number
+  maxRows: number = 100
 ): Promise<HuddlePlayPreview[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -85,13 +84,9 @@ export const getHuddlePlayPreviews = async (
     }
     const end = Math.min(start + safePageSize - 1, maxRows - 1);
 
-    const screenshotSelect = screenshotSnippet
-      ? `screenshot_text:left(screenshot_text, ${Math.max(1, screenshotSnippet)})`
-      : 'screenshot_text';
-
     const { data, error } = await supabase
       .from('huddle_plays')
-      .select(`id, created_at, user_id, final_reply, selected_tone, user_draft, generated_reply, ${screenshotSelect}`)
+      .select('id, created_at, user_id, final_reply, selected_tone, screenshot_text, user_draft, generated_reply')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(start, end);
@@ -292,170 +287,6 @@ export const deletePersonAssociations = async (name: string): Promise<void> => {
     }
   } catch (error) {
     console.error('Error in deletePersonAssociations:', error);
-  }
-};
-
-export const deleteHuddlePlaysByName = async (name: string): Promise<void> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const ids = new Set<string>();
-
-    // Grab ids from person overrides matching this name.
-    const { data: overrideMatches, error: overrideMatchError } = await supabase
-      .from('huddle_person_overrides')
-      .select('huddle_play_id')
-      .eq('user_id', user.id)
-      .or(`override.eq.${name},raw_name.eq.${name}`);
-    if (overrideMatchError) {
-      console.error('Error fetching override matches for deletion', overrideMatchError);
-    } else {
-      (overrideMatches || []).forEach((row: { huddle_play_id: string }) => ids.add(row.huddle_play_id));
-    }
-
-    // Grab ids whose screenshot_text contains the name (best-effort).
-    const { data: screenshotMatches, error: screenshotError } = await supabase
-      .from('huddle_plays')
-      .select('id')
-      .eq('user_id', user.id)
-      .ilike('screenshot_text', `%${name}%`);
-    if (screenshotError) {
-      console.error('Error fetching screenshot matches for deletion', screenshotError);
-    } else {
-      (screenshotMatches || []).forEach((row: { id: string }) => ids.add(row.id));
-    }
-
-    const idList = Array.from(ids);
-    if (!idList.length) return;
-
-    const { error: deleteError } = await supabase
-      .from('huddle_plays')
-      .delete()
-      .eq('user_id', user.id)
-      .in('id', idList);
-
-    if (deleteError) {
-      console.error('Error deleting huddle plays by name:', deleteError);
-    }
-  } catch (error) {
-    console.error('Error in deleteHuddlePlaysByName:', error);
-  }
-};
-
-export const getTrelloNamePositions = async (): Promise<Record<string, string>> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return {};
-
-    const { data, error } = await supabase
-      .from('trello_name_positions')
-      .select('name, column_id')
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Error fetching trello name positions:', error);
-      return {};
-    }
-
-    return (data || []).reduce<Record<string, string>>((acc, row) => {
-      acc[row.name] = row.column_id;
-      return acc;
-    }, {});
-  } catch (error) {
-    console.error('Error in getTrelloNamePositions:', error);
-    return {};
-  }
-};
-
-export const saveTrelloNamePosition = async (name: string, columnId: string): Promise<void> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const payload = {
-      user_id: user.id,
-      name,
-      column_id: columnId,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase
-      .from('trello_name_positions')
-      .upsert(payload, { onConflict: 'user_id,name' });
-
-    if (error) {
-      console.error('Error saving trello name position:', error);
-    }
-  } catch (error) {
-    console.error('Error in saveTrelloNamePosition:', error);
-  }
-};
-
-export const deleteTrelloNamePosition = async (name: string): Promise<void> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('trello_name_positions')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('name', name);
-
-    if (error) {
-      console.error('Error deleting trello name position:', error);
-    }
-  } catch (error) {
-    console.error('Error in deleteTrelloNamePosition:', error);
-  }
-};
-
-export const getTrelloBoardState = async (): Promise<Record<string, unknown>> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return {};
-
-    const { data, error } = await supabase
-      .from('trello_board_state')
-      .select('board_state')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error) {
-      if (error.code !== 'PGRST116') { // no rows found
-        console.error('Error fetching trello board state:', error);
-      }
-      return {};
-    }
-
-    return (data?.board_state as Record<string, unknown>) || {};
-  } catch (error) {
-    console.error('Error in getTrelloBoardState:', error);
-    return {};
-  }
-};
-
-export const saveTrelloBoardState = async (boardState: Record<string, unknown>): Promise<void> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const payload = {
-      user_id: user.id,
-      board_state: boardState,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase
-      .from('trello_board_state')
-      .upsert(payload, { onConflict: 'user_id' });
-
-    if (error) {
-      console.error('Error saving trello board state:', error);
-    }
-  } catch (error) {
-    console.error('Error in saveTrelloBoardState:', error);
   }
 };
 
