@@ -4,10 +4,11 @@ import { saveHuddlePlay, getUserHuddlePlays, getHuddlePlayPreviews, getHuddlePla
 import { useAuth } from './useAuth';
 
 const PAGE_SIZE = 25;
-const MAX_PAGES = 4; // Cap at 100 rows total.
-const MAX_ROWS = PAGE_SIZE * MAX_PAGES;
+const DEFAULT_MAX_PAGES = 4; // Cap at 100 rows total by default.
+const DEFAULT_MAX_ROWS = PAGE_SIZE * DEFAULT_MAX_PAGES;
 
 const HUDDLE_SAVED_EVENT = 'huddle-play-saved';
+const HUDDLE_UPDATED_EVENT = 'huddle-play-updated';
 
 type UseHuddlePlaysOptions = {
   paginated?: boolean;
@@ -26,11 +27,13 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(paginated);
   const { toast } = useToast();
+  const maxPages = Math.max(1, Math.ceil(maxRows / PAGE_SIZE));
 
-  const fetchHuddlePlays = useCallback(async () => {
+  const fetchHuddlePlays = useCallback(async (opts?: { full?: boolean }) => {
     try {
       setIsLoading(true);
       setError(null);
+      const snippet = opts?.full ? undefined : screenshotSnippet;
       const plays = light
         ? await getHuddlePlayPreviews(
             0,
@@ -48,7 +51,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
       }));
       setHuddlePlays(normalized);
       setPage(0);
-      setHasMore(paginated && plays.length === PAGE_SIZE && MAX_PAGES > 1);
+      setHasMore(paginated && plays.length === PAGE_SIZE && maxPages > 1);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch huddle plays';
       setError(errorMessage);
@@ -61,13 +64,13 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [paginated, toast]);
+  }, [paginated, toast, light, maxRows, maxPages, screenshotSnippet]);
 
   const loadMore = useCallback(async () => {
     if (!paginated) return;
     if (isLoadingMore || isLoading || !hasMore) return;
     const nextPage = page + 1;
-    if (nextPage >= MAX_PAGES) {
+    if (nextPage >= maxPages) {
       setHasMore(false);
       return;
     }
@@ -85,7 +88,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
         return [...prev, ...newItems];
       });
       setPage(nextPage);
-      const reachedMaxPages = nextPage >= MAX_PAGES - 1;
+      const reachedMaxPages = nextPage >= maxPages - 1;
       setHasMore(!reachedMaxPages && more.length === PAGE_SIZE);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch more huddle plays';
@@ -99,7 +102,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMore, isLoading, isLoadingMore, page, paginated, toast]);
+  }, [hasMore, isLoading, isLoadingMore, light, maxPages, maxRows, page, paginated, screenshotSnippet, toast]);
 
   const ensureHuddleDetail = useCallback(
     async (id: string) => {
@@ -150,10 +153,13 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
         setHuddlePlays(prev => 
           prev.map(play => 
             play.id === id 
-              ? { ...play, final_reply: finalReply, updated_at: new Date().toISOString() }
+              ? { ...play, final_reply: finalReply, generated_reply: finalReply, updated_at: new Date().toISOString() }
               : play
           )
         );
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(HUDDLE_UPDATED_EVENT, { detail: id }));
+        }
       }
     } catch (err) {
       console.error('Error updating final reply:', err);
@@ -180,8 +186,10 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
       fetchHuddlePlays();
     };
     window.addEventListener(HUDDLE_SAVED_EVENT, handler);
+    window.addEventListener(HUDDLE_UPDATED_EVENT, handler);
     return () => {
       window.removeEventListener(HUDDLE_SAVED_EVENT, handler);
+      window.removeEventListener(HUDDLE_UPDATED_EVENT, handler);
     };
   }, [autoFetch, fetchHuddlePlays]);
 
