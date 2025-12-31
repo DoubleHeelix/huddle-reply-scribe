@@ -144,6 +144,36 @@ export type Database = {
         }
         Relationships: []
       }
+      trello_board_positions: {
+        Row: {
+          column_id: string
+          created_at: string
+          id: string
+          mode: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_id: string
+          created_at?: string
+          id?: string
+          mode?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_id?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_style_profiles: {
         Row: {
           avg_sentence_length: number | null
