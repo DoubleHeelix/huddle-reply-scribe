@@ -29,6 +29,10 @@ import {
   saveHuddlePersonOverride,
   clearHuddlePersonOverride,
   deletePersonAssociations,
+  deleteHuddlePlaysByName,
+  getTrelloNamePositions,
+  saveTrelloNamePosition,
+  deleteTrelloNamePosition,
   type HuddlePlay,
 } from "@/utils/huddlePlayService";
 import { formatDistanceToNow } from "date-fns";
@@ -39,6 +43,7 @@ type Mode = "convo" | "process";
 const STORAGE_KEY = "trello_board_state";
 const TOUCH_KEY = "trello_last_touched";
 const HIDDEN_KEY = "trello_hidden_names";
+const TIMESTAMP_KEY = "trello_last_timestamp";
 
 type ColumnConfig = { id: ColumnId; label: string; description: string; badgeClass: string };
 
@@ -73,7 +78,8 @@ const createEmptyBoard = (cols: { id: ColumnId }[]): BoardState => {
 };
 
 export const TrelloTab = () => {
-  const { huddlePlays } = useHuddlePlays();
+  // Auto-fetch lightweight previews for names; only show the latest convo per person. Limit rows to reduce egress.
+  const { huddlePlays } = useHuddlePlays({ light: true, maxRows: 120, autoFetch: true });
   const [mode, setMode] = useState<Mode>("convo");
   const [modeTransition, setModeTransition] = useState<"idle" | "to-process" | "to-convo">("idle");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -85,6 +91,9 @@ export const TrelloTab = () => {
   const [collapsing, setCollapsing] = useState<Record<ColumnId, boolean>>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ column: ColumnId; name: string } | null>(null);
+  // Track when remote board state has been fetched to avoid overwriting it with empty local state.
+  const [boardLoaded, setBoardLoaded] = useState(false);
+  const [namePositions, setNamePositions] = useState<Record<string, string>>({});
   const [hiddenNames, setHiddenNames] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -105,6 +114,16 @@ export const TrelloTab = () => {
       if (stored) return JSON.parse(stored) as Record<string, number>;
     } catch (err) {
       console.warn("Unable to read touch timestamps from storage", err);
+    }
+    return {};
+  });
+  const [cachedTimestamps, setCachedTimestamps] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = localStorage.getItem(TIMESTAMP_KEY);
+      if (stored) return JSON.parse(stored) as Record<string, number>;
+    } catch (err) {
+      console.warn("Unable to read last timestamps from storage", err);
     }
     return {};
   });
@@ -216,17 +235,46 @@ export const TrelloTab = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const loadRemote = async () => {
+    const loadBoard = async () => {
       try {
-        const remote = await getPeopleOverrides();
-        if (!cancelled && remote) {
-          setOverrides((prev) => ({ ...remote, ...prev }));
+        const remote = await getTrelloBoardState();
+        if (!cancelled) {
+          setBoards((prev) => {
+            const hasRemoteConvo = remote && remote["convo"] && Object.keys(remote["convo"] as BoardState).length > 0;
+            const hasRemoteProcess = remote && remote["process"] && Object.keys(remote["process"] as BoardState).length > 0;
+            const shouldUseRemote = hasRemoteConvo || hasRemoteProcess;
+            if (!shouldUseRemote) return prev;
+            return {
+              convo: { ...createEmptyBoard(columnSets.convo), ...(remote["convo"] as BoardState ?? {}) },
+              process: { ...createEmptyBoard(columnSets.process), ...(remote["process"] as BoardState ?? {}) },
+            };
+          });
         }
       } catch (err) {
-        console.error("Error loading people overrides", err);
+        console.error("Error loading Trello board state", err);
+      } finally {
+        if (!cancelled) setBoardLoaded(true);
       }
     };
-    loadRemote();
+    loadBoard();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadNamePositions = async () => {
+      try {
+        const remote = await getTrelloNamePositions();
+        if (!cancelled && remote) {
+          setNamePositions(remote);
+        }
+      } catch (err) {
+        console.error("Error loading trello name positions", err);
+      }
+    };
+    loadNamePositions();
     return () => {
       cancelled = true;
     };
@@ -256,9 +304,37 @@ export const TrelloTab = () => {
   }, [overrides]);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadPeople = async () => {
+      try {
+        const remote = await getPeopleOverrides();
+        if (!cancelled && remote) {
+          setOverrides((prev) => ({ ...remote, ...prev }));
+        }
+      } catch (err) {
+        console.error("Error loading people overrides", err);
+      } finally {
+        if (!cancelled) setBoardLoaded(true);
+      }
+    };
+    loadPeople();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem("huddle_person_overrides", JSON.stringify(messageOverrides));
   }, [messageOverrides]);
+
+  const saveTrelloBoardStateSafe = useCallback(async (state?: BoardByMode) => {
+    try {
+      await saveTrelloBoardState(state ?? boards);
+    } catch (err) {
+      console.error("Error saving Trello board state", err);
+    }
+  }, [boards]);
 
   const applyOverride = useCallback(
     (rawName: string, huddleId?: string) => {
@@ -271,11 +347,17 @@ export const TrelloTab = () => {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    (["convo", "process"] as Mode[]).forEach((m) => {
-      localStorage.setItem(`${STORAGE_KEY}_${m}`, JSON.stringify(boards[m]));
-    });
-  }, [boards]);
+    if (!boardLoaded) return;
+    const persist = async () => {
+      if (typeof window !== "undefined") {
+        (["convo", "process"] as Mode[]).forEach((m) => {
+          localStorage.setItem(`${STORAGE_KEY}_${m}`, JSON.stringify(boards[m]));
+        });
+      }
+      await saveTrelloBoardStateSafe();
+    };
+    persist();
+  }, [boardLoaded, boards, saveTrelloBoardStateSafe]);
 
   const isWhatsAppText = (text: string | null | undefined): boolean => {
     if (!text) return false;
@@ -298,25 +380,25 @@ export const TrelloTab = () => {
   );
 
   const groupedByName = useMemo(() => {
+    // Only keep the most recent huddle per person.
     const groups = new Map<
       string,
       { appliedName: string; rawNames: Set<string>; huddles: HuddlePlay[] }
     >();
 
-    filteredPlays.forEach((huddle) => {
+    const sorted = filteredPlays
+      .slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    sorted.forEach((huddle) => {
       const rawName = extractPersonName(huddle.screenshot_text);
       const appliedName = applyOverride(rawName, huddle.id);
-      const existing = groups.get(appliedName);
-      if (existing) {
-        existing.huddles.push(huddle);
-        existing.rawNames.add(rawName);
-      } else {
-        groups.set(appliedName, {
-          appliedName,
-          rawNames: new Set([rawName]),
-          huddles: [huddle],
-        });
-      }
+      if (groups.has(appliedName)) return;
+      groups.set(appliedName, {
+        appliedName,
+        rawNames: new Set([rawName]),
+        huddles: [huddle],
+      });
     });
 
     return groups;
@@ -334,24 +416,24 @@ export const TrelloTab = () => {
   }, [groupedByName, hiddenNames]);
 
   const lastTimestampByName = useMemo(() => {
-    const map = new Map<string, number>();
+    // Start from cached timestamps to allow sorting before a load.
+    const map = new Map<string, number>(Object.entries(cachedTimestamps));
     groupedByName.forEach((value, key) => {
       const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
       if (isFinite(last)) map.set(key, last);
     });
     return map;
-  }, [groupedByName]);
+  }, [cachedTimestamps, groupedByName]);
 
   const lastChattedByName = useMemo(() => {
     const map = new Map<string, string>();
-    groupedByName.forEach((value, key) => {
-      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
-      if (isFinite(last)) {
-        map.set(key, formatDistanceToNow(new Date(last), { addSuffix: true }));
+    lastTimestampByName.forEach((ts, name) => {
+      if (isFinite(ts)) {
+        map.set(name, formatDistanceToNow(new Date(ts), { addSuffix: true }));
       }
     });
     return map;
-  }, [groupedByName]);
+  }, [lastTimestampByName]);
 
   const autoSigRef = useRef<string>("");
 
@@ -482,6 +564,24 @@ export const TrelloTab = () => {
     if (typeof window === "undefined") return;
     localStorage.setItem(TOUCH_KEY, JSON.stringify(lastTouched));
   }, [lastTouched]);
+
+  // Persist last chatted timestamps after a load to keep ordering without auto-fetch.
+  useEffect(() => {
+    if (!huddlePlays.length || groupedByName.size === 0) return;
+    const next: Record<string, number> = {};
+    groupedByName.forEach((value, key) => {
+      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
+      if (isFinite(last)) next[key] = last;
+    });
+    setCachedTimestamps(next);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(TIMESTAMP_KEY, JSON.stringify(next));
+      } catch (err) {
+        console.warn("Unable to persist last timestamps", err);
+      }
+    }
+  }, [groupedByName, huddlePlays.length]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -637,6 +737,11 @@ export const TrelloTab = () => {
       persistBoards(next);
       return next;
     });
+    if (boardLoaded) {
+      deleteTrelloNamePosition(targetName).catch((err) =>
+        console.error("Error removing name position", err)
+      );
+    }
 
     if (removedName) {
       setHiddenNames((prev) => new Set(prev).add(removedName));
@@ -660,6 +765,7 @@ export const TrelloTab = () => {
     if (removed) {
       try {
         await deletePersonAssociations(removed);
+        await deleteHuddlePlaysByName(removed);
       } catch (err) {
         console.error("Error deleting person associations from Supabase", err);
       }
@@ -705,6 +811,14 @@ export const TrelloTab = () => {
       persistBoards(nextBoards);
       return nextBoards;
     });
+    if (boardLoaded) {
+      saveTrelloNamePosition(name, to).catch((err) =>
+        console.error("Error saving trello name position", err)
+      );
+      setNamePositions((prev) => ({ ...prev, [name]: to }));
+      // Fire-and-forget remote persist once remote has loaded, to avoid overwriting server state with empty local state.
+      saveTrelloBoardStateSafe();
+    }
     setLastTouched((prev) => ({ ...prev, [name]: Date.now() }));
     setHiddenNames((prev) => {
       if (!prev.has(name)) return prev;
@@ -720,11 +834,13 @@ export const TrelloTab = () => {
     setDrafts(
       cols.reduce((acc, col) => ({ ...acc, [col.id]: "" }), {} as Record<ColumnId, string>)
     );
+    if (boardLoaded) {
+      saveTrelloBoardStateSafe();
+    }
   };
 
   return (
     <div className="space-y-4">
-
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
           <AlertDialogHeader>
