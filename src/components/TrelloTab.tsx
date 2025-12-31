@@ -78,8 +78,9 @@ const createEmptyBoard = (cols: { id: ColumnId }[]): BoardState => {
 };
 
 export const TrelloTab = () => {
-  // Auto-fetch lightweight previews for names; only show the latest convo per person. Limit rows to reduce egress.
-  const { huddlePlays } = useHuddlePlays({ light: true, maxRows: 120, autoFetch: true });
+  // Lazy-load conversations to reduce egress; user opts in via button.
+  const { huddlePlays, isLoading, refetch } = useHuddlePlays({ light: true, maxRows: 500, autoFetch: false });
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [mode, setMode] = useState<Mode>("convo");
   const [modeTransition, setModeTransition] = useState<"idle" | "to-process" | "to-convo">("idle");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -416,7 +417,7 @@ export const TrelloTab = () => {
   }, [groupedByName, hiddenNames]);
 
   const lastTimestampByName = useMemo(() => {
-    // Start from cached timestamps to allow sorting before a load.
+    // Start with cached timestamps to preserve recency ordering even before data is loaded.
     const map = new Map<string, number>(Object.entries(cachedTimestamps));
     groupedByName.forEach((value, key) => {
       const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
@@ -424,6 +425,24 @@ export const TrelloTab = () => {
     });
     return map;
   }, [cachedTimestamps, groupedByName]);
+
+  // Persist latest timestamps whenever fresh data is available.
+  useEffect(() => {
+    if (!huddlePlays.length || groupedByName.size === 0) return; // avoid wiping cached order when not loaded
+    const next: Record<string, number> = {};
+    groupedByName.forEach((value, key) => {
+      const last = Math.max(...value.huddles.map((h) => new Date(h.created_at).getTime()));
+      if (isFinite(last)) next[key] = last;
+    });
+    setCachedTimestamps(next);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(TIMESTAMP_KEY, JSON.stringify(next));
+      } catch (err) {
+        console.warn("Unable to persist last timestamps", err);
+      }
+    }
+  }, [groupedByName, huddlePlays.length]);
 
   const lastChattedByName = useMemo(() => {
     const map = new Map<string, string>();
@@ -512,6 +531,23 @@ export const TrelloTab = () => {
         }),
     [lastTimestampByName, lastTouched]
   );
+
+  // Keep stored board ordering in sync with recency so rendered lists and persisted state match.
+  useEffect(() => {
+    setBoards((prev) => {
+      const next: BoardByMode = {
+        convo: prev.convo ? { ...prev.convo } : createEmptyBoard(columnSets.convo),
+        process: prev.process ? { ...prev.process } : createEmptyBoard(columnSets.process),
+      };
+      (["convo", "process"] as Mode[]).forEach((m) => {
+        Object.keys(next[m]).forEach((colId) => {
+          next[m][colId] = orderNames(next[m][colId] || []);
+        });
+      });
+      persistBoards(next);
+      return next;
+    });
+  }, [orderNames, persistBoards]);
 
   const selectedGroup = useMemo(() => {
     if (!selectedName) return null;
@@ -839,8 +875,29 @@ export const TrelloTab = () => {
     }
   };
 
+  const handleLoadConversations = useCallback(async () => {
+    if (isLoading) return;
+    await refetch();
+    setHasLoadedOnce(true);
+  }, [isLoading, refetch]);
+
+  useEffect(() => {
+    if (huddlePlays.length) {
+      setHasLoadedOnce(true);
+    }
+  }, [huddlePlays.length]);
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center text-slate-200">
+        <div className="flex items-center gap-2">
+          <Button onClick={handleLoadConversations} disabled={isLoading}>
+            {isLoading && !hasLoadedOnce ? "Loading..." : "Load conversations"}
+          </Button>
+          {hasLoadedOnce && <span className="text-xs text-slate-400">Loaded</span>}
+        </div>
+      </div>
+
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
           <AlertDialogHeader>

@@ -13,13 +13,12 @@ const HUDDLE_UPDATED_EVENT = 'huddle-play-updated';
 type UseHuddlePlaysOptions = {
   paginated?: boolean;
   light?: boolean; // fetch lightweight list (metadata/previews) and hydrate on demand
-  maxRows?: number; // cap rows per request
+  maxRows?: number; // cap rows per request to trim egress
   autoFetch?: boolean; // when false, skip initial fetch; caller can invoke refetch manually
-  screenshotSnippet?: number; // trim screenshot_text for previews to reduce egress
 };
 
 export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
-  const { paginated = false, light = false, maxRows = DEFAULT_MAX_ROWS, autoFetch = true, screenshotSnippet } = options;
+  const { paginated = false, light = false, maxRows = MAX_ROWS, autoFetch = true } = options;
   const { user } = useAuth();
   const [huddlePlays, setHuddlePlays] = useState<(HuddlePlay & { __preview?: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(autoFetch);
@@ -39,8 +38,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
         ? await getHuddlePlayPreviews(
             0,
             paginated ? PAGE_SIZE : maxRows,
-            maxRows,
-            snippet
+            maxRows
           )
         : await getUserHuddlePlays(
             0,
@@ -80,7 +78,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     try {
       setIsLoadingMore(true);
       const more = light
-        ? await getHuddlePlayPreviews(nextPage, PAGE_SIZE, maxRows, screenshotSnippet)
+        ? await getHuddlePlayPreviews(nextPage, PAGE_SIZE, maxRows)
         : await getUserHuddlePlays(nextPage, PAGE_SIZE, maxRows);
       setHuddlePlays((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
