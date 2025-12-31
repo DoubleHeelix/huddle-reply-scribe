@@ -6,6 +6,8 @@ export type HuddlePlay = Tables<'huddle_plays'>;
 export type HuddlePlayInsert = TablesInsert<'huddle_plays'>;
 type PeopleOverrideInsert = TablesInsert<'people_overrides'>;
 type HuddlePersonOverrideInsert = TablesInsert<'huddle_person_overrides'>;
+type TrelloBoardPositionInsert = TablesInsert<'trello_board_positions'>;
+type TrelloBoardPositionRow = Tables<'trello_board_positions'>;
 
 export type HuddlePlayPreview = Pick<
   HuddlePlay,
@@ -342,6 +344,117 @@ export const clearHuddlePersonOverride = async (huddlePlayId: string): Promise<b
     return true;
   } catch (error) {
     console.error('Error in clearHuddlePersonOverride:', error);
+    return false;
+  }
+};
+
+export type TrelloBoardPosition = Pick<TrelloBoardPositionRow, 'name' | 'column_id' | 'mode'>;
+
+export const getTrelloBoardPositions = async (): Promise<TrelloBoardPosition[]> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('trello_board_positions')
+      .select('name, column_id, mode')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error fetching trello board positions:', error);
+      return [];
+    }
+
+    return (data || []) as TrelloBoardPosition[];
+  } catch (error) {
+    console.error('Error in getTrelloBoardPositions:', error);
+    return [];
+  }
+};
+
+export const upsertTrelloBoardPositions = async (
+  positions: TrelloBoardPosition[]
+): Promise<boolean> => {
+  if (!positions.length) return true;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const payload: TrelloBoardPositionInsert[] = positions.map((p) => ({
+      user_id: user.id,
+      name: p.name,
+      column_id: p.column_id,
+      mode: p.mode,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('trello_board_positions')
+      .upsert(payload, { onConflict: 'user_id,name,mode' });
+
+    if (error) {
+      console.error('Error saving trello board positions:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in upsertTrelloBoardPositions:', error);
+    return false;
+  }
+};
+
+export const deleteTrelloBoardPositions = async (
+  names: string[],
+  mode?: string
+): Promise<boolean> => {
+  if (!names.length) return true;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    let query = supabase
+      .from('trello_board_positions')
+      .delete()
+      .eq('user_id', user.id)
+      .in('name', names);
+
+    if (mode) {
+      query = query.eq('mode', mode);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      console.error('Error deleting trello board positions:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteTrelloBoardPositions:', error);
+    return false;
+  }
+};
+
+export const clearAllTrelloBoardPositions = async (): Promise<boolean> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('trello_board_positions')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error clearing trello board positions:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in clearAllTrelloBoardPositions:', error);
     return false;
   }
 };

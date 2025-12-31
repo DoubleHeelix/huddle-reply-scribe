@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, ArrowLeftRight, Columns3, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, ArrowLeftRight, ChevronDown, ChevronUp } from "lucide-react";
 import { Input as ShadInput } from "@/components/ui/input";
 import { useHuddlePlays } from "@/hooks/useHuddlePlays";
 import { extractPersonName } from "@/utils/extractPersonName";
@@ -29,6 +29,9 @@ import {
   saveHuddlePersonOverride,
   clearHuddlePersonOverride,
   deletePersonAssociations,
+  getTrelloBoardPositions,
+  upsertTrelloBoardPositions,
+  deleteTrelloBoardPositions,
   type HuddlePlay,
 } from "@/utils/huddlePlayService";
 import { formatDistanceToNow } from "date-fns";
@@ -74,9 +77,8 @@ const createEmptyBoard = (cols: { id: ColumnId }[]): BoardState => {
 };
 
 export const TrelloTab = () => {
-  // Lazy-load conversations to reduce egress; user opts in via button.
-  const { huddlePlays, isLoading, refetch } = useHuddlePlays({ light: true, maxRows: 500, autoFetch: false });
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // Auto-fetch conversations so names and timestamps are immediately available.
+  const { huddlePlays } = useHuddlePlays({ light: true, maxRows: 250 });
   const [mode, setMode] = useState<Mode>("convo");
   const [modeTransition, setModeTransition] = useState<"idle" | "to-process" | "to-convo">("idle");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -141,6 +143,49 @@ export const TrelloTab = () => {
     convo: loadBoardForMode("convo"),
     process: loadBoardForMode("process"),
   }));
+
+  // Hydrate from Supabase so column placements persist across devices.
+  useEffect(() => {
+    let cancelled = false;
+    const loadRemoteBoard = async () => {
+      try {
+        const positions = await getTrelloBoardPositions();
+        if (cancelled || !positions.length) return;
+        setBoards((prev) => {
+          const next: BoardByMode = {
+            convo: prev.convo ? { ...prev.convo } : createEmptyBoard(columnSets.convo),
+            process: prev.process ? { ...prev.process } : createEmptyBoard(columnSets.process),
+          };
+
+          (["convo", "process"] as Mode[]).forEach((m) => {
+            const cols = columnSets[m];
+            if (!next[m]) next[m] = createEmptyBoard(cols);
+            const modePositions = positions.filter((p) => p.mode === m);
+            if (!modePositions.length) return;
+
+            // Remove any existing placements for the names, then add the persisted target.
+            modePositions.forEach((pos) => {
+              Object.keys(next[m]).forEach((colId) => {
+                next[m][colId] = (next[m][colId] || []).filter((n) => n !== pos.name);
+              });
+              if (!next[m][pos.column_id]) next[m][pos.column_id] = [];
+              next[m][pos.column_id] = [pos.name, ...(next[m][pos.column_id] || [])];
+            });
+          });
+
+          persistBoards(next);
+          return next;
+        });
+      } catch (err) {
+        console.error("Error loading trello board positions", err);
+      }
+    };
+
+    loadRemoteBoard();
+    return () => {
+      cancelled = true;
+    };
+  }, [persistBoards]);
 
   const handleModeChange = useCallback(
     (nextMode: Mode) => {
@@ -356,6 +401,16 @@ export const TrelloTab = () => {
     return map;
   }, [cachedTimestamps, groupedByName]);
 
+  const lastTimestampLabelByName = useMemo(() => {
+    const map = new Map<string, string>();
+    lastTimestampByName.forEach((ts, name) => {
+      if (isFinite(ts)) {
+        map.set(name, formatDistanceToNow(new Date(ts), { addSuffix: true }));
+      }
+    });
+    return map;
+  }, [lastTimestampByName]);
+
   // Persist latest timestamps whenever fresh data is available.
   useEffect(() => {
     if (!huddlePlays.length || groupedByName.size === 0) return; // avoid wiping cached order when not loaded
@@ -373,16 +428,6 @@ export const TrelloTab = () => {
       }
     }
   }, [groupedByName, huddlePlays.length]);
-
-  const lastChattedByName = useMemo(() => {
-    const map = new Map<string, string>();
-    lastTimestampByName.forEach((ts, name) => {
-      if (isFinite(ts)) {
-        map.set(name, formatDistanceToNow(new Date(ts), { addSuffix: true }));
-      }
-    });
-    return map;
-  }, [lastTimestampByName]);
 
   const autoSigRef = useRef<string>("");
 
@@ -589,6 +634,9 @@ export const TrelloTab = () => {
       next.delete(value);
       return next;
     });
+    upsertTrelloBoardPositions([{ name: value, column_id: column, mode }]).catch((err) => {
+      console.error("Error saving trello position", err);
+    });
   };
 
   const saveRename = async (groupName: string, rawNames: Set<string>, newNameRaw: string) => {
@@ -693,6 +741,9 @@ export const TrelloTab = () => {
         delete next[removedName];
         return next;
       });
+      deleteTrelloBoardPositions([removedName]).catch((err) =>
+        console.error("Error deleting trello position", err)
+      );
     }
     return removedName;
   };
@@ -760,39 +811,27 @@ export const TrelloTab = () => {
       next.delete(name);
       return next;
     });
+    upsertTrelloBoardPositions([{ name, column_id: to, mode: targetMode }]).catch((err) => {
+      console.error("Error saving trello position", err);
+    });
   };
 
   const clearBoard = () => {
     const cols = columnSets[mode];
+    const namesToClear = Object.values(board || {}).flat();
     setBoards((prev) => ({ ...prev, [mode]: createEmptyBoard(cols) }));
     setDrafts(
       cols.reduce((acc, col) => ({ ...acc, [col.id]: "" }), {} as Record<ColumnId, string>)
     );
-  };
-
-  const handleLoadConversations = useCallback(async () => {
-    if (isLoading) return;
-    await refetch();
-    setHasLoadedOnce(true);
-  }, [isLoading, refetch]);
-
-  useEffect(() => {
-    if (huddlePlays.length) {
-      setHasLoadedOnce(true);
+    if (namesToClear.length) {
+      deleteTrelloBoardPositions(namesToClear, mode).catch((err) =>
+        console.error("Error clearing trello positions", err)
+      );
     }
-  }, [huddlePlays.length]);
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center text-slate-200">
-        <div className="flex items-center gap-2">
-          <Button onClick={handleLoadConversations} disabled={isLoading}>
-            {isLoading && !hasLoadedOnce ? "Loading..." : "Load conversations"}
-          </Button>
-          {hasLoadedOnce && <span className="text-xs text-slate-400">Loaded</span>}
-        </div>
-      </div>
-
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
           <AlertDialogHeader>
@@ -984,9 +1023,9 @@ export const TrelloTab = () => {
                           >
                             {name}
                           </button>
-                          {lastChattedByName.get(name) && (
+                          {lastTimestampLabelByName.get(name) && (
                             <div className="text-[11px] text-slate-400 truncate">
-                              Last chatted about {lastChattedByName.get(name)}
+                              Last chatted {lastTimestampLabelByName.get(name)}
                             </div>
                           )}
                         </div>
@@ -1077,32 +1116,41 @@ export const TrelloTab = () => {
             <div className="space-y-4 text-center">
               <h2 className="text-xl font-semibold text-white">{selectedGroup.appliedName}</h2>
               <p className="text-sm text-slate-400">
-                {selectedGroup.huddles.length} conversation{selectedGroup.huddles.length === 1 ? "" : "s"}
+                Showing most recent conversation{selectedGroup.huddles.length > 1 ? ` of ${selectedGroup.huddles.length}` : ""}
               </p>
 
-              {selectedGroup.huddles
-                .slice()
-                .sort(
-                  (a, b) =>
-                    new Date(b.created_at).getTime() -
-                    new Date(a.created_at).getTime()
-                )
-                .map((huddle) => {
-                  const detectedName = extractPersonName(huddle.screenshot_text);
-                  const appliedName = applyOverride(detectedName, huddle.id);
+              {selectedGroup.huddles.length === 0 ? (
+                <div className="text-sm text-slate-300 text-center py-4">
+                  No conversations found for this person yet.
+                </div>
+              ) : (
+                (() => {
+                  const [latest] = selectedGroup.huddles
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        new Date(b.created_at).getTime() -
+                        new Date(a.created_at).getTime()
+                    );
+                  const detectedName = extractPersonName(latest.screenshot_text);
+                  const appliedName = applyOverride(detectedName, latest.id);
                   const messageDraft =
-                    messageRenameDrafts[huddle.id] ??
-                    messageOverrides[huddle.id] ??
+                    messageRenameDrafts[latest.id] ??
+                    messageOverrides[latest.id] ??
                     appliedName;
-                  const hasMessageOverride = Boolean(messageOverrides[huddle.id]);
+                  const hasMessageOverride = Boolean(messageOverrides[latest.id]);
+                  const lastUpdatedLabel = formatDistanceToNow(new Date(latest.created_at), { addSuffix: true });
 
-                      return (
-                        <div
-                          key={huddle.id}
-                          className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 space-y-3"
-                        >
-                          <div className="rounded-md border border-slate-800 bg-slate-950/60 p-2 space-y-2">
-                            <div className="text-xs text-slate-300">
+                  return (
+                    <div
+                      key={latest.id}
+                      className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 space-y-3"
+                    >
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>Captured {lastUpdatedLabel}</span>
+                      </div>
+                      <div className="rounded-md border border-slate-800 bg-slate-950/60 p-2 space-y-2">
+                        <div className="text-xs text-slate-300">
                               Linked to <span className="text-white font-semibold">{appliedName}</span>
                               <span className="text-slate-500 ml-2">(detected: {detectedName})</span>
                               {hasMessageOverride && <span className="ml-2 text-cyan-300">custom</span>}
@@ -1113,7 +1161,7 @@ export const TrelloTab = () => {
                                 onChange={(e) =>
                                   setMessageRenameDrafts((prev) => ({
                                     ...prev,
-                                    [huddle.id]: e.target.value,
+                                    [latest.id]: e.target.value,
                                   }))
                                 }
                                 className="flex-1 min-w-[140px] max-w-full sm:max-w-[260px] bg-slate-900 border-slate-800 text-white text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -1122,7 +1170,7 @@ export const TrelloTab = () => {
                               <div className="flex gap-2 justify-end sm:justify-start shrink-0">
                                 <Button
                                   size="sm"
-                                  onClick={() => saveMessageRename(huddle, messageDraft)}
+                                  onClick={() => saveMessageRename(latest, messageDraft)}
                                 >
                                   Save
                                 </Button>
@@ -1131,7 +1179,7 @@ export const TrelloTab = () => {
                                     size="sm"
                                     variant="ghost"
                                     className="text-slate-200"
-                                    onClick={() => resetMessageRename(huddle.id)}
+                                    onClick={() => resetMessageRename(latest.id)}
                                   >
                                     Reset
                                   </Button>
@@ -1145,7 +1193,7 @@ export const TrelloTab = () => {
                               Screenshot context
                             </div>
                             <p className="text-slate-200 text-sm whitespace-pre-wrap leading-relaxed text-left">
-                              {huddle.screenshot_text || "No screenshot text available."}
+                              {latest.screenshot_text || "No screenshot text available."}
                             </p>
                           </div>
 
@@ -1154,12 +1202,13 @@ export const TrelloTab = () => {
                               Final output message
                             </div>
                             <div className="text-slate-100 text-sm whitespace-pre-wrap leading-relaxed text-left">
-                              {huddle.final_reply || huddle.generated_reply || "No generated reply yet."}
+                              {latest.final_reply || latest.generated_reply || "No generated reply yet."}
                             </div>
                           </div>
                     </div>
                   );
-                })}
+                })()
+              )}
             </div>
           ) : (
             <div className="text-sm text-slate-300 text-center py-4">
