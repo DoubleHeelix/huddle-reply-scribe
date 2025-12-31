@@ -12,13 +12,15 @@ const HUDDLE_SAVED_EVENT = 'huddle-play-saved';
 type UseHuddlePlaysOptions = {
   paginated?: boolean;
   light?: boolean; // fetch lightweight list (metadata/previews) and hydrate on demand
+  maxRows?: number; // cap rows per request to trim egress
+  autoFetch?: boolean; // when false, skip initial fetch; caller can invoke refetch manually
 };
 
 export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
-  const { paginated = false, light = false } = options;
+  const { paginated = false, light = false, maxRows = MAX_ROWS, autoFetch = true } = options;
   const { user } = useAuth();
   const [huddlePlays, setHuddlePlays] = useState<(HuddlePlay & { __preview?: boolean })[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(autoFetch);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
@@ -32,13 +34,13 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
       const plays = light
         ? await getHuddlePlayPreviews(
             0,
-            paginated ? PAGE_SIZE : MAX_ROWS,
-            MAX_ROWS
+            paginated ? PAGE_SIZE : maxRows,
+            maxRows
           )
         : await getUserHuddlePlays(
             0,
-            paginated ? PAGE_SIZE : MAX_ROWS,
-            MAX_ROWS
+            paginated ? PAGE_SIZE : maxRows,
+            maxRows
           );
       const normalized = (plays as Array<HuddlePlay | HuddlePlayPreview>).map((p) => ({
         ...(p as HuddlePlay),
@@ -73,8 +75,8 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     try {
       setIsLoadingMore(true);
       const more = light
-        ? await getHuddlePlayPreviews(nextPage, PAGE_SIZE, MAX_ROWS)
-        : await getUserHuddlePlays(nextPage, PAGE_SIZE, MAX_ROWS);
+        ? await getHuddlePlayPreviews(nextPage, PAGE_SIZE, maxRows)
+        : await getUserHuddlePlays(nextPage, PAGE_SIZE, maxRows);
       setHuddlePlays((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
         const newItems = more
@@ -159,16 +161,21 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchHuddlePlays();
-    } else {
+    if (!user) {
       setIsLoading(false);
       setHuddlePlays([]);
+      return;
     }
-  }, [fetchHuddlePlays, user]);
+    if (!autoFetch) {
+      setIsLoading(false);
+      return;
+    }
+    fetchHuddlePlays();
+  }, [autoFetch, fetchHuddlePlays, user]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!autoFetch) return;
     const handler = () => {
       fetchHuddlePlays();
     };
@@ -176,7 +183,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     return () => {
       window.removeEventListener(HUDDLE_SAVED_EVENT, handler);
     };
-  }, [fetchHuddlePlays]);
+  }, [autoFetch, fetchHuddlePlays]);
 
   return {
     huddlePlays,
