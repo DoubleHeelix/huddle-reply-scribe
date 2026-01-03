@@ -5,6 +5,7 @@ import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { useOCR } from '@/hooks/useOCR';
 import type { DocumentKnowledge } from '@/types/document';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
+import type { BatchItem } from '@/types/batch';
 
 export const useHuddleState = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -24,6 +25,11 @@ export const useHuddleState = () => {
   const [interruptionText, setInterruptionText] = useState("");
   const [conversationStarters, setConversationStarters] = useState<string[]>([]);
   const [editedStarter, setEditedStarter] = useState("");
+  const [huddleMode, setHuddleMode] = useState<'single' | 'batch'>(() => {
+    if (typeof window === 'undefined') return 'single';
+    return (localStorage.getItem('huddle_mode') as 'single' | 'batch') || 'single';
+  });
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
 
   const { toast } = useToast();
 
@@ -53,6 +59,11 @@ export const useHuddleState = () => {
     if (savedAutoCropping) setEnableAutoCropping(JSON.parse(savedAutoCropping));
     if (savedCropMargin) setAutoCropMargin(parseInt(savedCropMargin));
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('huddle_mode', huddleMode);
+  }, [huddleMode]);
 
   // Show error toast when error occurs
   useEffect(() => {
@@ -129,6 +140,12 @@ export const useHuddleState = () => {
     setConversationStarters,
     editedStarter,
     setEditedStarter,
+    huddleMode,
+    setHuddleMode,
+    batchItems,
+    setBatchItems,
+    batchItems,
+    setBatchItems,
     
     // Hooks
     generateReply,
