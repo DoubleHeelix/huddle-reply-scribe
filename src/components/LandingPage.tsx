@@ -74,6 +74,7 @@ const LandingPage = () => {
     { icon: ShieldCheck, title: "Context aware", copy: "Grounded by your huddles and documents." },
     { icon: Bot, title: "Voice to text", copy: "Draft by speaking, refine in seconds." },
   ];
+  const isSignup = authMode === 'signup';
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-slate-950 text-white">
@@ -104,7 +105,7 @@ const LandingPage = () => {
                 {features.map(({ title }) => (
                   <span
                     key={title}
-                    className="px-3 py-2 rounded-full bg-white/10 border border-white/10 text-xs text-slate-200 whitespace-nowrap dark:bg-white/10 dark:text-slate-200 bg-slate-100 text-slate-800 border-slate-200"
+                    className="px-3 py-2 rounded-full bg-white/15 border border-white/20 text-xs text-white/90 whitespace-nowrap shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
                   >
                     {title}
                   </span>
@@ -126,13 +127,23 @@ const LandingPage = () => {
                   </div>
                 ))}
               </div>
-            </div>
+              </div>
 
-            <div className="glass-surface rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-md border border-white/10 order-last md:order-none">
+            <div
+              className={`glass-surface rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-md border order-last md:order-none transition-all duration-300 ${
+                isSignup
+                  ? 'border-cyan-300/40 shadow-[0_20px_60px_rgba(45,212,191,0.15)]'
+                  : 'border-white/10'
+              }`}
+            >
               <div className="flex items-center justify-center mb-6">
                 <div className="text-center">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Get started</p>
-                  <h2 className="text-xl font-display">Sign {authMode === 'signin' ? 'in' : 'up'} to continue</h2>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                    {isSignup ? 'Create your account' : 'Welcome back'}
+                  </p>
+                  <h2 className="text-xl font-display">
+                    {isSignup ? 'Get your workspace set up' : 'Sign in to continue'}
+                  </h2>
                 </div>
               </div>
 
@@ -140,7 +151,7 @@ const LandingPage = () => {
                 <div className="space-y-2">
                   <label className="text-sm text-slate-300 flex items-center gap-2 justify-center text-center">
                     <Mail className="w-4 h-4 text-slate-400" />
-                    Work email
+                    Email
                   </label>
                   <Input
                     type="email"
@@ -169,7 +180,11 @@ const LandingPage = () => {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 hover:brightness-110 text-white font-display text-sm h-12 rounded-xl"
+                  className={`w-full bg-gradient-to-r text-white font-display text-sm h-12 rounded-xl ${
+                    isSignup
+                      ? 'from-cyan-400 via-teal-400 to-emerald-400 hover:brightness-110'
+                      : 'from-purple-500 via-indigo-500 to-cyan-400 hover:brightness-110'
+                  }`}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -186,10 +201,16 @@ const LandingPage = () => {
                 </Button>
               </form>
 
+              <div className="mt-4 text-xs text-slate-400 text-center">
+                {isSignup
+                  ? 'We will email you a verification link to activate your account.'
+                  : 'We’ll keep you signed in on this device.'}
+              </div>
+
               <div className="mt-6 flex items-center justify-center text-sm text-slate-300">
                 <button
                   onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                  className="hover:text-white transition-colors underline-offset-4"
+                  className="hover:text-white transition-colors underline-offset-4 font-medium"
                 >
                   {authMode === 'signin'
                     ? "Don't have an account? Sign up"
