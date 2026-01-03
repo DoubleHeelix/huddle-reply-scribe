@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
-import { Card, CardContent } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Settings, LogOut, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 
 
 interface SettingsSidebarProps {
@@ -34,9 +33,17 @@ interface SettingsSidebarProps {
   user: User | null;
   onSignOut: () => void;
   isAdmin: boolean;
+  huddleMode: 'single' | 'batch';
+  onHuddleModeChange: (mode: 'single' | 'batch') => void;
 }
 
-export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarProps) => {
+export const SettingsSidebar = ({
+  user,
+  onSignOut,
+  isAdmin,
+  huddleMode,
+  onHuddleModeChange,
+}: SettingsSidebarProps) => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -118,6 +125,24 @@ export const SettingsSidebar = ({ user, onSignOut, isAdmin }: SettingsSidebarPro
                 <Sun className="w-4 h-4" />
                 Light
               </Button>
+            </div>
+          </div>
+
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <h3 className="text-sm text-gray-300 mb-2">Huddle mode</h3>
+            <div className="flex items-center justify-between bg-slate-900/60 border border-white/10 rounded-xl px-3 py-3">
+              <div>
+                <p className="text-white text-sm font-medium">Single vs Batch</p>
+                <p className="text-xs text-gray-400">Batch lets you queue up to 5 screenshots for sequential replies.</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-white">
+                Single
+                <Switch
+                  checked={huddleMode === 'batch'}
+                  onCheckedChange={(checked) => onHuddleModeChange(checked ? 'batch' : 'single')}
+                />
+                Batch
+              </div>
             </div>
           </div>
           

@@ -28,6 +28,8 @@ export const MainApp = () => {
     extractText,
     isOCRProcessing,
     toast,
+    huddleMode,
+    setHuddleMode,
   } = huddleState;
 
   // Save Google Cloud API key to localStorage
@@ -133,6 +135,8 @@ export const MainApp = () => {
           user={user}
           onSignOut={onSignOut}
           isAdmin={isAdmin}
+          huddleMode={huddleMode}
+          onHuddleModeChange={setHuddleMode}
         />
 
         {/* Header + Tabs */}

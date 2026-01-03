@@ -6,6 +6,7 @@ import { ImageUploadSection } from './ImageUploadSection';
 import { DraftMessageSection } from './DraftMessageSection';
 import { GeneratedReplySection } from './GeneratedReplySection';
 import { AIKnowledgeSources } from './AIKnowledgeSources';
+import { BatchHuddlesSection } from './BatchHuddlesSection';
 import { useHuddleState } from '@/hooks/useHuddleState';
 import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
 
@@ -46,6 +47,9 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     lastUsedDocuments,
     setLastUsedDocuments,
     setAutoCroppingEnabled,
+    huddleMode,
+    batchItems,
+    setBatchItems,
   } = huddleState;
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [forceShowReplySection, setForceShowReplySection] = useState(false);
@@ -310,69 +314,83 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
   return (
     <div className="space-y-6 relative">
-      <ImageUploadSection
-        uploadedImage={uploadedImage}
-        isOCRProcessing={isOCRProcessing}
-        onImageUpload={handleImageUpload}
-      />
-
-      {!hasScreenshot && (
-        <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-900/40 p-4 text-center text-sm text-slate-400">
-          Step 2 (draft + generate) unlocks after you drop a screenshot above.
-        </div>
-      )}
-
-      <AnimatePresence>
-        {hasScreenshot && (
-          <motion.div
-            key="step-2"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className="space-y-6"
-          >
-          <DraftMessageSection
-            userDraft={userDraft}
-            onUserDraftChange={setUserDraft}
+      {huddleMode === 'batch' ? (
+        <BatchHuddlesSection
+          extractText={extractText}
+          generateReply={generateReply}
+          adjustTone={adjustTone}
+          toast={toast}
+          isAdjustingTone={isAdjustingTone}
+          batchItems={batchItems}
+          setBatchItems={setBatchItems}
+        />
+      ) : (
+        <>
+          <ImageUploadSection
+            uploadedImage={uploadedImage}
+            isOCRProcessing={isOCRProcessing}
+            onImageUpload={handleImageUpload}
           />
 
-          {/* Generate Button */}
-          <Button 
-            onClick={handleGenerateReply}
-            disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
-          >
-            <Zap className="w-5 h-5 mr-2" />
-            {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
-          </Button>
-
-          <GeneratedReplySection
-            generatedReply={generatedReply}
-            selectedTone={selectedTone}
-            isGenerating={isGenerating}
-            isAdjustingTone={isAdjustingTone}
-            showInlineLoader={showGenerationLoader}
-            forceShow={forceShowReplySection}
-            onToneChange={setSelectedTone}
-            onApplyTone={handleApplyTone}
-            onCopyReply={handleCopyReply}
-            onRegenerate={handleRegenerate}
-            onReset={handleResetHuddle}
-            copiedFeedback={copiedFeedback}
-          />
-
-          {/* AI Knowledge Sources Section - Show if we have any knowledge data */}
-              {showKnowledgeSources && (lastUsedHuddles.length > 0 || lastUsedDocuments.length > 0) && (
-                <AIKnowledgeSources
-                  pastHuddles={lastUsedHuddles}
-                  documentKnowledge={lastUsedDocuments}
-                  isVisible={true}
-                />
-              )}
-            </motion.div>
+          {!hasScreenshot && (
+            <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-900/40 p-4 text-center text-sm text-slate-400">
+              Step 2 (draft + generate) unlocks after you drop a screenshot above.
+            </div>
           )}
-        </AnimatePresence>
+
+          <AnimatePresence>
+            {hasScreenshot && (
+              <motion.div
+                key="step-2"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
+                className="space-y-6"
+              >
+              <DraftMessageSection
+                userDraft={userDraft}
+                onUserDraftChange={setUserDraft}
+              />
+
+              {/* Generate Button */}
+              <Button 
+                onClick={handleGenerateReply}
+                disabled={isGenerating || !userDraft.trim() || !uploadedImage}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
+              >
+                <Zap className="w-5 h-5 mr-2" />
+                {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
+              </Button>
+
+              <GeneratedReplySection
+                generatedReply={generatedReply}
+                selectedTone={selectedTone}
+                isGenerating={isGenerating}
+                isAdjustingTone={isAdjustingTone}
+                showInlineLoader={showGenerationLoader}
+                forceShow={forceShowReplySection}
+                onToneChange={setSelectedTone}
+                onApplyTone={handleApplyTone}
+                onCopyReply={handleCopyReply}
+                onRegenerate={handleRegenerate}
+                onReset={handleResetHuddle}
+                copiedFeedback={copiedFeedback}
+              />
+
+              {/* AI Knowledge Sources Section - Show if we have any knowledge data */}
+                  {showKnowledgeSources && (lastUsedHuddles.length > 0 || lastUsedDocuments.length > 0) && (
+                    <AIKnowledgeSources
+                      pastHuddles={lastUsedHuddles}
+                      documentKnowledge={lastUsedDocuments}
+                      isVisible={true}
+                    />
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+        </>
+      )}
     </div>
   );
 };
