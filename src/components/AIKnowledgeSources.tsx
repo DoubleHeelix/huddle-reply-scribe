@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { formatExtractedText } from '@/utils/textProcessing';
+import { formatExtractedText, renderMarkdownToHtml } from '@/utils/textProcessing';
 import type { DocumentKnowledge } from '@/types/document';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -181,9 +181,11 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
                     ? doc.metadata.highlight
                     : undefined;
                 const url = typeof doc.metadata?.url === 'string' ? doc.metadata.url : undefined;
-                const snippet = doc.content_chunk ? formatExtractedText(doc.content_chunk) : 'Loading snippet...';
+                const hasSnippet = Boolean(doc.content_chunk);
+                const snippetText = hasSnippet ? formatExtractedText(doc.content_chunk) : 'Loading snippet...';
+                const snippetHtml = hasSnippet ? renderMarkdownToHtml(doc.content_chunk) : '';
                 const documentTime = getDocumentTimeLabel(doc.metadata);
-                const fallbackLineTextRaw = snippet
+                const fallbackLineTextRaw = snippetText
                   .split(/\r?\n/)
                   .map((line) => line.trim())
                   .find((line) => line.length > 0);
@@ -270,7 +272,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
                             className="hover:underline"
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleCopySnippet(docId, snippet);
+                              handleCopySnippet(docId, snippetText);
                             }}
                           >
                             {copiedSnippetId === docId ? 'Copied' : 'Copy snippet'}
@@ -288,9 +290,16 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
                           </div>
                         )}
 
-                        <p className="text-sm text-slate-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
-                          {snippet}
-                        </p>
+                        {snippetHtml ? (
+                          <div
+                            className="prose prose-sm dark:prose-invert max-w-none text-slate-800 dark:text-gray-200 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: snippetHtml }}
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                            {snippetText}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
