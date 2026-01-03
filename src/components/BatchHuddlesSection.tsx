@@ -5,7 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { sanitizeHumanReply } from "@/utils/sanitizeHumanReply";
 import type { DocumentKnowledge } from "@/types/document";
 import type { useToast } from "@/hooks/use-toast";
@@ -43,6 +49,8 @@ const fileToDataUrl = (file: File) =>
 const fallbackScreenshotText =
   "Describe what you see in the screenshot or paste context from the huddle so we can tailor the reply.";
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface BatchHuddlesSectionProps {
   extractText: (file: File | Blob) => Promise<string>;
   generateReply: (
@@ -52,14 +60,11 @@ interface BatchHuddlesSectionProps {
     existingDocumentKnowledge?: DocumentKnowledge[],
     existingPastHuddles?: (HuddlePlay & { similarity?: number })[],
     onToken?: (partial: string) => void
-  ) => Promise<
-    | {
-        reply: string;
-        pastHuddles?: (HuddlePlay & { similarity?: number })[];
-        documentKnowledge?: DocumentKnowledge[];
-      }
-    | null
-  >;
+  ) => Promise<{
+    reply: string;
+    pastHuddles?: (HuddlePlay & { similarity?: number })[];
+    documentKnowledge?: DocumentKnowledge[];
+  } | null>;
   adjustTone: (reply: string, selectedTone: string) => Promise<string | null>;
   toast: ToastFn;
   isAdjustingTone: boolean;
@@ -81,7 +86,9 @@ export const BatchHuddlesSection = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const canAddMore = batchItems.length < 5;
-  const totalReady = batchItems.filter((i) => i.status === "ready" || i.status === "needs-draft").length;
+  const totalReady = batchItems.filter(
+    (i) => i.status === "ready" || i.status === "needs-draft"
+  ).length;
   const completed = batchItems.filter((i) => i.status === "done").length;
 
   const onDrop = async (accepted: File[]) => {
@@ -116,7 +123,9 @@ export const BatchHuddlesSection = ({
 
   const runOCR = async (id: string, file: File) => {
     setBatchItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: "ocr", error: undefined } : item))
+      prev.map((item) =>
+        item.id === id ? { ...item, status: "ocr", error: undefined } : item
+      )
     );
 
     try {
@@ -137,7 +146,9 @@ export const BatchHuddlesSection = ({
       console.error("Batch OCR failed", error);
       setBatchItems((prev) =>
         prev.map((item) =>
-          item.id === id ? { ...item, status: "error", error: "OCR failed" } : item
+          item.id === id
+            ? { ...item, status: "error", error: "OCR failed" }
+            : item
         )
       );
       toast({
@@ -149,20 +160,32 @@ export const BatchHuddlesSection = ({
   };
 
   const updateItem = (id: string, updater: (item: BatchItem) => BatchItem) => {
-    setBatchItems((prev) => prev.map((item) => (item.id === id ? updater(item) : item)));
+    setBatchItems((prev) =>
+      prev.map((item) => (item.id === id ? updater(item) : item))
+    );
   };
 
   const handleDraftChange = (id: string, draft: string) => {
     updateItem(id, (item) => ({
       ...item,
       draft,
-      status: item.status === "needs-draft" && draft.trim() ? "ready" : item.status,
+      status:
+        item.status === "needs-draft" && draft.trim() ? "ready" : item.status,
     }));
   };
 
   const runGeneration = async (id: string, isRegeneration = false) => {
     const target = batchItems.find((i) => i.id === id);
     if (!target) return;
+
+    if (isRegeneration && target.status === "generating") {
+      toast({
+        title: "Please wait",
+        description:
+          "This huddle is already generating. Try again in a moment.",
+      });
+      return;
+    }
 
     if (!target.draft.trim()) {
       toast({
@@ -187,19 +210,34 @@ export const BatchHuddlesSection = ({
       error: undefined,
     }));
 
-    const result = await generateReply(
-      screenshotText,
-      draftForAI,
-      isRegeneration,
-      target.documents,
-      target.pastHuddles,
-      (partial) => {
-        updateItem(id, (item) => ({ ...item, reply: sanitizeHumanReply(partial) }));
+    let result = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      result = await generateReply(
+        screenshotText,
+        draftForAI,
+        isRegeneration,
+        target.documents,
+        target.pastHuddles,
+        (partial) => {
+          updateItem(id, (item) => ({
+            ...item,
+            reply: sanitizeHumanReply(partial),
+          }));
+        }
+      );
+
+      if (result) break;
+      if (attempt === 1) {
+        await wait(250);
       }
-    );
+    }
 
     if (!result) {
-      updateItem(id, (item) => ({ ...item, status: "error", error: "Generation failed" }));
+      updateItem(id, (item) => ({
+        ...item,
+        status: "error",
+        error: "Generation failed",
+      }));
       toast({
         title: "Generation failed",
         description: "Try again or adjust the draft.",
@@ -219,7 +257,9 @@ export const BatchHuddlesSection = ({
     }));
     toast({
       title: "Reply ready",
-      description: `Used ${result.pastHuddles?.length || 0} huddles and ${result.documentKnowledge?.length || 0} docs.`,
+      description: `Used ${result.pastHuddles?.length || 0} huddles and ${
+        result.documentKnowledge?.length || 0
+      } docs.`,
     });
   };
 
@@ -229,6 +269,7 @@ export const BatchHuddlesSection = ({
     for (const item of batchItems) {
       if (item.status === "done" || item.status === "generating") continue;
       await runGeneration(item.id, false);
+      await wait(300);
     }
     setIsRunningAll(false);
   };
@@ -279,7 +320,10 @@ export const BatchHuddlesSection = ({
     disabled: !canAddMore,
   });
 
-  const activeItem = useMemo(() => batchItems.find((i) => i.id === activeId) || batchItems[0], [batchItems, activeId]);
+  const activeItem = useMemo(
+    () => batchItems.find((i) => i.id === activeId) || batchItems[0],
+    [batchItems, activeId]
+  );
 
   return (
     <div className="space-y-4">
@@ -288,8 +332,14 @@ export const BatchHuddlesSection = ({
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors ${
-              isDragActive ? "border-cyan-400 bg-cyan-500/10" : "border-white/15"
-            } ${!canAddMore ? "cursor-not-allowed opacity-60" : "hover:border-cyan-300 hover:bg-white/5"}`}
+              isDragActive
+                ? "border-cyan-400 bg-cyan-500/10"
+                : "border-white/15"
+            } ${
+              !canAddMore
+                ? "cursor-not-allowed opacity-60"
+                : "hover:border-cyan-300 hover:bg-white/5"
+            }`}
           >
             <input {...getInputProps()} />
             <div className="flex flex-col items-center gap-3 text-white">
@@ -297,7 +347,9 @@ export const BatchHuddlesSection = ({
                 <Upload className="w-6 h-6 text-cyan-300" />
               </div>
               <div>
-                <p className="text-lg font-display">Drop up to 5 huddle screenshots</p>
+                <p className="text-lg font-display">
+                  Drop up to 5 huddle screenshots
+                </p>
               </div>
               <div className="px-4 py-2 rounded-full bg-white/10 text-sm text-white/90">
                 {canAddMore ? "Select images" : "Batch full"}
@@ -306,9 +358,15 @@ export const BatchHuddlesSection = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
-            <Badge className="bg-cyan-500/20 text-cyan-200">Queue {batchItems.length}/5</Badge>
-            <Badge className="bg-emerald-500/20 text-emerald-100">Done {completed}</Badge>
-            <Badge className="bg-indigo-500/20 text-indigo-100">Ready {totalReady}</Badge>
+            <Badge className="bg-cyan-500/20 text-cyan-200">
+              Queue {batchItems.length}/5
+            </Badge>
+            <Badge className="bg-emerald-500/20 text-emerald-100">
+              Done {completed}
+            </Badge>
+            <Badge className="bg-indigo-500/20 text-indigo-100">
+              Ready {totalReady}
+            </Badge>
           </div>
 
           <div className="flex gap-3 justify-center">
@@ -329,7 +387,11 @@ export const BatchHuddlesSection = ({
                 </>
               )}
             </Button>
-            <Button variant="outline" onClick={handleReset} className="border-white/20 text-white">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              className="border-white/20 text-white"
+            >
               Reset batch
             </Button>
           </div>
@@ -340,7 +402,11 @@ export const BatchHuddlesSection = ({
         {batchItems.map((item, index) => (
           <Card
             key={item.id}
-            className={`bg-slate-900/80 border ${activeItem?.id === item.id ? "border-cyan-400/40" : "border-white/10"} glass-surface`}
+            className={`bg-slate-900/80 border ${
+              activeItem?.id === item.id
+                ? "border-cyan-400/40"
+                : "border-white/10"
+            } glass-surface`}
             onClick={() => setActiveId(item.id)}
           >
             <CardContent className="p-4 sm:p-5 space-y-3">
@@ -348,7 +414,9 @@ export const BatchHuddlesSection = ({
                 <div className="space-y-2">
                   <div className="relative w-full bg-slate-950/80 border border-white/10 rounded-2xl overflow-hidden shadow-inner">
                     <div className="absolute top-2 left-2">
-                      <Badge className="bg-black/60 text-white border-white/10">{index + 1}</Badge>
+                      <Badge className="bg-black/60 text-white border-white/10">
+                        {index + 1}
+                      </Badge>
                     </div>
                     <img
                       src={item.imageUrl}
@@ -383,7 +451,9 @@ export const BatchHuddlesSection = ({
                   <div className="grid grid-cols-2 gap-3">
                     <Button
                       onClick={() => runGeneration(item.id, false)}
-                      disabled={item.status === "ocr" || item.status === "generating"}
+                      disabled={
+                        item.status === "ocr" || item.status === "generating"
+                      }
                       className="bg-gradient-to-r from-purple-600 to-blue-500 text-white"
                     >
                       {item.status === "generating" ? (
@@ -401,7 +471,11 @@ export const BatchHuddlesSection = ({
                     <Button
                       variant="outline"
                       onClick={() => runGeneration(item.id, true)}
-                      disabled={item.status === "ocr" || item.status === "generating" || !item.reply}
+                      disabled={
+                        item.status === "ocr" ||
+                        item.status === "generating" ||
+                        !item.reply
+                      }
                       className="border-white/20 text-white"
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
@@ -413,7 +487,12 @@ export const BatchHuddlesSection = ({
                     <div className="flex items-center gap-2">
                       <Select
                         value={item.tone}
-                        onValueChange={(val) => updateItem(item.id, (curr) => ({ ...curr, tone: val }))}
+                        onValueChange={(val) =>
+                          updateItem(item.id, (curr) => ({
+                            ...curr,
+                            tone: val,
+                          }))
+                        }
                         disabled={!item.reply || isAdjustingTone}
                       >
                         <SelectTrigger className="w-full bg-slate-950 border-white/15 text-white">
@@ -421,7 +500,11 @@ export const BatchHuddlesSection = ({
                         </SelectTrigger>
                         <SelectContent className="bg-slate-900 border-white/10 text-white">
                           {toneOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value} className="text-white">
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              className="text-white"
+                            >
                               {option.label}
                             </SelectItem>
                           ))}
@@ -432,7 +515,9 @@ export const BatchHuddlesSection = ({
                       <Button
                         variant="outline"
                         onClick={() => handleAdjustTone(item.id)}
-                        disabled={!item.reply || item.tone === "none" || isAdjustingTone}
+                        disabled={
+                          !item.reply || item.tone === "none" || isAdjustingTone
+                        }
                         className="border-white/20 text-white w-full"
                       >
                         {isAdjustingTone ? "Adjusting..." : "Apply tone"}
@@ -457,10 +542,14 @@ export const BatchHuddlesSection = ({
                         <Check className="w-4 h-4" />
                         Reply ready
                       </div>
-                      <pre className="whitespace-pre-wrap font-sans">{item.reply}</pre>
-                      {(item.pastHuddles.length > 0 || item.documents.length > 0) && (
+                      <pre className="whitespace-pre-wrap font-sans">
+                        {item.reply}
+                      </pre>
+                      {(item.pastHuddles.length > 0 ||
+                        item.documents.length > 0) && (
                         <p className="mt-2 text-xs text-slate-400">
-                          Sources: {item.pastHuddles.length} huddles • {item.documents.length} docs
+                          Sources: {item.pastHuddles.length} huddles •{" "}
+                          {item.documents.length} docs
                         </p>
                       )}
                     </div>
@@ -471,7 +560,10 @@ export const BatchHuddlesSection = ({
           </Card>
         ))}
 
-        <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <Dialog
+          open={!!previewImage}
+          onOpenChange={(open) => !open && setPreviewImage(null)}
+        >
           <DialogContent className="max-w-5xl bg-slate-900/95 border-white/10">
             {previewImage && (
               <img
@@ -486,7 +578,8 @@ export const BatchHuddlesSection = ({
         {!batchItems.length && (
           <Card className="bg-slate-900/60 border-white/5 glass-surface">
             <CardContent className="p-6 text-center text-slate-300">
-              Drop multiple screenshots to queue huddles and generate replies in one pass.
+              Drop multiple screenshots to queue huddles and generate replies in
+              one pass.
             </CardContent>
           </Card>
         )}
