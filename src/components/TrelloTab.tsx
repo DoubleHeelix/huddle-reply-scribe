@@ -50,6 +50,7 @@ import {
   type HuddlePlay,
 } from "@/utils/huddlePlayService";
 import { formatDistanceToNow } from "date-fns";
+import { fetchLLMNameCandidate } from "@/utils/nameInferenceService";
 
 type ColumnId = string;
 type Mode = "convo" | "process";
@@ -58,6 +59,7 @@ const STORAGE_KEY = "trello_board_state";
 const TOUCH_KEY = "trello_last_touched";
 const HIDDEN_KEY = "trello_hidden_names";
 const TIMESTAMP_KEY = "trello_last_timestamp";
+const AI_GUESS_KEY = "trello_ai_name_guesses";
 
 type ColumnConfig = {
   id: ColumnId;
@@ -217,6 +219,19 @@ export const TrelloTab = () => {
     }
     return {};
   });
+  const [aiNameGuesses, setAiNameGuesses] = useState<Record<string, string>>(
+    () => {
+      if (typeof window === "undefined") return {};
+      try {
+        const stored = localStorage.getItem(AI_GUESS_KEY);
+        if (stored) return JSON.parse(stored) as Record<string, string>;
+      } catch (err) {
+        console.warn("Unable to read AI name guesses from storage", err);
+      }
+      return {};
+    }
+  );
+  const aiGuessInFlight = useRef<Set<string>>(new Set());
 
   const loadBoardForMode = (nextMode: Mode): BoardState => {
     const cols = columnSets[nextMode];
@@ -371,15 +386,22 @@ export const TrelloTab = () => {
       JSON.stringify(messageOverrides)
     );
   }, [messageOverrides]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(AI_GUESS_KEY, JSON.stringify(aiNameGuesses));
+  }, [aiNameGuesses]);
 
   const applyOverride = useCallback(
     (rawName: string, huddleId?: string) => {
+      if (huddleId && aiNameGuesses[huddleId]) {
+        return aiNameGuesses[huddleId];
+      }
       if (huddleId && messageOverrides[huddleId]) {
         return messageOverrides[huddleId];
       }
       return overrides[rawName] || rawName || "Unknown";
     },
-    [messageOverrides, overrides]
+    [aiNameGuesses, messageOverrides, overrides]
   );
 
   useEffect(() => {
@@ -433,6 +455,32 @@ export const TrelloTab = () => {
 
     return groups;
   }, [applyOverride, filteredPlays]);
+
+  // Backfill unknown names with LLM guess (cached per huddle id).
+  useEffect(() => {
+    const fetchGuesses = async () => {
+      const targets = filteredPlays
+        .filter((huddle) => {
+          const rawName = extractPersonName(huddle.screenshot_text);
+          return rawName === "Unknown" && !aiNameGuesses[huddle.id];
+        })
+        .slice(0, 3); // small batch to avoid flooding
+
+      for (const huddle of targets) {
+        if (aiGuessInFlight.current.has(huddle.id)) continue;
+        aiGuessInFlight.current.add(huddle.id);
+        try {
+          const guess = await fetchLLMNameCandidate(huddle.screenshot_text);
+          if (guess) {
+            setAiNameGuesses((prev) => ({ ...prev, [huddle.id]: guess }));
+          }
+        } finally {
+          aiGuessInFlight.current.delete(huddle.id);
+        }
+      }
+    };
+    fetchGuesses();
+  }, [filteredPlays, aiNameGuesses]);
 
   const autoNameEntries = useMemo(() => {
     const entries: { name: string; last: number }[] = [];
@@ -1360,6 +1408,11 @@ export const TrelloTab = () => {
                     latest.screenshot_text
                   );
                   const appliedName = applyOverride(detectedName, latest.id);
+                  const aiGuess = aiNameGuesses[latest.id];
+                  const detectedLabel =
+                    detectedName === "Unknown" && aiGuess
+                      ? `${aiGuess} (AI guess)`
+                      : detectedName;
                   const messageDraft =
                     messageRenameDrafts[latest.id] ??
                     messageOverrides[latest.id] ??
@@ -1387,7 +1440,7 @@ export const TrelloTab = () => {
                             {appliedName}
                           </span>
                           <span className="text-slate-500 ml-2">
-                            (detected: {detectedName})
+                            (detected: {detectedLabel})
                           </span>
                           {hasMessageOverride && (
                             <span className="ml-2 text-cyan-300">custom</span>
