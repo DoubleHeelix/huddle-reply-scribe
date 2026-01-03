@@ -175,6 +175,10 @@ export const BatchHuddlesSection = ({
     }
 
     const screenshotText = target.extractedText || fallbackScreenshotText;
+    const draftForAI =
+      target.draft.trim().toLowerCase() === "test"
+        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
+        : target.draft;
 
     updateItem(id, (item) => ({
       ...item,
@@ -185,7 +189,7 @@ export const BatchHuddlesSection = ({
 
     const result = await generateReply(
       screenshotText,
-      target.draft,
+      draftForAI,
       isRegeneration,
       target.documents,
       target.pastHuddles,
@@ -294,9 +298,6 @@ export const BatchHuddlesSection = ({
               </div>
               <div>
                 <p className="text-lg font-display">Drop up to 5 huddle screenshots</p>
-                <p className="text-sm text-slate-300">
-                  We’ll OCR each one, then generate replies sequentially so you don’t hit limits.
-                </p>
               </div>
               <div className="px-4 py-2 rounded-full bg-white/10 text-sm text-white/90">
                 {canAddMore ? "Select images" : "Batch full"}
@@ -368,30 +369,9 @@ export const BatchHuddlesSection = ({
                       </Button>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Tip: open full view to read tiny UI details while drafting.
-                  </p>
                 </div>
 
                 <div className="flex-1 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-white font-medium">{item.fileName}</p>
-                      <p className="text-xs text-slate-400">{statusCopy[item.status]}</p>
-                    </div>
-                    <Badge
-                      className={
-                        item.status === "done"
-                          ? "bg-emerald-500/20 text-emerald-100"
-                          : item.status === "error"
-                            ? "bg-rose-500/20 text-rose-100"
-                            : "bg-indigo-500/20 text-indigo-100"
-                      }
-                    >
-                      {item.status}
-                    </Badge>
-                  </div>
-
                   <Textarea
                     value={item.draft}
                     onChange={(e) => handleDraftChange(item.id, e.target.value)}
@@ -400,9 +380,8 @@ export const BatchHuddlesSection = ({
                     className="bg-slate-950/70 border-white/10 text-white placeholder:text-slate-500"
                   />
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <Button
-                      size="sm"
                       onClick={() => runGeneration(item.id, false)}
                       disabled={item.status === "ocr" || item.status === "generating"}
                       className="bg-gradient-to-r from-purple-600 to-blue-500 text-white"
@@ -420,7 +399,6 @@ export const BatchHuddlesSection = ({
                       )}
                     </Button>
                     <Button
-                      size="sm"
                       variant="outline"
                       onClick={() => runGeneration(item.id, true)}
                       disabled={item.status === "ocr" || item.status === "generating" || !item.reply}
@@ -429,41 +407,48 @@ export const BatchHuddlesSection = ({
                       <RefreshCcw className="w-4 h-4 mr-2" />
                       Regenerate
                     </Button>
-                    <Select
-                      value={item.tone}
-                      onValueChange={(val) => updateItem(item.id, (curr) => ({ ...curr, tone: val }))}
-                      disabled={!item.reply || isAdjustingTone}
-                    >
-                      <SelectTrigger className="w-44 bg-slate-950 border-white/15 text-white">
-                        <SelectValue placeholder="Tone" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-white/10 text-white">
-                        {toneOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-white">
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAdjustTone(item.id)}
-                      disabled={!item.reply || item.tone === "none" || isAdjustingTone}
-                      className="border-white/20 text-white"
-                    >
-                      {isAdjustingTone ? "Adjusting..." : "Apply tone"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleCopy(item.reply)}
-                      disabled={!item.reply}
-                      className="text-white"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy
-                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={item.tone}
+                        onValueChange={(val) => updateItem(item.id, (curr) => ({ ...curr, tone: val }))}
+                        disabled={!item.reply || isAdjustingTone}
+                      >
+                        <SelectTrigger className="w-full bg-slate-950 border-white/15 text-white">
+                          <SelectValue placeholder="Tone" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                          {toneOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value} className="text-white">
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2 justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleAdjustTone(item.id)}
+                        disabled={!item.reply || item.tone === "none" || isAdjustingTone}
+                        className="border-white/20 text-white w-full"
+                      >
+                        {isAdjustingTone ? "Adjusting..." : "Apply tone"}
+                      </Button>
+                    </div>
+                    <div className="flex justify-center col-span-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleCopy(item.reply)}
+                        disabled={!item.reply}
+                        className="text-white w-full"
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </Button>
+                    </div>
                   </div>
 
                   {item.reply && (
