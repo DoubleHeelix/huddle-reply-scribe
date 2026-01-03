@@ -161,8 +161,12 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     scrollToReplySection();
     
     const screenshotText = getScreenshotText();
+    const draftForAI =
+      userDraft.trim().toLowerCase() === "test"
+        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
+        : userDraft;
     
-    const result = await generateReply(screenshotText, userDraft, false, [], [], (partial) => {
+    const result = await generateReply(screenshotText, draftForAI, false, [], [], (partial) => {
       setGeneratedReply(sanitizeHumanReply(partial));
     });
     
@@ -197,9 +201,13 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     scrollToReplySection();
     
     const screenshotText = getScreenshotText();
+    const draftForAI =
+      userDraft.trim().toLowerCase() === "test"
+        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
+        : userDraft;
     const result = await generateReply(
       screenshotText,
-      userDraft,
+      draftForAI,
       true,
       lastUsedDocuments,
       lastUsedHuddles,
