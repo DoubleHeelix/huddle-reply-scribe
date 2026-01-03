@@ -49,6 +49,8 @@ const fileToDataUrl = (file: File) =>
 const fallbackScreenshotText =
   "Describe what you see in the screenshot or paste context from the huddle so we can tailor the reply.";
 
+const BATCH_LIMIT = 3;
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface BatchHuddlesSectionProps {
@@ -85,14 +87,14 @@ export const BatchHuddlesSection = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const canAddMore = batchItems.length < 5;
+  const canAddMore = batchItems.length < BATCH_LIMIT;
   const totalReady = batchItems.filter(
     (i) => i.status === "ready" || i.status === "needs-draft"
   ).length;
   const completed = batchItems.filter((i) => i.status === "done").length;
 
   const onDrop = async (accepted: File[]) => {
-    const availableSlots = Math.max(0, 5 - batchItems.length);
+    const availableSlots = Math.max(0, BATCH_LIMIT - batchItems.length);
     const files = accepted.slice(0, availableSlots);
     if (!files.length) return;
 
@@ -316,7 +318,7 @@ export const BatchHuddlesSection = ({
       "image/jpeg": [".jpg", ".jpeg"],
     },
     multiple: true,
-    maxFiles: 5,
+    maxFiles: BATCH_LIMIT,
     disabled: !canAddMore,
   });
 
@@ -348,7 +350,7 @@ export const BatchHuddlesSection = ({
               </div>
               <div>
                 <p className="text-lg font-display">
-                  Drop up to 5 huddle screenshots
+                  Drop up to {BATCH_LIMIT} huddle screenshots
                 </p>
               </div>
               <div className="px-4 py-2 rounded-full bg-white/10 text-sm text-white/90">
@@ -359,7 +361,7 @@ export const BatchHuddlesSection = ({
 
           <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
             <Badge className="bg-cyan-500/20 text-cyan-200">
-              Queue {batchItems.length}/5
+              Queue {batchItems.length}/{BATCH_LIMIT}
             </Badge>
             <Badge className="bg-emerald-500/20 text-emerald-100">
               Done {completed}
