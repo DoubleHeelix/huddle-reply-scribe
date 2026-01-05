@@ -99,6 +99,14 @@ const LandingPage = () => {
                   Confident replies, <span className="gradient-text">without the guesswork.</span>
                 </h1>
               </div>
+              <div className="flex justify-center md:justify-start">
+                <a
+                  href="/flow"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 via-indigo-500 to-cyan-400 text-white text-sm font-semibold shadow-lg shadow-cyan-900/40 hover:brightness-110 transition-transform duration-400 hover:-translate-y-0.5"
+                >
+                  See the flow page
+                </a>
+              </div>
 
               {/* Compact highlights on mobile, full cards on md+ */}
               <div className="flex gap-2 overflow-x-auto pb-1 md:hidden justify-center">
@@ -117,12 +125,12 @@ const LandingPage = () => {
                     key={title}
                     className="glass-surface rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition-transform duration-500"
                   >
-                    <div className="h-10 w-10 rounded-lg bg-white/10 dark:bg-white/10 bg-slate-100 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-200" />
+                    <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center shadow-inner shadow-cyan-500/20">
+                      <Icon className="w-5 h-5 text-cyan-200" />
                     </div>
                     <div className="space-y-1">
-                      <p className="font-display text-base text-slate-900 dark:text-white">{title}</p>
-                      <p className="text-sm text-slate-700 dark:text-slate-300">{copy}</p>
+                      <p className="font-display text-base text-white drop-shadow-sm">{title}</p>
+                      <p className="text-sm text-slate-200/90">{copy}</p>
                     </div>
                   </div>
                 ))}

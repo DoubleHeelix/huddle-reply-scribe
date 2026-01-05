@@ -326,4 +326,70 @@
     transform-origin: top;
     will-change: transform, opacity, filter;
   }
+
+  /* Flow page motion */
+  @keyframes flow-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+      filter: blur(1px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes flow-pop {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.96);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(0) scale(1.02);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .flow-fade {
+    opacity: 0;
+    animation: flow-fade-up 750ms ease forwards;
+  }
+
+  .flow-pop {
+    opacity: 0;
+    animation: flow-pop 900ms ease forwards;
+  }
+
+  /* Apple-like smooth reveal */
+  .apple-reveal {
+    --parallax: 0px;
+    opacity: 0;
+    transform: translateY(32px) scale(0.98);
+    filter: blur(10px);
+    transition:
+      opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 1200ms cubic-bezier(0.16, 1, 0.3, 1),
+      filter 900ms ease;
+  }
+
+  .apple-reveal.in-view {
+    opacity: 1;
+    transform: translateY(var(--parallax, 0px)) scale(1);
+    filter: blur(0);
+  }
+
+  .apple-reveal.parallax {
+    will-change: transform, opacity, filter;
+  }
+
+  .apple-lift:hover {
+    transform: translateY(calc(var(--parallax, 0px) - 8px)) scale(1.02);
+    transition-duration: 600ms;
+  }
 }
