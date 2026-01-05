@@ -562,6 +562,20 @@ serve(async (req: Request) => {
       let continuityThreads: SimilarHuddle[] = [];
       // Reuse one embedding across match + storage to avoid duplicate OpenAI calls.
       const combinedTextForEmbedding = `${screenshotText} ${userDraft}`;
+      const askAboutUser = (() => {
+        const combined = combinedTextForEmbedding.toLowerCase();
+        return (
+          /what do you do/.test(combined) ||
+          /what's your job/.test(combined) ||
+          /what is your job/.test(combined) ||
+          /where do you work/.test(combined) ||
+          /what work do you/.test(combined) ||
+          /your occupation/.test(combined) ||
+          /what are you working on/.test(combined) ||
+          /what.*job/.test(combined) ||
+          /what.*work/.test(combined)
+        );
+      })();
       const sharedEmbeddingPromise = (async () => {
         try {
           const embeddingResponse = await fetch(
@@ -664,6 +678,12 @@ serve(async (req: Request) => {
           common_topics?: string[];
           common_phrases?: { bigrams?: string[]; trigrams?: string[] };
           style_fingerprint?: Partial<StyleFingerprint>;
+          personal_profile?: {
+            occupation?: string;
+            hobbies?: string;
+            location?: string;
+            fun_fact?: string;
+          } | null;
         };
         console.log("🎨 DEBUG: Found user style profile:", profile);
 
@@ -685,6 +705,21 @@ serve(async (req: Request) => {
           profile.style_fingerprint
         );
 
+        const personalProfile = profile.personal_profile || {};
+        const personalDetailsLines: string[] = [];
+        if (personalProfile.occupation) {
+          personalDetailsLines.push(`- Occupation: ${personalProfile.occupation}`);
+        }
+        if (personalProfile.hobbies) {
+          personalDetailsLines.push(`- Hobbies: ${personalProfile.hobbies}`);
+        }
+        if (personalProfile.location) {
+          personalDetailsLines.push(`- Location/timezone: ${personalProfile.location}`);
+        }
+        if (personalProfile.fun_fact) {
+          personalDetailsLines.push(`- Fun fact: ${personalProfile.fun_fact}`);
+        }
+
         contextFromStyleProfile = `
 
 User's typical writing style (for reference):
@@ -695,6 +730,13 @@ User's typical writing style (for reference):
 - Common phrases (trigrams): ${formattedTrigrams}
 ${styleFingerprintSummary ? styleFingerprintSummary : ""}
 `;
+
+        if (askAboutUser && personalDetailsLines.length > 0) {
+          contextFromStyleProfile += `
+Personal details (only include if the conversation asks about the user):
+${personalDetailsLines.join("\n")}
+`;
+        }
       }
 
       // Fallback continuity context: most recent threads if no similar matches
@@ -1183,6 +1225,13 @@ Refine this draft to make it better without inventing missing details.`;
       const styleFingerprint = computeStyleFingerprint(draftsArray);
       console.log("🧬 DEBUG: [5/6] Style fingerprint:", styleFingerprint);
 
+      // Fetch any saved personal profile to merge into the response
+      const { data: existingProfile } = await supabase
+        .from("user_style_profiles")
+        .select("personal_profile")
+        .eq("user_id", userId)
+        .maybeSingle();
+
       const analysisResult = {
         huddle_count: huddlePlays.length,
         avg_sentence_length: avgSentenceLength,
@@ -1194,6 +1243,7 @@ Refine this draft to make it better without inventing missing details.`;
           trigrams,
         },
         common_sentences: commonSentences,
+        personal_profile: existingProfile?.personal_profile ?? null,
       };
 
       console.log(
@@ -1217,6 +1267,12 @@ Refine this draft to make it better without inventing missing details.`;
         updated_at: string;
         common_phrases?: { bigrams?: string[]; trigrams?: string[] };
         style_fingerprint?: StyleFingerprint;
+        personal_profile?: {
+          occupation?: string;
+          hobbies?: string;
+          location?: string;
+          fun_fact?: string;
+        };
       } = {
         ...analysisData,
         user_id: userId,
@@ -1274,6 +1330,18 @@ Refine this draft to make it better without inventing missing details.`;
             maxWords: 18,
             minFreq: 2,
           });
+        }
+      }
+
+      if (!profileData.personal_profile) {
+        // keep any existing personal_profile if present in DB
+        const { data: existingProfile, error: existingErr } = await supabase
+          .from("user_style_profiles")
+          .select("personal_profile")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!existingErr && existingProfile?.personal_profile) {
+          profileData.personal_profile = existingProfile.personal_profile as Record<string, unknown>;
         }
       }
 

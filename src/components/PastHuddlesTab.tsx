@@ -44,6 +44,12 @@ type AnalysisResult = {
   common_topics?: string[];
   common_phrases?: { bigrams?: string[]; trigrams?: string[] };
   common_sentences?: string[];
+  personal_profile?: {
+    occupation?: string;
+    hobbies?: string;
+    location?: string;
+    fun_fact?: string;
+  };
   style_fingerprint?: StyleFingerprintDetails;
 };
 
@@ -348,6 +354,9 @@ export const PastHuddlesTab = () => {
   // NEW: local inputs to add phrases
   const [newBigram, setNewBigram] = useState("");
   const [newTrigram, setNewTrigram] = useState("");
+  // NEW: personal profile fields
+  const [personalProfile, setPersonalProfile] = useState<{ occupation?: string; hobbies?: string; location?: string; fun_fact?: string }>({});
+  const [initialPersonalProfile, setInitialPersonalProfile] = useState<{ occupation?: string; hobbies?: string; location?: string; fun_fact?: string }>({});
   const [previewSeed, setPreviewSeed] = useState<number>(Date.now());
   const [isConfirmingAnalysis, setIsConfirmingAnalysis] = useState(false);
   const { toast } = useToast();
@@ -374,6 +383,9 @@ export const PastHuddlesTab = () => {
       setEditableTrigrams(tri);
       setInitialBigrams(bi);
       setInitialTrigrams(tri);
+      const personal = data?.personal_profile || {};
+      setPersonalProfile(personal);
+      setInitialPersonalProfile(personal);
       setPreviewSeed(Date.now());
       setIsConfirmingAnalysis(true);
     } catch (err) {
@@ -407,6 +419,7 @@ export const PastHuddlesTab = () => {
         bigrams: bigramsClean,
         trigrams: trigramsClean,
       },
+      personal_profile: personalProfile,
     };
 
     setIsAnalyzing(true); // Reuse the analyzing state for the save operation
@@ -606,6 +619,14 @@ export const PastHuddlesTab = () => {
     () => diffList([...initialBigrams, ...initialTrigrams], [...editableBigrams, ...editableTrigrams]),
     [editableBigrams, editableTrigrams, initialBigrams, initialTrigrams]
   );
+  const personalHasChanges = useMemo(() => {
+    return (
+      (personalProfile.occupation || '') !== (initialPersonalProfile.occupation || '') ||
+      (personalProfile.hobbies || '') !== (initialPersonalProfile.hobbies || '') ||
+      (personalProfile.location || '') !== (initialPersonalProfile.location || '') ||
+      (personalProfile.fun_fact || '') !== (initialPersonalProfile.fun_fact || '')
+    );
+  }, [personalProfile, initialPersonalProfile]);
 
   const hasMinimumData = topicsClean.length >= 3 || phraseTotal >= 2;
   const readinessLabel = hasMinimumData
@@ -762,8 +783,45 @@ export const PastHuddlesTab = () => {
             </div>
 
             <div className="space-y-6 mb-6">
-
               <div className="space-y-6">
+                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-gray-200 text-lg font-semibold font-sans">About you</h4>
+                      <p className="text-sm text-gray-400">We’ll weave this into replies when someone asks about you.</p>
+                    </div>
+                    {personalHasChanges && (
+                      <span className="text-xs text-amber-300">Edited</span>
+                    )}
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <Input
+                      value={personalProfile.occupation || ''}
+                      onChange={(e) => setPersonalProfile((p) => ({ ...p, occupation: e.target.value }))}
+                      placeholder="Occupation (e.g. Product manager at Acme)"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm rounded-lg px-3"
+                    />
+                    <Input
+                      value={personalProfile.hobbies || ''}
+                      onChange={(e) => setPersonalProfile((p) => ({ ...p, hobbies: e.target.value }))}
+                      placeholder="Hobbies (e.g. climbing, cooking, guitars)"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm rounded-lg px-3"
+                    />
+                    <Input
+                      value={personalProfile.location || ''}
+                      onChange={(e) => setPersonalProfile((p) => ({ ...p, location: e.target.value }))}
+                      placeholder="Location/timezone (e.g. NYC, EST)"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm rounded-lg px-3"
+                    />
+                    <Input
+                      value={personalProfile.fun_fact || ''}
+                      onChange={(e) => setPersonalProfile((p) => ({ ...p, fun_fact: e.target.value }))}
+                      placeholder="Fun fact (optional)"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-10 text-sm rounded-lg px-3"
+                    />
+                  </div>
+                </div>
+
                 <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
                   <div className="flex items-center justify-between mb-4">
                   <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Words</h4>
@@ -873,8 +931,8 @@ export const PastHuddlesTab = () => {
                   <FingerprintRow label="Slang" value={formatFingerprintList(analysisResult, 'slang_examples')} />
                 </div>
               </div>
-              </div>
             </div>
+          </div>
           </div>
 
           {/* Fixed bottom action bar (sticky) */}
@@ -894,6 +952,7 @@ export const PastHuddlesTab = () => {
                   setNewTrigram("");
                   setPreviewSeed(Date.now());
                   setIsConfirmingAnalysis(false);
+                  setPersonalProfile(initialPersonalProfile);
                 }}
               >
                 Cancel
