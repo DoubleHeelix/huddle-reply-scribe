@@ -6,10 +6,26 @@ const MIN_CONFIDENCE_SCORE = 5;
 export const extractPersonName = (text: string | null | undefined): string => {
   if (!text) return 'Unknown';
 
+  const statusNoise = (line: string) => {
+    const lower = line.toLowerCase();
+    if (!line.trim()) return true;
+    if (/^\d{1,2}:\d{2}$/.test(line)) return true; // time
+    if (/^\d{1,2}%$/.test(line)) return true; // battery
+    if (/[☆♪♫🎵🎶▶️⏸️⏹️⏺️]/.test(line)) return true; // media symbols
+    if (/(wifi|lte|4g|5g|gsm|volte|vo)/i.test(line)) return true;
+    if (/(gmail|email|whatsapp|phone|messages|camera|break|red john)/i.test(lower)) return true;
+    return false;
+  };
+
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((line, idx) => {
+      // Drop obvious status-bar noise in the first few lines
+      if (idx < 3 && statusNoise(line)) return false;
+      return true;
+    });
 
   const stopWords = new Set([
     'you',
@@ -82,7 +98,8 @@ export const extractPersonName = (text: string | null | undefined): string => {
     if (candidate.startsWith('To ')) return; // avoid chat headers like "To Catch"
     if (!(looksLikeHandle(candidate) || looksLikeName(candidate))) return;
     const wordBonus = candidate.trim().split(/\s+/).length > 1 ? 1 : 0;
-    scoreMap.set(candidate, (scoreMap.get(candidate) || 0) + weight + wordBonus);
+    const handleBonus = looksLikeHandle(candidate) && /[_\\.]/.test(candidate) ? 1 : 0;
+    scoreMap.set(candidate, (scoreMap.get(candidate) || 0) + weight + wordBonus + handleBonus);
   };
 
   const addHandleWithNeighborName = (line: string, weight: number) => {
@@ -147,6 +164,12 @@ export const extractPersonName = (text: string | null | undefined): string => {
   const limitedLines = lines.slice(0, 15);
   addInstagramHeaderSignals(limitedLines.slice(0, 8));
   addMessengerHeaderSignals(limitedLines.slice(0, 8));
+
+  // Heavily weight the first few lines (chat header) for handles/names.
+  limitedLines.slice(0, 6).forEach((line) => {
+    if (looksLikeHandle(line)) addCandidate(line, 9);
+    else if (looksLikeName(line)) addCandidate(line, 8);
+  });
 
   const arrowTokens = ['<-', '->', '→', '←'];
   const brandRegex = /(instagram|insta|ig)\s+([A-Z@][\w.'’_-]{2,30}(?:\s+[A-Z@][\w.'’_-]{1,30}){0,2})/i;

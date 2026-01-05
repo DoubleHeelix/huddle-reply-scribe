@@ -904,7 +904,7 @@ Refine this draft to make it better without inventing missing details.`;
         continuityContext.length > 0 ||
         systemPrompt.length + userPrompt.length > 7000;
       const chatModel = "gpt-5-mini";
-      const maxTokens = contextIsHeavy ? 500 : 350;
+      const maxTokens = contextIsHeavy ? 800 : 600;
 
       console.log("🧠 DEBUG: Model selection:", {
         contextIsHeavy,

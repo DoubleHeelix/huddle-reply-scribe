@@ -201,6 +201,13 @@ export const useEnhancedAISuggestions = () => {
               onToken,
               false
             );
+          } else if (trimmedReply === errorMessage) {
+            console.error('❌ DEBUG: Reply equals fallback error after attempts', {
+              attempts: attempt,
+              pastHuddlesCount: pastHuddles.length,
+              documentKnowledgeCount: documentKnowledgeUsed.length,
+              replyLength: trimmedReply.length,
+            });
           }
 
           // Ensure UI sees the final reply even if no tokens were streamed.
@@ -213,7 +220,10 @@ export const useEnhancedAISuggestions = () => {
           };
         } catch (err) {
           lastError = err;
-          console.error(`❌ DEBUG: Enhanced AI attempt ${attempt} failed`, err);
+          console.error(
+            `❌ DEBUG: Enhanced AI attempt ${attempt}/${maxAttempts} failed`,
+            err instanceof Error ? err.message : err
+          );
           if (attempt === maxAttempts) break;
           console.log('🔁 DEBUG: Retrying generation...');
         }
@@ -231,6 +241,14 @@ export const useEnhancedAISuggestions = () => {
           false
         );
       }
+
+      console.error('❌ DEBUG: Generation failed after retries', {
+        attempts: maxAttempts,
+        lastError: lastError instanceof Error ? lastError.message : lastError,
+        lastErrorStack: lastError instanceof Error ? lastError.stack : undefined,
+        screenshotLength: screenshotText.length,
+        draftLength: userDraft.length,
+      });
 
       if (onToken) onToken(errorMessage);
       setError(errorMessage);
