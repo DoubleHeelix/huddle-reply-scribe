@@ -1095,12 +1095,25 @@ Refine this draft to make it better without inventing missing details.`;
 
       // Background storage with shared embedding
       const maybeStore = async () => {
+        // Store only on first pass; skip regenerations/auto-retries and error cases
+        if (isRegeneration) {
+          console.log("ℹ️ DEBUG: Skipping storage (regeneration/auto-retry).");
+          return;
+        }
+        if (streamErrored || !sawDone) {
+          console.log("⚠️ DEBUG: Skipping storage (stream error or missing DONE).");
+          return;
+        }
         if (!userId) return;
         const wordCount = userDraft?.split(/\s+/).filter(Boolean).length || 0;
         if (wordCount < 3) {
           console.log(
             `⚠️ DEBUG: Huddle not stored. Draft word count (${wordCount}) is below the threshold of 3.`
           );
+          return;
+        }
+        if (!fullReply.trim()) {
+          console.log("⚠️ DEBUG: Huddle not stored. Empty or whitespace-only reply.");
           return;
         }
 
