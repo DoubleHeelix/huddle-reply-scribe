@@ -65,7 +65,7 @@ export const useEnhancedAISuggestions = () => {
     allowAutoRegenerate: boolean = true
   ): Promise<GenerateReplyResult | null> => {
     const errorMessage = "Generation failed. Please click re-generate";
-    const maxAttempts = 2;
+    const maxAttempts = 5;
     let lastError: unknown = null;
     let lastDocumentKnowledge = existingDocumentKnowledge;
     let lastPastHuddles = existingPastHuddles;
