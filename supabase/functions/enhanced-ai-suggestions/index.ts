@@ -8,6 +8,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Exclude obvious system/prompt words from phrase extraction.
+const PHRASE_BANLIST = new Set([
+  "screenshot",
+  "context",
+  "generate",
+  "reply",
+  "document",
+  "knowledge",
+  "huddles",
+  "possible",
+  "provided",
+  "explicit",
+  "draft",
+  "style",
+  "user's",
+]);
+const MIN_PHRASE_FREQ = 2;
+const TOP_PHRASES = 15;
+
 // ---------- Phrase extraction utilities ----------
 function normalizeAndTokenize(input: string): string[] {
   // Keep letters, digits, intra-word apostrophes/hyphens; split on whitespace
@@ -33,24 +52,39 @@ function removeStopWords(tokens: string[], stop: Set<string>): string[] {
   });
 }
 
-function ngrams(tokens: string[], n: number): string[] {
+// Trim only leading/trailing stop words so we keep natural phrasing.
+function trimEdges(tokens: string[]): string[] {
+  let start = 0;
+  let end = tokens.length;
+  while (start < end && stopWords.has(tokens[start])) start++;
+  while (end > start && stopWords.has(tokens[end - 1])) end--;
+  return tokens.slice(start, end);
+}
+
+// Build n-grams per draft (no cross-draft bleed).
+function ngramsByDraft(texts: string[], n: number): string[] {
   const grams: string[] = [];
-  for (let i = 0; i <= tokens.length - n; i++) {
-    const gramTokens = tokens.slice(i, i + n);
-    // skip n-grams that are entirely stop words or contain empty tokens
-    const allStop = gramTokens.every((t) => stopWords.has(t));
-    if (allStop) continue;
-    grams.push(gramTokens.join(" "));
+  for (const text of texts) {
+    const tokens = normalizeAndTokenize(text);
+    if (tokens.length < n) continue;
+    for (let i = 0; i <= tokens.length - n; i++) {
+      const raw = tokens.slice(i, i + n);
+      const trimmed = trimEdges(raw);
+      if (trimmed.length !== n) continue;
+      if (trimmed.some((t) => PHRASE_BANLIST.has(t))) continue;
+      grams.push(trimmed.join(" "));
+    }
   }
   return grams;
 }
 
-function topN(items: string[], n: number): string[] {
+function topN(items: string[], n: number, minFreq = 1): string[] {
   const freq = new Map<string, number>();
   for (const it of items) {
     freq.set(it, (freq.get(it) || 0) + 1);
   }
   const sorted = Array.from(freq.entries())
+    .filter(([, count]) => count >= minFreq)
     // Sort by frequency desc, then lexicographically for stability
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, n)
@@ -62,21 +96,54 @@ function extractCommonPhrases(
   texts: string[],
   options?: { top?: number }
 ): { bigrams: string[]; trigrams: string[] } {
-  const top = options?.top ?? 20;
+  const top = options?.top ?? TOP_PHRASES;
 
-  // Concatenate texts; alternatively process per-text to preserve boundaries
-  const combined = texts.join(" ");
-  const tokens = normalizeAndTokenize(combined);
-  // For phrase style, we remove stop words before building n-grams to emphasize content words
-  const contentTokens = removeStopWords(tokens, stopWords);
+  // Respect per-draft boundaries and keep natural stop words inside phrases.
+  const bigramsAll = ngramsByDraft(texts, 2);
+  const trigramsAll = ngramsByDraft(texts, 3);
 
-  const bigramsAll = ngrams(contentTokens, 2);
-  const trigramsAll = ngrams(contentTokens, 3);
-
-  const bigramsTop = topN(bigramsAll, top);
-  const trigramsTop = topN(trigramsAll, top);
+  const bigramsTop = topN(bigramsAll, top, MIN_PHRASE_FREQ);
+  const trigramsTop = topN(trigramsAll, top, MIN_PHRASE_FREQ);
 
   return { bigrams: bigramsTop, trigrams: trigramsTop };
+}
+
+function extractCommonSentences(
+  drafts: string[],
+  options?: { top?: number; minWords?: number; maxWords?: number; minFreq?: number }
+): string[] {
+  const top = options?.top ?? 10;
+  const minWords = options?.minWords ?? 4;
+  const maxWords = options?.maxWords ?? 18;
+  const minFreq = options?.minFreq ?? 2;
+
+  const freq = new Map<string, { count: number; original: string }>();
+
+  drafts.forEach((raw) => {
+    const text = (raw || "").trim();
+    if (!text) return;
+    const sentences =
+      text.match(/[^.!?]+[.!?]+/g)?.map((s) => s.trim()) ||
+      text.split(/\n+/).map((s) => s.trim());
+
+    sentences.forEach((s) => {
+      if (!s) return;
+      const wordCount = s.split(/\s+/).filter(Boolean).length;
+      if (wordCount < minWords || wordCount > maxWords) return;
+      const key = s.toLowerCase();
+      const entry = freq.get(key) || { count: 0, original: s };
+      entry.count += 1;
+      freq.set(key, entry);
+    });
+  });
+
+  const sorted = Array.from(freq.entries())
+    .filter(([, val]) => val.count >= minFreq)
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .slice(0, top)
+    .map(([, val]) => val.original);
+
+  return sorted;
 }
 // -------------------------------------------------
 
@@ -1100,6 +1167,12 @@ Refine this draft to make it better without inventing missing details.`;
       const { bigrams, trigrams } = extractCommonPhrases(draftsArray, {
         top: 20,
       });
+      const commonSentences = extractCommonSentences(draftsArray, {
+        top: 8,
+        minWords: 4,
+        maxWords: 18,
+        minFreq: 2,
+      });
       console.log("🧩 DEBUG: [4/6] Extracted phrases:", {
         bigramsCount: bigrams.length,
         trigramsCount: trigrams.length,
@@ -1120,6 +1193,7 @@ Refine this draft to make it better without inventing missing details.`;
           bigrams,
           trigrams,
         },
+        common_sentences: commonSentences,
       };
 
       console.log(
@@ -1153,12 +1227,12 @@ Refine this draft to make it better without inventing missing details.`;
         console.log(
           "ℹ️ DEBUG: common_phrases missing in analysisData; recomputing from latest drafts..."
         );
-        const { data: latestDrafts, error: latestErr } = await supabase
-          .from("huddle_plays")
-          .select("user_draft, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(200);
+      const { data: latestDrafts, error: latestErr } = await supabase
+        .from("huddle_plays")
+        .select("user_draft, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(200);
         if (latestErr) {
           console.error(
             "❌ DEBUG: Error fetching drafts for phrase recompute:",
@@ -1172,6 +1246,34 @@ Refine this draft to make it better without inventing missing details.`;
             top: 20,
           });
           profileData.common_phrases = { bigrams, trigrams };
+        }
+      }
+
+      if (!profileData.common_sentences) {
+        console.log(
+          "ℹ️ DEBUG: common_sentences missing in analysisData; recomputing from latest drafts..."
+        );
+        const { data: latestDrafts, error: latestErr } = await supabase
+          .from("huddle_plays")
+          .select("user_draft, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (latestErr) {
+          console.error(
+            "❌ DEBUG: Error fetching drafts for sentence recompute:",
+            latestErr
+          );
+        } else {
+          const drafts = (latestDrafts || [])
+            .map((p: { user_draft: string }) => (p.user_draft || "").trim())
+            .filter(Boolean);
+          profileData.common_sentences = extractCommonSentences(drafts, {
+            top: 8,
+            minWords: 4,
+            maxWords: 18,
+            minFreq: 2,
+          });
         }
       }
 

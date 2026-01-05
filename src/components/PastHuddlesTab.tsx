@@ -43,6 +43,7 @@ type AnalysisResult = {
   huddle_count?: number;
   common_topics?: string[];
   common_phrases?: { bigrams?: string[]; trigrams?: string[] };
+  common_sentences?: string[];
   style_fingerprint?: StyleFingerprintDetails;
 };
 
@@ -594,6 +595,7 @@ export const PastHuddlesTab = () => {
   const topicsClean = editableKeywords.map((v) => v.trim()).filter(Boolean);
   const bigramsClean = editableBigrams.map((v) => v.trim()).filter(Boolean);
   const trigramsClean = editableTrigrams.map((v) => v.trim()).filter(Boolean);
+  const sentences = analysisData.common_sentences || [];
   const phraseTotal = bigramsClean.length + trigramsClean.length;
 
   const topicDiff = useMemo(
@@ -735,6 +737,9 @@ export const PastHuddlesTab = () => {
                     <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
                       {phraseTotal} phrases
                     </span>
+                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                      {sentences.length} sentences
+                    </span>
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -756,193 +761,118 @@ export const PastHuddlesTab = () => {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2 mb-6">
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <h4 className="text-gray-100 text-lg font-semibold font-sans">What's changing</h4>
-                    <p className="text-sm text-gray-400">See the deltas before you save. Added items are highlighted.</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-700 text-gray-200 hover:bg-gray-800"
-                    onClick={resetEditsToDetected}
-                  >
-                    Reset to detected
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-[#131824] border border-[#1f2330] p-3">
-                    <p className="text-xs uppercase tracking-[0.1em] text-gray-400 mb-2">Topics</p>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {topicDiff.added.length > 0 ? (
-                          topicDiff.added.map((item, idx) => (
-                            <span key={`t-add-${idx}`} className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-200">
-                              + {item}
-                            </span>
-                          ))
-                        ) : (
-                          <p className="text-xs text-gray-500">No new topics added.</p>
-                        )}
-                      </div>
-                      {topicDiff.removed.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {topicDiff.removed.map((item, idx) => (
-                            <span key={`t-rem-${idx}`} className="px-3 py-1 text-xs rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
-                              - {item}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-[#131824] border border-[#1f2330] p-3">
-                    <p className="text-xs uppercase tracking-[0.1em] text-gray-400 mb-2">Phrases</p>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {phraseDiff.added.length > 0 ? (
-                          phraseDiff.added.map((item, idx) => (
-                            <span key={`p-add-${idx}`} className="px-3 py-1 text-xs rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-200">
-                              + {item}
-                            </span>
-                          ))
-                        ) : (
-                          <p className="text-xs text-gray-500">No new phrases added.</p>
-                        )}
-                      </div>
-                      {phraseDiff.removed.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {phraseDiff.removed.map((item, idx) => (
-                            <span key={`p-rem-${idx}`} className="px-3 py-1 text-xs rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
-                              - {item}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="space-y-6 mb-6">
 
-              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <h4 className="text-gray-100 text-lg font-semibold font-sans">Preview before saving</h4>
-                    <p className="text-sm text-gray-400">See a quick sample of how your replies will read with these settings.</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-200 hover:text-white hover:bg-gray-800"
-                    onClick={() => setPreviewSeed(Date.now())}
-                  >
-                    Regenerate
-                  </Button>
-                </div>
-                <div className="bg-[#131824] border border-[#1f2330] rounded-xl p-4 text-gray-100 text-sm leading-relaxed">
-                  {previewText || 'Add a few topics or phrases to generate a preview of your style.'}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">Based on {topicsClean.length} topics, {phraseTotal} phrases, and your cadence fingerprint.</p>
-              </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-6">
                 <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Topics</h4>
-                    <span className="text-xs text-gray-500">Tap to edit</span>
+                  <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Words</h4>
+                  <span className="text-xs text-gray-500">Tap to edit</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {editableKeywords.length === 0 && (
+                    <p className="text-gray-500 text-sm font-sans py-2">No topics detected. Engage in more huddles to generate insights!</p>
+                  )}
+                  {editableKeywords.map((keyword, index) => (
+                    <div
+                      key={`kw-${index}`}
+                      className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out shadow-sm"
+                    >
+                      <Input
+                        value={keyword}
+                        onChange={(e) => handleKeywordChange(index, e.target.value)}
+                        className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[110px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Bigrams)</h4>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newBigram}
+                      onChange={(e) => setNewBigram(e.target.value)}
+                      placeholder="Add bigram (e.g. 'follow up')"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
+                    />
+                    <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addBigram}>
+                      Add
+                    </Button>
                   </div>
+                </div>
+                {editableBigrams.length > 0 ? (
                   <div className="flex flex-wrap gap-3">
-                    {editableKeywords.length === 0 && (
-                      <p className="text-gray-500 text-sm font-sans py-2">No topics detected. Engage in more huddles to generate insights!</p>
-                    )}
-                    {editableKeywords.map((keyword, index) => (
-                      <div
-                        key={`kw-${index}`}
-                        className="flex items-center gap-2 bg-[#131824] border border-[#2a3142] rounded-full px-4 py-2.5 hover:ring-1 hover:ring-[#39415a]/60 transition-all duration-200 ease-in-out shadow-sm"
-                      >
-                        <Input
-                          value={keyword}
-                          onChange={(e) => handleKeywordChange(index, e.target.value)}
-                          className="bg-transparent border-0 focus-visible:ring-0 focus:outline-none text-gray-100 placeholder:text-gray-400 h-auto p-0 px-1 text-sm w-[8.5rem] sm:w-auto min-w-[110px]"
-                        />
+                    {editableBigrams.map((p, idx) => (
+                      <ChipEditable key={`bi-edit-${idx}`} value={p} onChange={(v) => handleBigramChange(idx, v)} onRemove={() => removeBigram(idx)} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-sans text-center py-2">No bigrams. Add some above to personalize your style!</p>
+                )}
+              </div>
+
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Trigrams)</h4>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newTrigram}
+                      onChange={(e) => setNewTrigram(e.target.value)}
+                      placeholder="Add trigram (e.g. 'get back soon')"
+                      className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
+                    />
+                    <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addTrigram}>
+                      Add
+                    </Button>
+                  </div>
+                </div>
+                {editableTrigrams.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {editableTrigrams.map((p, idx) => (
+                      <ChipEditable key={`tri-edit-${idx}`} value={p} onChange={(v) => handleTrigramChange(idx, v)} onRemove={() => removeTrigram(idx)} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-sans text-center py-2">No trigrams. Add some above to personalize your style!</p>
+                )}
+              </div>
+
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-[#9c6bfa]" />
+                  <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Sentences</h4>
+                </div>
+                {sentences.length > 0 ? (
+                  <div className="space-y-2 text-sm text-gray-200">
+                    {sentences.map((s, idx) => (
+                      <div key={`sentence-${idx}`} className="rounded-xl bg-[#131824] border border-[#2a3142] px-3 py-2">
+                        {s}
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-[#9c6bfa]" />
-                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Cadence & tone</h4>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-3 text-sm text-gray-300">
-                    <FingerprintRow label="Emoji cadence" value={formatFingerprintValue(analysisResult, 'emoji_rate_per_message', 'emoji_message_share')} />
-                    <FingerprintRow label="Punctuation lean" value={formatFingerprintValue(analysisResult, 'exclamation_per_sentence', 'question_per_sentence')} />
-                    <FingerprintRow label="Capitalization" value={formatFingerprintValue(analysisResult, 'uppercase_word_ratio')} />
-                    <FingerprintRow label="Typical length" value={formatFingerprintValue(analysisResult, 'typical_word_count', 'typical_char_count')} />
-                    <FingerprintRow label="Greetings" value={formatFingerprintList(analysisResult, 'greetings')} />
-                    <FingerprintRow label="Closings" value={formatFingerprintList(analysisResult, 'closings')} />
-                    <FingerprintRow label="Slang" value={formatFingerprintList(analysisResult, 'slang_examples')} />
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-sans text-center py-2">No recurring sentences detected yet.</p>
+                )}
               </div>
 
-              <div className="space-y-6">
-                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Bigrams)</h4>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={newBigram}
-                        onChange={(e) => setNewBigram(e.target.value)}
-                        placeholder="Add bigram (e.g. 'follow up')"
-                        className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
-                      />
-                      <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addBigram}>
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                  {editableBigrams.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {editableBigrams.map((p, idx) => (
-                        <ChipEditable key={`bi-edit-${idx}`} value={p} onChange={(v) => handleBigramChange(idx, v)} onRemove={() => removeBigram(idx)} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm font-sans text-center py-2">No bigrams. Add some above to personalize your style!</p>
-                  )}
+              <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-[#9c6bfa]" />
+                  <h4 className="text-gray-200 text-lg font-semibold font-sans">Cadence & tone</h4>
                 </div>
-
-                <div className="bg-[#0f1115] border border-[#1f2330] rounded-2xl p-4 sm:p-6 shadow-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-gray-200 text-lg font-semibold font-sans">Common Phrases (Trigrams)</h4>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={newTrigram}
-                        onChange={(e) => setNewTrigram(e.target.value)}
-                        placeholder="Add trigram (e.g. 'get back soon')"
-                        className="bg-[#131824] border border-[#2a3142] text-gray-100 placeholder:text-gray-400 h-9 text-sm w-full sm:w-auto flex-grow rounded-lg px-3"
-                      />
-                      <Button size="sm" className="h-9 px-4 bg-[#5b6bfa] hover:bg-[#4e5ae6] text-white rounded-lg" onClick={addTrigram}>
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                  {editableTrigrams.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {editableTrigrams.map((p, idx) => (
-                        <ChipEditable key={`tri-edit-${idx}`} value={p} onChange={(v) => handleTrigramChange(idx, v)} onRemove={() => removeTrigram(idx)} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm font-sans text-center py-2">No trigrams. Add some above to personalize your style!</p>
-                  )}
+                <div className="grid sm:grid-cols-2 gap-3 text-sm text-gray-300">
+                  <FingerprintRow label="Emoji cadence" value={formatFingerprintValue(analysisResult, 'emoji_rate_per_message', 'emoji_message_share')} />
+                  <FingerprintRow label="Punctuation lean" value={formatFingerprintValue(analysisResult, 'exclamation_per_sentence', 'question_per_sentence')} />
+                  <FingerprintRow label="Capitalization" value={formatFingerprintValue(analysisResult, 'uppercase_word_ratio')} />
+                  <FingerprintRow label="Typical length" value={formatFingerprintValue(analysisResult, 'typical_word_count', 'typical_char_count')} />
+                  <FingerprintRow label="Greetings" value={formatFingerprintList(analysisResult, 'greetings')} />
+                  <FingerprintRow label="Closings" value={formatFingerprintList(analysisResult, 'closings')} />
+                  <FingerprintRow label="Slang" value={formatFingerprintList(analysisResult, 'slang_examples')} />
                 </div>
+              </div>
               </div>
             </div>
           </div>
