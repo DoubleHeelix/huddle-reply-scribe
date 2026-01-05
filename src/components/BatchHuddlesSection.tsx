@@ -271,7 +271,7 @@ export const BatchHuddlesSection = ({
     for (const item of batchItems) {
       if (item.status === "done" || item.status === "generating") continue;
       await runGeneration(item.id, false);
-      await wait(300);
+      await wait(800); // brief pause to let streaming finish before moving to the next huddle
     }
     setIsRunningAll(false);
   };
