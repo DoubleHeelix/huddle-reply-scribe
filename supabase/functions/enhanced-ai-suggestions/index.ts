@@ -510,6 +510,10 @@ serve(async (req: Request) => {
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const ALLOWED_TEST_EMAILS = new Set([
+      "heelixkumar@yahoo.com",
+      "heelixkumar98@gmail.com",
+    ]);
 
     const {
       action,
@@ -541,12 +545,24 @@ serve(async (req: Request) => {
       const token = authHeader?.replace("Bearer ", "");
 
       let userId = null;
+      let userEmail = null;
       if (token) {
         const {
           data: { user },
         } = await supabase.auth.getUser(token);
         userId = user?.id;
+        userEmail = user?.email?.toLowerCase() || null;
         console.log("👤 DEBUG: User ID from token:", userId);
+      }
+
+      // Prevent trivial "test" drafts from non-allowed users to avoid abuse.
+      const trimmedDraft = (userDraft || "").trim().toLowerCase();
+      if (trimmedDraft === "test" && (!userEmail || !ALLOWED_TEST_EMAILS.has(userEmail))) {
+        console.log("⚠️ DEBUG: Rejecting 'test' draft for user", userEmail);
+        return new Response(
+          JSON.stringify({ error: "Please provide a short draft instead of 'test'." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Kick off profile and similar-huddle retrieval in parallel to reduce latency
