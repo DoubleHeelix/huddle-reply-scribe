@@ -973,6 +973,8 @@ Refine this draft to make it better without inventing missing details.`;
       });
 
       let fallbackEnsured = false;
+      let streamErrored = false;
+      let sawDone = false;
 
       const stream = new ReadableStream({
         start(controller) {
@@ -1000,6 +1002,7 @@ Refine this draft to make it better without inventing missing details.`;
           };
 
           const pushDone = () => {
+            sawDone = true;
             ensureFallback();
             controller.enqueue(
               encoder.encode(JSON.stringify({ type: "done" }) + "\n")
@@ -1054,7 +1057,18 @@ Refine this draft to make it better without inventing missing details.`;
               .read()
               .then(({ done, value }) => {
                 if (done) {
-                  pushDone();
+                  if (streamErrored) return;
+                  if (!sawDone) {
+                    streamErrored = true;
+                    controller.error(
+                      new Error("Stream ended before completion token")
+                    );
+                    rejectStreamComplete?.(
+                      new Error("Stream ended before completion token")
+                    );
+                    return;
+                  }
+                  // If DONE was seen, pushDone already closed the controller.
                   return;
                 }
                 if (value) processChunk(value);
@@ -1062,6 +1076,8 @@ Refine this draft to make it better without inventing missing details.`;
               })
               .catch((err) => {
                 console.error("❌ DEBUG: Error reading OpenAI stream:", err);
+                streamErrored = true;
+                fullReply = "";
                 controller.error(err);
                 rejectStreamComplete?.(err);
               });
@@ -1071,6 +1087,8 @@ Refine this draft to make it better without inventing missing details.`;
         },
         cancel(reason) {
           console.error("❌ DEBUG: Stream cancelled:", reason);
+          streamErrored = true;
+          fullReply = "";
           rejectStreamComplete?.(reason);
         },
       });
