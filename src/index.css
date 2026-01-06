@@ -393,3 +393,72 @@
     transition-duration: 600ms;
   }
 }
+
+/* Presentation flow/Apple-like motion */
+@keyframes apple-fade-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes apple-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); filter: blur(8px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.apple-fade {
+  opacity: 0;
+  animation: apple-fade-up 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.apple-rise {
+  opacity: 0;
+  animation: apple-rise 1100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.apple-delay-1 { animation-delay: 120ms; }
+.apple-delay-2 { animation-delay: 220ms; }
+.apple-delay-3 { animation-delay: 320ms; }
+.apple-delay-4 { animation-delay: 420ms; }
+.apple-delay-5 { animation-delay: 520ms; }
+
+@keyframes pulse-glow {
+  0% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+  100% { opacity: 0.4; transform: scale(0.98); }
+}
+
+@keyframes drift {
+  0% { transform: translateY(0px) translateX(0px); }
+  50% { transform: translateY(-8px) translateX(6px); }
+  100% { transform: translateY(0px) translateX(0px); }
+}
+
+.flow-glow {
+  position: relative;
+  overflow: hidden;
+}
+.flow-glow::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.12), transparent 40%),
+    radial-gradient(circle at 70% 60%, rgba(45,212,191,0.12), transparent 42%);
+  filter: blur(32px);
+  opacity: 0.9;
+  animation: pulse-glow 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.flow-connector {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(99,102,241,0.85), rgba(45,212,191,0.85));
+  box-shadow: 0 0 24px rgba(59,130,246,0.35);
+  animation: pulse-glow 2.8s ease-in-out infinite;
+}
+
+.float-soft {
+  animation: drift 12s ease-in-out infinite;
+}

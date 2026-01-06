@@ -3,6 +3,9 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
+  Code2,
+  FileText,
+  Image as ImageIcon,
   MessageSquare,
   Mic,
   ShieldCheck,
@@ -262,6 +265,82 @@ const FlowPage = () => {
               </Reveal>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <Reveal delay={80} className="text-center space-y-2">
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Signals in the mix</p>
+            <h3 className="text-2xl sm:text-3xl font-display text-white">How each component shapes the reply</h3>
+            <p className="text-slate-300 text-sm sm:text-base max-w-3xl mx-auto">
+              Everything funnels into one coherent reply—style, documents, screenshot context, your draft, and the prompt guardrails.
+            </p>
+          </Reveal>
+
+          <Reveal delay={140} className="relative max-w-5xl mx-auto rounded-3xl bg-slate-900/80 border border-white/12 p-5 sm:p-7 lg:p-9 shadow-2xl shadow-purple-900/30 overflow-hidden flow-glow">
+            <div className="absolute inset-0 pointer-events-none opacity-50">
+              <div className="absolute -left-16 -top-10 w-56 h-56 bg-purple-500/18 blur-3xl" />
+              <div className="absolute right-6 bottom-0 w-64 h-64 bg-cyan-400/18 blur-3xl" />
+            </div>
+
+            {/* Input nodes */}
+            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+              {[
+                { icon: Sparkles, label: "Profile style", copy: "Tone, cadence, personal details when asked" },
+                { icon: FileText, label: "Documents", copy: "Facts pulled only when relevant" },
+                { icon: ImageIcon, label: "Screenshot context", copy: "Latest conversation and cues" },
+                { icon: MessageSquare, label: "User draft", copy: "Your intent guides the shape" },
+                { icon: Code2, label: "Prompts", copy: "Guardrails to stay concise and on-brand" },
+              ].map(({ icon: Icon, label, copy }, idx) => (
+                <Reveal key={label} delay={160 + idx * 80} className="float-soft">
+                  <div className="rounded-2xl bg-slate-950/85 border border-white/15 px-4 py-4 w-full sm:w-[170px] flex flex-col items-center gap-2 shadow-lg shadow-black/30">
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-400 text-white flex items-center justify-center shadow-lg shadow-cyan-900/40">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-semibold text-white text-center leading-snug">{label}</p>
+                    <p className="text-xs text-slate-300 leading-snug text-center">{copy}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+
+            {/* Connectors into fusion layer */}
+            <div className="relative my-8 sm:my-10 flex flex-col items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2 text-slate-400 text-xs sm:text-sm">
+                <span className="hidden sm:inline">↓</span>
+                Signals merge in the AI composer
+                <span className="hidden sm:inline">↓</span>
+              </div>
+              <div className="flow-connector w-full max-w-3xl" />
+            </div>
+
+            {/* Fusion layer */}
+            <div className="relative w-full max-w-3xl mx-auto apple-rise">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/20 via-indigo-500/20 to-cyan-400/20 blur-2xl" />
+              <div className="relative rounded-2xl bg-slate-950/85 border border-white/15 px-5 sm:px-7 py-4 sm:py-5 flex items-center justify-between gap-4 shadow-lg shadow-purple-900/40">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Fusion layer</p>
+                  <p className="text-sm sm:text-base text-slate-100">Applies style, sources docs, keeps it human</p>
+                </div>
+                <div className="h-11 w-11 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-slate-950 font-semibold text-sm shadow-lg shadow-emerald-500/30">
+                  AI
+                </div>
+              </div>
+            </div>
+
+            {/* Output */}
+            <Reveal delay={260} className="relative max-w-xl mx-auto mt-6 sm:mt-8">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400/22 via-cyan-400/22 to-indigo-400/22 blur-2xl" />
+              <div className="relative rounded-2xl bg-slate-950/90 border border-emerald-300/30 px-4 sm:px-6 py-4 flex items-center justify-between gap-3 shadow-lg shadow-emerald-500/30 apple-fade apple-delay-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-emerald-200">Generated reply</p>
+                  <p className="text-sm text-slate-100">Clear, on-brand, sources attached</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-slate-950 font-semibold text-sm">
+                  ✓
+                </div>
+              </div>
+            </Reveal>
+          </Reveal>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2">
