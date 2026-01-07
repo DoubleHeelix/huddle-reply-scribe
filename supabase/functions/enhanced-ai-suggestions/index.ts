@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0?target=deno";
+import supabaseJs from "https://esm.sh/@supabase/supabase-js@2.50.0/dist/umd/supabase.js?target=deno&deno-std=0.168.0";
 import { stopWords } from "../shared/stopWords.ts";
+
+const { createClient } = supabaseJs;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
