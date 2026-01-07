@@ -233,12 +233,16 @@ type VirtualizedHuddleListProps = {
   huddles: HuddlePlay[];
   isHuddleExpanded: (id: string) => boolean;
   toggleHuddleExpansion: (id: string) => void | Promise<void>;
+  isDraftExpanded: (id: string) => boolean;
+  toggleDraftExpansion: (id: string) => void | Promise<void>;
 };
 
 const VirtualizedHuddleList = ({
   huddles,
   isHuddleExpanded,
   toggleHuddleExpansion,
+  isDraftExpanded,
+  toggleDraftExpansion,
 }: VirtualizedHuddleListProps) => {
   if (!huddles.length) return null;
 
@@ -310,9 +314,22 @@ const VirtualizedHuddleList = ({
                     <p className="text-gray-800 dark:text-gray-300 text-sm font-medium mb-1 font-sans">
                       Your Draft:
                     </p>
-                    <p className="text-gray-800 dark:text-gray-200 text-sm font-sans line-clamp-2">
+                    <p
+                      className={`text-gray-800 dark:text-gray-200 text-sm font-sans ${
+                        !isDraftExpanded(huddle.id) && 'line-clamp-2'
+                      }`}
+                    >
                       {huddle.user_draft}
                     </p>
+                    {huddle.user_draft && huddle.user_draft.length > 120 && (
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto text-xs text-blue-600 dark:text-blue-400 hover:no-underline"
+                        onClick={() => toggleDraftExpansion(huddle.id)}
+                      >
+                        {isDraftExpanded(huddle.id) ? 'Show less' : 'Expand draft'}
+                      </Button>
+                    )}
                   </div>
 
                   <div>
@@ -341,6 +358,7 @@ export const PastHuddlesTab = () => {
   const [searchResults, setSearchResults] = useState<HuddlePlay[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [expandedHuddles, setExpandedHuddles] = useState<string[]>([]);
+  const [expandedDrafts, setExpandedDrafts] = useState<Record<string, boolean>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
@@ -566,6 +584,9 @@ export const PastHuddlesTab = () => {
   };
 
   const isHuddleExpanded = (id: string) => expandedHuddles.includes(id);
+  const isDraftExpanded = (id: string) => Boolean(expandedDrafts[id]);
+  const toggleDraftExpansion = (id: string) =>
+    setExpandedDrafts((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -1049,6 +1070,8 @@ export const PastHuddlesTab = () => {
                       huddles={categorizedHuddles[category]}
                       isHuddleExpanded={isHuddleExpanded}
                       toggleHuddleExpansion={toggleHuddleExpansion}
+                      isDraftExpanded={isDraftExpanded}
+                      toggleDraftExpansion={toggleDraftExpansion}
                     />
                   </CardContent>
                 </motion.div>
