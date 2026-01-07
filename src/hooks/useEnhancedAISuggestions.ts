@@ -12,6 +12,7 @@ interface GenerateReplyResult {
   reply: string;
   pastHuddles?: PastHuddleWithSimilarity[];
   documentKnowledge?: DocumentKnowledge[];
+  slangAddressTerms?: string[];
 }
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -61,7 +62,7 @@ export const useEnhancedAISuggestions = () => {
     isRegeneration: boolean = false,
     existingDocumentKnowledge: DocumentKnowledge[] = [],
     existingPastHuddles: PastHuddleWithSimilarity[] = [],
-    onToken?: (partial: string) => void,
+    onToken?: (partial: string, options?: { slangAddressTerms?: string[] }) => void,
     allowAutoRegenerate: boolean = true
   ): Promise<GenerateReplyResult | null> => {
     const errorMessage = "Generation failed. Please click re-generate";
@@ -132,6 +133,7 @@ export const useEnhancedAISuggestions = () => {
           const decoder = new TextDecoder();
           let buffer = '';
           let reply = '';
+          let slangAddressTerms: string[] | undefined;
           let pastHuddles: PastHuddleWithSimilarity[] = isRegeneration ? existingPastHuddles : [];
           let documentKnowledgeUsed: DocumentKnowledge[] = documentKnowledge;
 
@@ -149,11 +151,14 @@ export const useEnhancedAISuggestions = () => {
                 if (payload.type === 'meta') {
                   pastHuddles = isRegeneration ? existingPastHuddles : sanitizeHuddleMeta(payload.pastHuddles || []);
                   documentKnowledgeUsed = sanitizeDocumentMeta(payload.documentKnowledge || documentKnowledge);
+                  slangAddressTerms = Array.isArray(payload.slangAddressTerms)
+                    ? payload.slangAddressTerms
+                    : slangAddressTerms;
                   lastPastHuddles = pastHuddles;
                   lastDocumentKnowledge = documentKnowledgeUsed;
                 } else if (payload.type === 'token') {
                   reply += payload.text || '';
-                  if (onToken) onToken(reply);
+                  if (onToken) onToken(reply, { slangAddressTerms });
                 }
               } catch (err) {
                 console.error('❌ DEBUG: Error parsing stream payload:', err, line);
@@ -168,11 +173,14 @@ export const useEnhancedAISuggestions = () => {
               if (payload.type === 'meta') {
                 pastHuddles = isRegeneration ? existingPastHuddles : sanitizeHuddleMeta(payload.pastHuddles || []);
                 documentKnowledgeUsed = sanitizeDocumentMeta(payload.documentKnowledge || documentKnowledge);
+                slangAddressTerms = Array.isArray(payload.slangAddressTerms)
+                  ? payload.slangAddressTerms
+                  : slangAddressTerms;
                 lastPastHuddles = pastHuddles;
                 lastDocumentKnowledge = documentKnowledgeUsed;
               } else if (payload.type === 'token') {
                 reply += payload.text || '';
-                if (onToken) onToken(reply);
+                if (onToken) onToken(reply, { slangAddressTerms });
               }
             } catch (err) {
               console.error('❌ DEBUG: Error parsing trailing stream payload:', err, buffer);
@@ -211,12 +219,13 @@ export const useEnhancedAISuggestions = () => {
           }
 
           // Ensure UI sees the final reply even if no tokens were streamed.
-          if (reply && onToken) onToken(reply);
+          if (reply && onToken) onToken(reply, { slangAddressTerms });
 
           return {
             reply,
             pastHuddles,
-            documentKnowledge: documentKnowledgeUsed
+            documentKnowledge: documentKnowledgeUsed,
+            slangAddressTerms,
           };
         } catch (err) {
           lastError = err;
