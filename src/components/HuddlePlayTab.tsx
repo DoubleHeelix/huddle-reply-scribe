@@ -166,12 +166,28 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
         : userDraft;
     
-    const result = await generateReply(screenshotText, draftForAI, false, [], [], (partial) => {
-      setGeneratedReply(sanitizeHumanReply(partial));
-    });
+    let latestSlangTerms: string[] | undefined;
+    const result = await generateReply(
+      screenshotText,
+      draftForAI,
+      false,
+      [],
+      [],
+      (partial, meta) => {
+        if (meta?.slangAddressTerms?.length) {
+          latestSlangTerms = meta.slangAddressTerms;
+        }
+        setGeneratedReply(
+          sanitizeHumanReply(partial, { slangAddressTerms: latestSlangTerms })
+        );
+      }
+    );
     
     if (result) {
-      setGeneratedReply(sanitizeHumanReply(result.reply));
+      const slangTerms = result.slangAddressTerms || latestSlangTerms;
+      setGeneratedReply(
+        sanitizeHumanReply(result.reply, { slangAddressTerms: slangTerms })
+      );
       
       // Store the knowledge sources used for this generation
       setLastUsedHuddles(result.pastHuddles || []);
@@ -205,19 +221,28 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       userDraft.trim().toLowerCase() === "test"
         ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
         : userDraft;
+    let latestSlangTerms: string[] | undefined;
     const result = await generateReply(
       screenshotText,
       draftForAI,
       true,
       lastUsedDocuments,
       lastUsedHuddles,
-      (partial) => {
-        setGeneratedReply(sanitizeHumanReply(partial));
+      (partial, meta) => {
+        if (meta?.slangAddressTerms?.length) {
+          latestSlangTerms = meta.slangAddressTerms;
+        }
+        setGeneratedReply(
+          sanitizeHumanReply(partial, { slangAddressTerms: latestSlangTerms })
+        );
       }
     );
     
     if (result) {
-      setGeneratedReply(sanitizeHumanReply(result.reply));
+      const slangTerms = result.slangAddressTerms || latestSlangTerms;
+      setGeneratedReply(
+        sanitizeHumanReply(result.reply, { slangAddressTerms: slangTerms })
+      );
       
       setLastUsedHuddles(result.pastHuddles || []);
       setLastUsedDocuments(result.documentKnowledge || []);

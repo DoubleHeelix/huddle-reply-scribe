@@ -21,4 +21,18 @@ describe("sanitizeHumanReply", () => {
     const input = "Great job 🎉 — really nice!";
     expect(sanitizeHumanReply(input)).toBe("Great job 🎉 really nice!");
   });
+
+  it("removes vocative commas before casual address terms", () => {
+    const input = "That's really cool to hear, bro. whats new with you?";
+    expect(sanitizeHumanReply(input)).toBe(
+      "That's really cool to hear bro. whats new with you?"
+    );
+  });
+
+  it("supports dynamic slang address terms", () => {
+    const input = "Appreciate it, boss. thanks again!";
+    expect(
+      sanitizeHumanReply(input, { slangAddressTerms: ["boss"] })
+    ).toBe("Appreciate it boss. thanks again!");
+  });
 });

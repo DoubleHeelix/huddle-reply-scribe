@@ -190,6 +190,16 @@ const slangTerms = [
   "jk",
   "smh",
 ];
+const defaultSlangAddressTerms = [
+  "bro",
+  "broo",
+  "brooo",
+  "man",
+  "dude",
+  "fam",
+  "yall",
+  "y'all",
+];
 const greetingsList = [
   "hey",
   "hi",
@@ -232,6 +242,34 @@ function median(nums: number[]): number {
   return sorted[mid];
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildSlangAddressTerms(terms: string[] = []): string[] {
+  const merged = [...defaultSlangAddressTerms, ...terms];
+  return Array.from(
+    new Set(
+      merged
+        .map((term) => term.trim().toLowerCase())
+        .filter((term) => term.length >= 2)
+    )
+  );
+}
+
+function buildSlangAddressRegex(terms: string[]): RegExp | null {
+  if (!terms.length) return null;
+  const escaped = terms.map(escapeRegex).join("|");
+  return new RegExp(`,\\s+(${escaped})(?=$|\\s|[.!?])`, "gi");
+}
+
+function removeVocativeComma(text: string, terms: string[] = []): string {
+  if (!terms.length) return text;
+  const regex = buildSlangAddressRegex(terms);
+  if (!regex) return text;
+  return text.replace(regex, " $1");
+}
+
 function topItems(map: Map<string, number>, limit: number): string[] {
   return Array.from(map.entries())
     .sort((a, b) => b[1] - a[1])
@@ -240,7 +278,10 @@ function topItems(map: Map<string, number>, limit: number): string[] {
 }
 
 // Remove control characters and odd symbols that occasionally appear in model output.
-function sanitizeReply(text: string, options: { trim?: boolean } = {}): string {
+function sanitizeReply(
+  text: string,
+  options: { trim?: boolean; slangAddressTerms?: string[] } = {}
+): string {
   if (!text) return "";
   let cleaned = text
     // Strip control characters
@@ -254,6 +295,10 @@ function sanitizeReply(text: string, options: { trim?: boolean } = {}): string {
     .replace(/[ \t]+/g, " ")
     // Limit excessive blank lines
     .replace(/\n{3,}/g, "\n\n");
+
+  if (options.slangAddressTerms?.length) {
+    cleaned = removeVocativeComma(cleaned, options.slangAddressTerms);
+  }
 
   return options.trim ? cleaned.trim() : cleaned;
 }
@@ -687,6 +732,7 @@ serve(async (req: Request) => {
 
       // Build style profile context after parallel fetch
       let contextFromStyleProfile = "";
+      let slangAddressTerms = defaultSlangAddressTerms;
       if (profileResult?.data) {
         const profile = profileResult.data as {
           avg_sentence_length?: number;
@@ -702,6 +748,9 @@ serve(async (req: Request) => {
           } | null;
         };
         console.log("🎨 DEBUG: Found user style profile:", profile);
+        slangAddressTerms = buildSlangAddressTerms(
+          profile.style_fingerprint?.slang_examples || []
+        );
 
         const phrases = profile.common_phrases || {};
         const bigrams: string[] = Array.isArray(phrases.bigrams)
@@ -858,6 +907,11 @@ Hard rules:
 - No greetings/closings unless already present. No emojis unless the user's style profile or draft uses them.
 - Never copy unusual phrases that could be offensive, manipulative, or overly salesy.
 - Don’t repeat the same signature phrase more than once per message
+- Do not add a comma before casual address terms like ${
+        slangAddressTerms.length
+          ? slangAddressTerms.slice(0, 12).join(", ")
+          : defaultSlangAddressTerms.join(", ")
+      } unless the user's draft already uses that comma.
 
 Your Goal:
 - Refine the user’s draft so it’s clearer, more engaging, and more effective—without changing their original intent or voice.
@@ -938,6 +992,7 @@ Refine this draft to make it better without inventing missing details.`;
           type: "meta",
           pastHuddles: pastHuddlesForDisplay,
           documentKnowledge: documentKnowledge || [],
+          slangAddressTerms,
         }) + "\n"
       );
 
@@ -1005,7 +1060,7 @@ Refine this draft to make it better without inventing missing details.`;
             if (!fullReply.trim()) {
               const fallback = sanitizeReply(
                 "Generation failed. Please click re-generate",
-                { trim: true }
+                { trim: true, slangAddressTerms }
               );
               fullReply = fallback;
               controller.enqueue(
@@ -1048,7 +1103,9 @@ Refine this draft to make it better without inventing missing details.`;
                 const deltaRaw = parsed.choices?.[0]?.delta?.content;
                 const delta = extractDeltaText(deltaRaw);
                 if (delta) {
-                  const cleanedDelta = sanitizeReply(delta);
+                  const cleanedDelta = sanitizeReply(delta, {
+                    slangAddressTerms,
+                  });
                   if (!cleanedDelta) continue;
                   fullReply += cleanedDelta;
                   controller.enqueue(
@@ -1145,6 +1202,7 @@ Refine this draft to make it better without inventing missing details.`;
           console.log("💾 DEBUG: Storing huddle with shared embedding.");
           const cleanedReplyForStorage = sanitizeReply(fullReply, {
             trim: true,
+            slangAddressTerms,
           });
           const huddleToInsert = {
             user_id: userId,
@@ -1487,7 +1545,7 @@ Refine this draft to make it better without inventing missing details.`;
       const data = await response.json();
       const adjustedReply = sanitizeReply(
         extractMessageContent(data.choices?.[0]) || originalReply,
-        { trim: true }
+        { trim: true, slangAddressTerms: defaultSlangAddressTerms }
       );
 
       return new Response(JSON.stringify({ reply: adjustedReply }), {

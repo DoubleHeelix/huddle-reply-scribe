@@ -61,11 +61,15 @@ interface BatchHuddlesSectionProps {
     isRegeneration?: boolean,
     existingDocumentKnowledge?: DocumentKnowledge[],
     existingPastHuddles?: (HuddlePlay & { similarity?: number })[],
-    onToken?: (partial: string) => void
+    onToken?: (
+      partial: string,
+      options?: { slangAddressTerms?: string[] }
+    ) => void
   ) => Promise<{
     reply: string;
     pastHuddles?: (HuddlePlay & { similarity?: number })[];
     documentKnowledge?: DocumentKnowledge[];
+    slangAddressTerms?: string[];
   } | null>;
   adjustTone: (reply: string, selectedTone: string) => Promise<string | null>;
   toast: ToastFn;
@@ -213,6 +217,7 @@ export const BatchHuddlesSection = ({
     }));
 
     let result = null;
+    let latestSlangTerms: string[] | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
       result = await generateReply(
         screenshotText,
@@ -220,10 +225,15 @@ export const BatchHuddlesSection = ({
         isRegeneration,
         target.documents,
         target.pastHuddles,
-        (partial) => {
+        (partial, meta) => {
+          if (meta?.slangAddressTerms?.length) {
+            latestSlangTerms = meta.slangAddressTerms;
+          }
           updateItem(id, (item) => ({
             ...item,
-            reply: sanitizeHumanReply(partial),
+            reply: sanitizeHumanReply(partial, {
+              slangAddressTerms: latestSlangTerms,
+            }),
           }));
         }
       );
@@ -248,7 +258,10 @@ export const BatchHuddlesSection = ({
       return;
     }
 
-    const cleanReply = sanitizeHumanReply(result.reply);
+    const slangTerms = result.slangAddressTerms || latestSlangTerms;
+    const cleanReply = sanitizeHumanReply(result.reply, {
+      slangAddressTerms: slangTerms,
+    });
 
     updateItem(id, (item) => ({
       ...item,
