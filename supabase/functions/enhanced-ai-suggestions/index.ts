@@ -520,6 +520,7 @@ interface RequestBody {
   action:
     | "generateReply"
     | "adjustTone"
+    | "health"
     | "analyzeStyle"
     | "confirmAndSaveStyle";
   screenshotText?: string;
@@ -577,6 +578,13 @@ serve(async (req: Request) => {
 
     const cleanAction = action?.trim();
     console.log("🤖 DEBUG: Enhanced AI Suggestions - Action:", cleanAction);
+
+    if (cleanAction === "health") {
+      return new Response(
+        JSON.stringify({ ok: true, ts: new Date().toISOString() }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (cleanAction === "generateReply") {
       console.log("📊 DEBUG: Generate reply request details:", {
