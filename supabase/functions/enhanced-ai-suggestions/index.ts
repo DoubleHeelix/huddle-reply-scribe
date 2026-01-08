@@ -1056,11 +1056,39 @@ Refine this draft to make it better without inventing missing details.`;
       let fallbackEnsured = false;
       let streamErrored = false;
       let sawDone = false;
+      let controllerClosed = false;
 
       const stream = new ReadableStream({
         start(controller) {
+          const safeEnqueue = (payload: string) => {
+            if (controllerClosed) return;
+            try {
+              controller.enqueue(encoder.encode(payload));
+            } catch (err) {
+              controllerClosed = true;
+              console.error("❌ DEBUG: Stream enqueue failed:", err);
+            }
+          };
+
+          const safeClose = () => {
+            if (controllerClosed) return;
+            controllerClosed = true;
+            try {
+              controller.close();
+            } catch (err) {
+              console.error("❌ DEBUG: Stream close failed:", err);
+            }
+          };
+
           // send meta first
-          controller.enqueue(metaChunk);
+          if (!controllerClosed) {
+            try {
+              controller.enqueue(metaChunk);
+            } catch (err) {
+              controllerClosed = true;
+              console.error("❌ DEBUG: Meta enqueue failed:", err);
+            }
+          }
 
           const reader = openAIResponse.body!.getReader();
           let buffer = "";
@@ -1073,22 +1101,17 @@ Refine this draft to make it better without inventing missing details.`;
                 { trim: true, slangAddressTerms }
               );
               fullReply = fallback;
-              controller.enqueue(
-                encoder.encode(
-                  JSON.stringify({ type: "token", text: fallback }) + "\n"
-                )
-              );
+              safeEnqueue(JSON.stringify({ type: "token", text: fallback }) + "\n");
             }
             fallbackEnsured = true;
           };
 
           const pushDone = () => {
+            if (controllerClosed) return;
             sawDone = true;
             ensureFallback();
-            controller.enqueue(
-              encoder.encode(JSON.stringify({ type: "done" }) + "\n")
-            );
-            controller.close();
+            safeEnqueue(JSON.stringify({ type: "done" }) + "\n");
+            safeClose();
             resolveStreamComplete?.();
           };
 
@@ -1118,11 +1141,8 @@ Refine this draft to make it better without inventing missing details.`;
                   });
                   if (!cleanedDelta) continue;
                   fullReply += cleanedDelta;
-                  controller.enqueue(
-                    encoder.encode(
-                      JSON.stringify({ type: "token", text: cleanedDelta }) +
-                        "\n"
-                    )
+                  safeEnqueue(
+                    JSON.stringify({ type: "token", text: cleanedDelta }) + "\n"
                   );
                 }
               } catch (err) {
@@ -1143,9 +1163,12 @@ Refine this draft to make it better without inventing missing details.`;
                   if (streamErrored) return;
                   if (!sawDone) {
                     streamErrored = true;
-                    controller.error(
-                      new Error("Stream ended before completion token")
-                    );
+                    if (!controllerClosed) {
+                      controller.error(
+                        new Error("Stream ended before completion token")
+                      );
+                      controllerClosed = true;
+                    }
                     rejectStreamComplete?.(
                       new Error("Stream ended before completion token")
                     );
@@ -1161,7 +1184,10 @@ Refine this draft to make it better without inventing missing details.`;
                 console.error("❌ DEBUG: Error reading OpenAI stream:", err);
                 streamErrored = true;
                 fullReply = "";
-                controller.error(err);
+                if (!controllerClosed) {
+                  controller.error(err);
+                  controllerClosed = true;
+                }
                 rejectStreamComplete?.(err);
               });
           };
@@ -1172,6 +1198,7 @@ Refine this draft to make it better without inventing missing details.`;
           console.error("❌ DEBUG: Stream cancelled:", reason);
           streamErrored = true;
           fullReply = "";
+          controllerClosed = true;
           rejectStreamComplete?.(reason);
         },
       });
