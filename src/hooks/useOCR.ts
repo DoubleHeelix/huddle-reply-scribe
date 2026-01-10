@@ -39,6 +39,8 @@ export const useOCR = (options: UseOCROptions = {}) => {
         setError(result.error || 'OCR processing failed');
         return '';
       }
+
+      console.log('OCR: Extracted text:', result.text);
       
       return result.text;
     } catch (err) {

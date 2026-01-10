@@ -558,6 +558,7 @@ serve(async (req: Request) => {
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const BASE_OPENAI_TIMEOUT_MS = 90_000;
     const ALLOWED_TEST_EMAILS = new Set([
       "heelixkumar@yahoo.com",
       "heelixkumar98@gmail.com",
@@ -649,6 +650,11 @@ serve(async (req: Request) => {
       })();
       const sharedEmbeddingPromise = (async () => {
         try {
+          const embeddingController = new AbortController();
+          const embeddingTimeout = setTimeout(
+            () => embeddingController.abort(),
+            BASE_OPENAI_TIMEOUT_MS
+          );
           const embeddingResponse = await fetch(
             "https://api.openai.com/v1/embeddings",
             {
@@ -657,12 +663,14 @@ serve(async (req: Request) => {
                 Authorization: `Bearer ${openaiApiKey}`,
                 "Content-Type": "application/json",
               },
+              signal: embeddingController.signal,
               body: JSON.stringify({
                 input: combinedTextForEmbedding,
                 model: "text-embedding-3-small",
               }),
             }
           );
+          clearTimeout(embeddingTimeout);
           const embeddingData = await embeddingResponse.json();
           const embedding = embeddingData.data?.[0]?.embedding;
           console.log(
@@ -977,6 +985,13 @@ Refine this draft to make it better without inventing missing details.`;
         },
       });
 
+      console.log("🧾 DEBUG: contextFromStyleProfile:", contextFromStyleProfile);
+      console.log("🧾 DEBUG: contextFromDocuments:", contextFromDocuments);
+      console.log("🧾 DEBUG: contextFromPastHuddles:", contextFromPastHuddles);
+      console.log("🧾 DEBUG: continuityContext:", continuityContext);
+      console.log("🧾 DEBUG: screenshotText:", screenshotText);
+      console.log("🧾 DEBUG: userDraft:", userDraft);
+
       // Use gpt-5-mini; bump token budget when context is heavy so style/continuity stay accurate.
       const contextIsHeavy =
         contextFromDocuments.length > 0 ||
@@ -1022,6 +1037,12 @@ Refine this draft to make it better without inventing missing details.`;
         openAIRequestBody.temperature = 0.65;
       }
 
+      const chatTimeoutMs = contextIsHeavy ? 120_000 : BASE_OPENAI_TIMEOUT_MS;
+      const chatController = new AbortController();
+      const chatTimeout = setTimeout(
+        () => chatController.abort(),
+        chatTimeoutMs
+      );
       const openAIResponse = await fetch(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -1030,9 +1051,11 @@ Refine this draft to make it better without inventing missing details.`;
             Authorization: `Bearer ${openaiApiKey}`,
             "Content-Type": "application/json",
           },
+          signal: chatController.signal,
           body: JSON.stringify(openAIRequestBody),
         }
       );
+      clearTimeout(chatTimeout);
 
       if (!openAIResponse.ok || !openAIResponse.body) {
         const errorBody = await openAIResponse.text();
