@@ -1,5 +1,6 @@
--- First, drop the existing function if it exists
-DROP FUNCTION IF EXISTS public.search_document_knowledge;
+-- First, drop existing overloads if they exist.
+DROP FUNCTION IF EXISTS public.search_document_knowledge(vector, float, int);
+DROP FUNCTION IF EXISTS public.search_document_knowledge(vector, float, int, uuid);
 
 -- Then, create the updated function without the user_id filter
 CREATE OR REPLACE FUNCTION search_document_knowledge(

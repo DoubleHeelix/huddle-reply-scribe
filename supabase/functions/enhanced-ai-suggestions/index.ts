@@ -599,6 +599,37 @@ serve(async (req: Request) => {
       );
     }
 
+    const styleActionRequested =
+      cleanAction === "analyzeStyle" || cleanAction === "confirmAndSaveStyle";
+    let effectiveStyleUserId: string | null = null;
+    if (styleActionRequested) {
+      const authHeader = req.headers.get("Authorization");
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) {
+        throw new Error("Unauthorized: missing bearer token for style action");
+      }
+
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await supabase.auth.getUser(token);
+
+      if (authError || !authUser) {
+        throw new Error("Unauthorized: invalid session for style action");
+      }
+
+      effectiveStyleUserId = authUser.id;
+      if (userId && userId !== effectiveStyleUserId) {
+        console.warn(
+          "⚠️ DEBUG: Ignoring mismatched body userId for style action.",
+          {
+            bodyUserId: userId,
+            authUserId: effectiveStyleUserId,
+          }
+        );
+      }
+    }
+
     if (cleanAction === "generateReply") {
       console.log("📊 DEBUG: Generate reply request details:", {
         screenshotTextLength: screenshotText?.length || 0,
@@ -1318,18 +1349,18 @@ Refine this draft to make it better without inventing missing details.`;
         status: 200,
       });
     } else if (cleanAction === "analyzeStyle") {
-      if (!userId) {
+      if (!effectiveStyleUserId) {
         console.error("❌ DEBUG: analyzeStyle called without userId.");
-        throw new Error("userId is required for style analysis");
+        throw new Error("Unauthorized");
       }
 
-      console.log("🔬 DEBUG: [1/6] Starting style analysis for user:", userId);
+      console.log("🔬 DEBUG: [1/6] Starting style analysis for user:", effectiveStyleUserId);
 
       // Fetch latest 200 user-authored drafts from huddle_plays
       const { data: huddlePlays, error } = await supabase
         .from("huddle_plays")
         .select("user_draft, created_at")
-        .eq("user_id", userId)
+        .eq("user_id", effectiveStyleUserId)
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -1402,24 +1433,55 @@ Refine this draft to make it better without inventing missing details.`;
       const styleFingerprint = computeStyleFingerprint(draftsArray);
       console.log("🧬 DEBUG: [5/6] Style fingerprint:", styleFingerprint);
 
-      // Fetch any saved personal profile to merge into the response
+      // Fetch saved profile fields so manual edits persist in the analysis UI.
       const { data: existingProfile } = await supabase
         .from("user_style_profiles")
-        .select("personal_profile")
-        .eq("user_id", userId)
+        .select(
+          "common_topics, common_phrases, style_fingerprint, personal_profile, common_sentences, formality, sentiment, avg_sentence_length, huddle_count"
+        )
+        .eq("user_id", effectiveStyleUserId)
         .maybeSingle();
 
+      const existingTopics = Array.isArray(existingProfile?.common_topics)
+        ? existingProfile.common_topics
+        : [];
+      const existingPhrases = (existingProfile?.common_phrases ||
+        {}) as { bigrams?: string[]; trigrams?: string[] };
+      const existingBigrams = Array.isArray(existingPhrases.bigrams)
+        ? existingPhrases.bigrams
+        : [];
+      const existingTrigrams = Array.isArray(existingPhrases.trigrams)
+        ? existingPhrases.trigrams
+        : [];
+      const mergedTopics = Array.from(
+        new Set([...existingTopics, ...commonTopics].map((v) => v.trim()).filter(Boolean))
+      ).slice(0, 16);
+      const mergedBigrams = Array.from(
+        new Set([...existingBigrams, ...bigrams].map((v) => v.trim()).filter(Boolean))
+      ).slice(0, 20);
+      const mergedTrigrams = Array.from(
+        new Set([...existingTrigrams, ...trigrams].map((v) => v.trim()).filter(Boolean))
+      ).slice(0, 20);
+      const mergedCommonSentences = Array.isArray(existingProfile?.common_sentences)
+        ? (existingProfile.common_sentences as string[])
+        : commonSentences;
+
       const analysisResult = {
-        huddle_count: huddlePlays.length,
-        avg_sentence_length: avgSentenceLength,
-        common_topics: commonTopics,
-        style_fingerprint: styleFingerprint,
+        huddle_count: existingProfile?.huddle_count ?? huddlePlays.length,
+        avg_sentence_length:
+          existingProfile?.avg_sentence_length ?? avgSentenceLength,
+        formality: existingProfile?.formality ?? null,
+        sentiment: existingProfile?.sentiment ?? null,
+        common_topics: mergedTopics,
+        style_fingerprint:
+          (existingProfile?.style_fingerprint as StyleFingerprint | null) ||
+          styleFingerprint,
         // Include phrases in analysis result so the client can confirm/save
         common_phrases: {
-          bigrams,
-          trigrams,
+          bigrams: mergedBigrams,
+          trigrams: mergedTrigrams,
         },
-        common_sentences: commonSentences,
+        common_sentences: mergedCommonSentences,
         personal_profile: existingProfile?.personal_profile ?? null,
       };
 
@@ -1431,10 +1493,10 @@ Refine this draft to make it better without inventing missing details.`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } else if (cleanAction === "confirmAndSaveStyle") {
-      console.log("💾 DEBUG: Starting confirmAndSaveStyle for user:", userId);
-      if (!userId || !analysisData) {
+      console.log("💾 DEBUG: Starting confirmAndSaveStyle for user:", effectiveStyleUserId);
+      if (!effectiveStyleUserId || !analysisData) {
         throw new Error(
-          "userId and analysisData are required for saving style"
+          "Authenticated user and analysisData are required for saving style"
         );
       }
 
@@ -1452,7 +1514,7 @@ Refine this draft to make it better without inventing missing details.`;
         };
       } = {
         ...analysisData,
-        user_id: userId,
+        user_id: effectiveStyleUserId,
         updated_at: new Date().toISOString(),
       };
 
@@ -1463,7 +1525,7 @@ Refine this draft to make it better without inventing missing details.`;
       const { data: latestDrafts, error: latestErr } = await supabase
         .from("huddle_plays")
         .select("user_draft, created_at")
-        .eq("user_id", userId)
+        .eq("user_id", effectiveStyleUserId)
         .order("created_at", { ascending: false })
         .limit(200);
         if (latestErr) {
@@ -1489,7 +1551,7 @@ Refine this draft to make it better without inventing missing details.`;
         const { data: latestDrafts, error: latestErr } = await supabase
           .from("huddle_plays")
           .select("user_draft, created_at")
-          .eq("user_id", userId)
+          .eq("user_id", effectiveStyleUserId)
           .order("created_at", { ascending: false })
           .limit(200);
         if (latestErr) {
@@ -1515,7 +1577,7 @@ Refine this draft to make it better without inventing missing details.`;
         const { data: existingProfile, error: existingErr } = await supabase
           .from("user_style_profiles")
           .select("personal_profile")
-          .eq("user_id", userId)
+          .eq("user_id", effectiveStyleUserId)
           .maybeSingle();
         if (!existingErr && existingProfile?.personal_profile) {
           profileData.personal_profile = existingProfile.personal_profile as Record<string, unknown>;
@@ -1529,7 +1591,7 @@ Refine this draft to make it better without inventing missing details.`;
         const { data: latestDrafts, error: latestErr } = await supabase
           .from("huddle_plays")
           .select("user_draft, created_at")
-          .eq("user_id", userId)
+          .eq("user_id", effectiveStyleUserId)
           .order("created_at", { ascending: false })
           .limit(200);
         if (latestErr) {
