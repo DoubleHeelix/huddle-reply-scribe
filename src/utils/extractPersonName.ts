@@ -1,4 +1,5 @@
 const MIN_CONFIDENCE_SCORE = 5;
+const MEDIA_SYMBOL_REGEX = /(?:[☆♪♫]|🎵|🎶|▶️|⏸️|⏹️|⏺️)/u;
 
 // Pull a likely person name/handle out of the OCR text using platform-specific cues,
 // frequency, and simple shape checks (human name or @handle). Falls back to Unknown
@@ -11,7 +12,7 @@ export const extractPersonName = (text: string | null | undefined): string => {
     if (!line.trim()) return true;
     if (/^\d{1,2}:\d{2}$/.test(line)) return true; // time
     if (/^\d{1,2}%$/.test(line)) return true; // battery
-    if (/[☆♪♫🎵🎶▶️⏸️⏹️⏺️]/.test(line)) return true; // media symbols
+    if (MEDIA_SYMBOL_REGEX.test(line)) return true; // media symbols
     if (/(wifi|lte|4g|5g|gsm|volte|vo)/i.test(line)) return true;
     if (/(gmail|email|whatsapp|phone|messages|camera|break|red john)/i.test(lower)) return true;
     return false;

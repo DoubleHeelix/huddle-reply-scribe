@@ -244,11 +244,10 @@ const VirtualizedHuddleList = ({
   isDraftExpanded,
   toggleDraftExpansion,
 }: VirtualizedHuddleListProps) => {
-  if (!huddles.length) return null;
-
   const itemHeightEstimate = 320; // Approx height of one huddle card; adjust if layout changes.
   const { containerRef, onScroll, startIndex, endIndex, offsetTop, totalHeight } =
     useVirtualWindow(huddles.length, itemHeightEstimate);
+  if (!huddles.length) return null;
 
   const visibleHuddles = huddles.slice(startIndex, endIndex + 1);
 

@@ -144,8 +144,6 @@ export const useHuddleState = () => {
     setHuddleMode,
     batchItems,
     setBatchItems,
-    batchItems,
-    setBatchItems,
     
     // Hooks
     generateReply,

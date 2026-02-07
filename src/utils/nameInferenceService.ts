@@ -6,8 +6,16 @@ export type NameCandidateResponse = {
   error?: string;
 };
 
+const stripControlChars = (value: string) =>
+  Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return !(code >= 0 && code <= 31);
+    })
+    .join("");
+
 const cleanText = (text: string | null | undefined) =>
-  (text || "").replace(/[\u0000-\u001F]+/g, "").trim();
+  stripControlChars(text || "").trim();
 
 export const fetchLLMNameCandidate = async (
   text: string | null | undefined

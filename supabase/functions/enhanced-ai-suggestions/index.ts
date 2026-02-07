@@ -279,6 +279,15 @@ function topItems(map: Map<string, number>, limit: number): string[] {
     .map(([key]) => key);
 }
 
+function stripControlChars(value: string): string {
+  return Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return !((code >= 0 && code <= 31) || (code >= 127 && code <= 159));
+    })
+    .join("");
+}
+
 // Remove control characters and odd symbols that occasionally appear in model output.
 function sanitizeReply(
   text: string,
@@ -287,7 +296,9 @@ function sanitizeReply(
   if (!text) return "";
   let cleaned = text
     // Strip control characters
-    .replace(/[\u0000-\u001F\u007F-\u009F]+/g, "")
+    .trim();
+
+  cleaned = stripControlChars(cleaned)
     // Keep letters, numbers, punctuation, spaces, line breaks, and emoji; drop other symbols
     .replace(
       /[^\p{L}\p{N}\p{P}\p{Zs}\n\r\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,

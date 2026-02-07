@@ -61,7 +61,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [paginated, toast]);
+  }, [light, maxRows, paginated, toast]);
 
   const loadMore = useCallback(async () => {
     if (!paginated) return;
@@ -99,7 +99,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMore, isLoading, isLoadingMore, page, paginated, toast]);
+  }, [hasMore, isLoading, isLoadingMore, light, maxRows, page, paginated, toast]);
 
   const ensureHuddleDetail = useCallback(
     async (id: string) => {

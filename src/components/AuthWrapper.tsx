@@ -92,7 +92,7 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [toast]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
