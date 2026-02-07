@@ -75,11 +75,13 @@ export function sanitizeHumanReply(
   // Remove zero-width and control characters.
   text = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
   text = stripControlChars(text);
+  text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  text = text.replace(/[^\S\n]+/gu, " ");
 
   // Drop unusual symbols outside typical letters/numbers/punctuation/spaces/newlines/emoji.
   text = text.replace(
     /[^\p{L}\p{N}\p{P}\p{Zs}\n\r\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
-    ""
+    " "
   );
 
   // Normalize whitespace (collapse runs of spaces/tabs, trim, limit blank lines).

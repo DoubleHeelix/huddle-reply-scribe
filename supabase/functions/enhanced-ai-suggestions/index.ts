@@ -294,15 +294,16 @@ function sanitizeReply(
   options: { trim?: boolean; slangAddressTerms?: string[] } = {}
 ): string {
   if (!text) return "";
-  let cleaned = text
-    // Strip control characters
-    .trim();
+  let cleaned = text.trim();
 
   cleaned = stripControlChars(cleaned)
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[^\S\n]+/gu, " ")
     // Keep letters, numbers, punctuation, spaces, line breaks, and emoji; drop other symbols
     .replace(
       /[^\p{L}\p{N}\p{P}\p{Zs}\n\r\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
-      ""
+      " "
     )
     // Normalize runs of spaces/tabs
     .replace(/[ \t]+/g, " ")
