@@ -294,7 +294,7 @@ function sanitizeReply(
   options: { trim?: boolean; slangAddressTerms?: string[] } = {}
 ): string {
   if (!text) return "";
-  let cleaned = text.trim();
+  let cleaned = text;
 
   cleaned = stripControlChars(cleaned)
     .replace(/\r\n/g, "\n")
