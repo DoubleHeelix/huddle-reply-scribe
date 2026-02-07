@@ -131,11 +131,11 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     }
   };
 
-  const getScreenshotText = (): string => {
+  const getScreenshotText = useCallback((): string => {
     return extractedText || "Please describe what you see in the screenshot or the conversation context that's relevant to your draft message.";
-  };
+  }, [extractedText]);
 
-  const handleGenerateReply = async () => {
+  const handleGenerateReply = useCallback(async () => {
     console.log('Generate reply clicked. Draft length:', userDraft.trim().length, 'Image exists:', !!uploadedImage);
 
     if (!userDraft.trim()) {
@@ -209,7 +209,17 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       });
 
     }
-  };
+  }, [
+    userDraft,
+    uploadedImage,
+    generateReply,
+    toast,
+    setGeneratedReply,
+    setLastUsedHuddles,
+    setLastUsedDocuments,
+    setShowKnowledgeSources,
+    getScreenshotText,
+  ]);
 
   const handleRegenerate = async () => {
     if (!userDraft.trim() || !uploadedImage) return;
@@ -282,7 +292,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     });
   };
 
-  const handleCopyReply = async () => {
+  const handleCopyReply = useCallback(async () => {
     if (!generatedReply) return;
     
     try {
@@ -300,7 +310,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         variant: "destructive",
       });
     }
-  };
+  }, [generatedReply, toast]);
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to generate, Cmd/Ctrl+C to copy reply
   const handleShortcut = useCallback(

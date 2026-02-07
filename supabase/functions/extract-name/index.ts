@@ -23,9 +23,17 @@ Rules:
 const MAX_LINES = 15;
 const MAX_CHARS = 1200;
 
+const stripControlChars = (value: string): string =>
+  Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return !(code >= 0 && code <= 31);
+    })
+    .join("");
+
 const sanitizeText = (text: unknown): string => {
   if (!text || typeof text !== "string") return "";
-  return text.replace(/[\u0000-\u001F]+/g, " ").trim();
+  return stripControlChars(text).trim();
 };
 
 const trimText = (text: string): string => {

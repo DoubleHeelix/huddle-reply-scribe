@@ -36,6 +36,14 @@ type SanitizeOptions = {
   slangAddressTerms?: string[];
 };
 
+const stripControlChars = (value: string) =>
+  Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return !((code >= 0 && code <= 31) || (code >= 127 && code <= 159));
+    })
+    .join("");
+
 export function sanitizeHumanReply(
   input: string,
   options: SanitizeOptions = {}
@@ -66,7 +74,7 @@ export function sanitizeHumanReply(
 
   // Remove zero-width and control characters.
   text = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
-  text = text.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+  text = stripControlChars(text);
 
   // Drop unusual symbols outside typical letters/numbers/punctuation/spaces/newlines/emoji.
   text = text.replace(
