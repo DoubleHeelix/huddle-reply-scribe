@@ -177,12 +177,14 @@ export type Database = {
       user_style_profiles: {
         Row: {
           avg_sentence_length: number | null
+          common_sentences: Json | null
           common_topics: string[] | null
           created_at: string
           formality: string | null
           huddle_count: number | null
           id: string
           common_phrases: Json | null
+          personal_profile: Json | null
           style_fingerprint: Json | null
           sentiment: string | null
           updated_at: string
@@ -190,12 +192,14 @@ export type Database = {
         }
         Insert: {
           avg_sentence_length?: number | null
+          common_sentences?: Json | null
           common_topics?: string[] | null
           created_at?: string
           common_phrases?: Json | null
           formality?: string | null
           huddle_count?: number | null
           id?: string
+          personal_profile?: Json | null
           style_fingerprint?: Json | null
           sentiment?: string | null
           updated_at?: string
@@ -203,12 +207,14 @@ export type Database = {
         }
         Update: {
           avg_sentence_length?: number | null
+          common_sentences?: Json | null
           common_topics?: string[] | null
           created_at?: string
           common_phrases?: Json | null
           formality?: string | null
           huddle_count?: number | null
           id?: string
+          personal_profile?: Json | null
           style_fingerprint?: Json | null
           sentiment?: string | null
           updated_at?: string
