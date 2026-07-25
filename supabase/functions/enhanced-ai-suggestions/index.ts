@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import supabaseJs from "https://esm.sh/@supabase/supabase-js@2.50.0/dist/umd/supabase.js?target=deno&deno-std=0.168.0";
+import {
+  HUDDLE_MODELS,
+  selectHuddleReplyModel,
+} from "../shared/huddleModelRouting.ts";
 import { stopWords } from "../shared/stopWords.ts";
 
 const { createClient } = supabaseJs;
@@ -1035,18 +1039,28 @@ Refine this draft to make it better without inventing missing details.`;
       console.log("🧾 DEBUG: screenshotText:", screenshotText);
       console.log("🧾 DEBUG: userDraft:", userDraft);
 
-      // Use gpt-5-mini; bump token budget when context is heavy so style/continuity stay accurate.
+      // Keep the first pass cost-efficient, then use GPT-5 mini when the user
+      // regenerates or the client falls back after a failed first pass.
       const contextIsHeavy =
         contextFromDocuments.length > 0 ||
         contextFromPastHuddles.length > 0 ||
         continuityContext.length > 0 ||
         systemPrompt.length + userPrompt.length > 7000;
-      const chatModel = "gpt-5-mini";
+      const {
+        model: chatModel,
+        reasoningEffort,
+        route: modelRoute,
+      } = selectHuddleReplyModel({
+        isRegeneration: Boolean(isRegeneration),
+        contextIsHeavy,
+      });
       const maxTokens = contextIsHeavy ? 1200 : 1000;
 
       console.log("🧠 DEBUG: Model selection:", {
         contextIsHeavy,
         chatModel,
+        reasoningEffort,
+        modelRoute,
         maxTokens,
       });
 
@@ -1061,6 +1075,8 @@ Refine this draft to make it better without inventing missing details.`;
           pastHuddles: pastHuddlesForDisplay,
           documentKnowledge: documentKnowledge || [],
           slangAddressTerms,
+          generationModel: chatModel,
+          modelRoute,
         }) + "\n"
       );
 
@@ -1073,6 +1089,7 @@ Refine this draft to make it better without inventing missing details.`;
           { role: "user", content: userPrompt },
         ],
         max_completion_tokens: maxTokens,
+        reasoning_effort: reasoningEffort,
         stream: true,
       };
 
@@ -1644,7 +1661,7 @@ Refine this draft to make it better without inventing missing details.`;
         });
       }
 
-      const toneModel = "gpt-5-mini";
+      const toneModel = HUDDLE_MODELS.toneAdjustment;
       const toneRequestBody: Record<string, unknown> = {
         model: toneModel,
         messages: [
