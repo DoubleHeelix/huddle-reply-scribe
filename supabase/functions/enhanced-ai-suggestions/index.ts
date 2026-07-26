@@ -4,6 +4,7 @@ import {
   HUDDLE_MODELS,
   selectHuddleReplyModel,
 } from "../shared/huddleModelRouting.ts";
+import { shouldGenerateHuddleEmbedding } from "../shared/huddleCostPolicy.ts";
 import { stopWords } from "../shared/stopWords.ts";
 
 const { createClient } = supabaseJs;
@@ -695,41 +696,54 @@ serve(async (req: Request) => {
           /what.*work/.test(combined)
         );
       })();
-      const sharedEmbeddingPromise = (async () => {
-        try {
-          const embeddingController = new AbortController();
-          const embeddingTimeout = setTimeout(
-            () => embeddingController.abort(),
-            BASE_OPENAI_TIMEOUT_MS
-          );
-          const embeddingResponse = await fetch(
-            "https://api.openai.com/v1/embeddings",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${openaiApiKey}`,
-                "Content-Type": "application/json",
-              },
-              signal: embeddingController.signal,
-              body: JSON.stringify({
-                input: combinedTextForEmbedding,
-                model: "text-embedding-3-small",
-              }),
-            }
-          );
-          clearTimeout(embeddingTimeout);
-          const embeddingData = await embeddingResponse.json();
-          const embedding = embeddingData.data?.[0]?.embedding;
-          console.log(
-            "🧠 DEBUG: Shared embedding generated. Length:",
-            embedding?.length || 0
-          );
-          return embedding;
-        } catch (err) {
-          console.error("❌ DEBUG: Shared embedding generation failed:", err);
-          return null;
-        }
-      })();
+      const shouldGenerateEmbedding = shouldGenerateHuddleEmbedding(
+        Boolean(isRegeneration)
+      );
+      const sharedEmbeddingPromise: Promise<number[] | null> =
+        shouldGenerateEmbedding
+          ? (async () => {
+              try {
+                const embeddingController = new AbortController();
+                const embeddingTimeout = setTimeout(
+                  () => embeddingController.abort(),
+                  BASE_OPENAI_TIMEOUT_MS
+                );
+                const embeddingResponse = await fetch(
+                  "https://api.openai.com/v1/embeddings",
+                  {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${openaiApiKey}`,
+                      "Content-Type": "application/json",
+                    },
+                    signal: embeddingController.signal,
+                    body: JSON.stringify({
+                      input: combinedTextForEmbedding,
+                      model: "text-embedding-3-small",
+                    }),
+                  }
+                );
+                clearTimeout(embeddingTimeout);
+                const embeddingData = await embeddingResponse.json();
+                const embedding = embeddingData.data?.[0]?.embedding;
+                console.log(
+                  "🧠 DEBUG: Shared embedding generated. Length:",
+                  embedding?.length || 0
+                );
+                return embedding;
+              } catch (err) {
+                console.error(
+                  "❌ DEBUG: Shared embedding generation failed:",
+                  err
+                );
+                return null;
+              }
+            })()
+          : Promise.resolve(null);
+
+      if (!shouldGenerateEmbedding) {
+        console.log("ℹ️ DEBUG: Skipping unused embedding for regeneration.");
+      }
 
       const similarHuddlesPromise =
         userId && !isRegeneration
@@ -1091,6 +1105,7 @@ Refine this draft to make it better without inventing missing details.`;
         max_completion_tokens: maxTokens,
         reasoning_effort: reasoningEffort,
         stream: true,
+        stream_options: { include_usage: true },
       };
 
       if (!chatModel.startsWith("gpt-5")) {
@@ -1140,6 +1155,12 @@ Refine this draft to make it better without inventing missing details.`;
       let streamErrored = false;
       let sawDone = false;
       let controllerClosed = false;
+      let streamUsage: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        completion_tokens_details?: { reasoning_tokens?: number };
+      } | null = null;
 
       const stream = new ReadableStream({
         start(controller) {
@@ -1193,6 +1214,17 @@ Refine this draft to make it better without inventing missing details.`;
             if (controllerClosed) return;
             sawDone = true;
             ensureFallback();
+            if (streamUsage) {
+              console.log("📈 Huddle OpenAI usage:", {
+                model: chatModel,
+                modelRoute,
+                promptTokens: streamUsage.prompt_tokens,
+                completionTokens: streamUsage.completion_tokens,
+                reasoningTokens:
+                  streamUsage.completion_tokens_details?.reasoning_tokens,
+                totalTokens: streamUsage.total_tokens,
+              });
+            }
             safeEnqueue(JSON.stringify({ type: "done" }) + "\n");
             safeClose();
             resolveStreamComplete?.();
@@ -1216,6 +1248,9 @@ Refine this draft to make it better without inventing missing details.`;
                 : trimmed;
               try {
                 const parsed = JSON.parse(payloadText);
+                if (parsed.usage) {
+                  streamUsage = parsed.usage;
+                }
                 const deltaRaw = parsed.choices?.[0]?.delta?.content;
                 const delta = extractDeltaText(deltaRaw);
                 if (delta) {
