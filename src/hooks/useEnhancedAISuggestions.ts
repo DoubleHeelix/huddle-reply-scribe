@@ -3,6 +3,10 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
+import {
+  RetryableGenerationError,
+  runWithGenerationRetry,
+} from '@/utils/generationRetryPolicy';
 import type { DocumentKnowledge } from '@/types/document';
 import type { HuddlePlay } from '@/utils/huddlePlayService';
 
@@ -62,12 +66,9 @@ export const useEnhancedAISuggestions = () => {
     isRegeneration: boolean = false,
     existingDocumentKnowledge: DocumentKnowledge[] = [],
     existingPastHuddles: PastHuddleWithSimilarity[] = [],
-    onToken?: (partial: string, options?: { slangAddressTerms?: string[] }) => void,
-    allowAutoRegenerate: boolean = true
+    onToken?: (partial: string, options?: { slangAddressTerms?: string[] }) => void
   ): Promise<GenerateReplyResult | null> => {
     const errorMessage = "Generation failed. Please click re-generate";
-    const maxAttempts = 5;
-    let lastError: unknown = null;
     let lastDocumentKnowledge = existingDocumentKnowledge;
     let lastPastHuddles = existingPastHuddles;
 
@@ -75,11 +76,12 @@ export const useEnhancedAISuggestions = () => {
     setError(null);
 
     try {
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          console.log(`🤖 DEBUG: Enhanced AI - Starting reply generation (attempt ${attempt}/${maxAttempts})...`);
-          console.log('📸 DEBUG: Screenshot text length:', screenshotText.length);
-          console.log('✏️ DEBUG: User draft length:', userDraft.length);
+      try {
+        return await runWithGenerationRetry(
+          async (attempt, maxAttempts) => {
+            console.log(`🤖 DEBUG: Enhanced AI - Starting reply generation (attempt ${attempt}/${maxAttempts})...`);
+            console.log('📸 DEBUG: Screenshot text length:', screenshotText.length);
+            console.log('✏️ DEBUG: User draft length:', userDraft.length);
 
           // Search for relevant documents based on screenshot + draft content
           let documentKnowledge: DocumentKnowledge[] = [];
@@ -93,7 +95,7 @@ export const useEnhancedAISuggestions = () => {
               documentKnowledge = await searchDocuments(searchQuery, 3);
               console.log(`📚 DEBUG: Found ${documentKnowledge.length} relevant document chunks`);
             } else {
-              documentKnowledge = existingDocumentKnowledge;
+              documentKnowledge = lastDocumentKnowledge;
               console.log(`📚 DEBUG: Re-using document knowledge on retry: ${documentKnowledge.length}`);
             }
           }
@@ -195,77 +197,68 @@ export const useEnhancedAISuggestions = () => {
 
           const trimmedReply = reply.trim();
           if (!trimmedReply) {
-            throw new Error('Empty reply from AI function');
+            throw new RetryableGenerationError('Empty reply from AI function');
           }
 
-          if (trimmedReply === errorMessage && allowAutoRegenerate) {
-            console.log('🔁 DEBUG: Auto-regenerating after fallback reply...');
-            return await generateReply(
-              screenshotText,
-              userDraft,
-              true,
-              documentKnowledgeUsed,
-              pastHuddles,
-              onToken,
-              false
+          if (trimmedReply === errorMessage) {
+            throw new RetryableGenerationError(
+              'AI function returned the fallback reply'
             );
-          } else if (trimmedReply === errorMessage) {
-            console.error('❌ DEBUG: Reply equals fallback error after attempts', {
-              attempts: attempt,
-              pastHuddlesCount: pastHuddles.length,
-              documentKnowledgeCount: documentKnowledgeUsed.length,
-              replyLength: trimmedReply.length,
-            });
           }
 
           // Ensure UI sees the final reply even if no tokens were streamed.
           if (reply && onToken) onToken(reply, { slangAddressTerms });
 
-          return {
-            reply,
-            pastHuddles,
-            documentKnowledge: documentKnowledgeUsed,
-            slangAddressTerms,
-          };
-        } catch (err) {
-          lastError = err;
-          console.error(
-            `❌ DEBUG: Enhanced AI attempt ${attempt}/${maxAttempts} failed`,
-            err instanceof Error ? err.message : err
-          );
-          if (attempt === maxAttempts) break;
-          console.log('🔁 DEBUG: Retrying generation...');
-        }
-      }
-
-      if (allowAutoRegenerate) {
-        console.log('🔁 DEBUG: Auto-regenerating after repeated failures...');
-        return await generateReply(
-          screenshotText,
-          userDraft,
-          true,
-          lastDocumentKnowledge,
-          lastPastHuddles,
-          onToken,
-          false
+            return {
+              reply,
+              pastHuddles,
+              documentKnowledge: documentKnowledgeUsed,
+              slangAddressTerms,
+            };
+          },
+          {
+            onRetry: ({
+              attempt,
+              nextAttempt,
+              maxAttempts,
+              delayMs,
+              error: retryError,
+            }) => {
+              console.warn('🔁 DEBUG: Retrying transient generation failure', {
+                attempt,
+                nextAttempt,
+                maxAttempts,
+                delayMs,
+                error:
+                  retryError instanceof Error
+                    ? retryError.message
+                    : String(retryError),
+              });
+            },
+          }
         );
+      } catch (generationError) {
+        console.error('❌ DEBUG: Generation failed after bounded retries', {
+          lastError:
+            generationError instanceof Error
+              ? generationError.message
+              : generationError,
+          lastErrorStack:
+            generationError instanceof Error
+              ? generationError.stack
+              : undefined,
+          screenshotLength: screenshotText.length,
+          draftLength: userDraft.length,
+        });
+
+        if (onToken) onToken(errorMessage);
+        setError(errorMessage);
+        return {
+          reply: errorMessage,
+          pastHuddles: lastPastHuddles,
+          documentKnowledge: lastDocumentKnowledge,
+        };
       }
-
-      console.error('❌ DEBUG: Generation failed after retries', {
-        attempts: maxAttempts,
-        lastError: lastError instanceof Error ? lastError.message : lastError,
-        lastErrorStack: lastError instanceof Error ? lastError.stack : undefined,
-        screenshotLength: screenshotText.length,
-        draftLength: userDraft.length,
-      });
-
-      if (onToken) onToken(errorMessage);
-      setError(errorMessage);
-      return {
-        reply: errorMessage,
-        pastHuddles: [],
-        documentKnowledge: [],
-      };
     } finally {
       setIsGenerating(false);
     }

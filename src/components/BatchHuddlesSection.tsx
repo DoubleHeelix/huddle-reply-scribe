@@ -216,33 +216,25 @@ export const BatchHuddlesSection = ({
       error: undefined,
     }));
 
-    let result = null;
     let latestSlangTerms: string[] | undefined;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      result = await generateReply(
-        screenshotText,
-        draftForAI,
-        isRegeneration,
-        target.documents,
-        target.pastHuddles,
-        (partial, meta) => {
-          if (meta?.slangAddressTerms?.length) {
-            latestSlangTerms = meta.slangAddressTerms;
-          }
-          updateItem(id, (item) => ({
-            ...item,
-            reply: sanitizeHumanReply(partial, {
-              slangAddressTerms: latestSlangTerms,
-            }),
-          }));
+    const result = await generateReply(
+      screenshotText,
+      draftForAI,
+      isRegeneration,
+      target.documents,
+      target.pastHuddles,
+      (partial, meta) => {
+        if (meta?.slangAddressTerms?.length) {
+          latestSlangTerms = meta.slangAddressTerms;
         }
-      );
-
-      if (result) break;
-      if (attempt === 1) {
-        await wait(250);
+        updateItem(id, (item) => ({
+          ...item,
+          reply: sanitizeHumanReply(partial, {
+            slangAddressTerms: latestSlangTerms,
+          }),
+        }));
       }
-    }
+    );
 
     if (!result) {
       updateItem(id, (item) => ({
