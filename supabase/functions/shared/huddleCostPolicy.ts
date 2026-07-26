@@ -1,3 +1,4 @@
 export const shouldGenerateHuddleEmbedding = (
-  isRegeneration: boolean
-): boolean => !isRegeneration;
+  isRegeneration: boolean,
+  hasStoredHuddle = false,
+): boolean => !isRegeneration && !hasStoredHuddle;

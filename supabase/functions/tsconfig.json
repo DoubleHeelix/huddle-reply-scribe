@@ -2,16 +2,14 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "lib": ["esnext", "dom"],
-    "moduleResolution": "node",
+    "lib": ["esnext", "dom", "deno.ns"],
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "strict": true,
     "noImplicitAny": true,
     "skipLibCheck": true,
-    "types": [
-      "https://deno.land/x/deno/runtime.d.ts"
-    ]
+    "noEmit": true
   },
   "include": ["**/*.ts"]
 }

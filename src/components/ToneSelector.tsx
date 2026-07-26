@@ -31,15 +31,15 @@ export const ToneSelector = ({
   return (
     <div className="flex gap-2 items-center">
       <Select value={selectedTone} onValueChange={onToneChange} disabled={disabled}>
-        <SelectTrigger className="w-48 bg-gray-900 border-gray-600 text-white">
+        <SelectTrigger className="w-48 border-[#826f56]/15 bg-white/80 text-[#29231c] dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7]">
           <SelectValue placeholder="Adjust tone..." />
         </SelectTrigger>
-        <SelectContent className="bg-gray-800 border-gray-600">
+        <SelectContent className="border-[#826f56]/15 bg-[#fffcf7] dark:border-white/10 dark:bg-[#171513]">
           {TONE_OPTIONS.map((option) => (
             <SelectItem 
               key={option.value} 
               value={option.value}
-              className="text-white hover:bg-gray-700"
+              className="text-[#29231c] focus:bg-[#efe7dc] focus:text-[#29231c] dark:text-[#f4efe7] dark:focus:bg-white/[0.08] dark:focus:text-[#f4efe7]"
             >
               {option.label}
             </SelectItem>
@@ -51,7 +51,7 @@ export const ToneSelector = ({
         onClick={onApplyTone}
         disabled={disabled || selectedTone === 'none' || isAdjusting}
         variant="outline"
-        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+        className="border-[#c49b5d] bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
         size="sm"
       >
         {isAdjusting ? 'Adjusting...' : 'Apply Tone'}

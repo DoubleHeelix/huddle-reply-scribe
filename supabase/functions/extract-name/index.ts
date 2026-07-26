@@ -1,130 +1,94 @@
-/// <reference types="https://deno.land/x/deno/runtime.d.ts" />
-
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireAuthenticatedUser } from "../shared/auth.ts";
+import { handleCorsPreflight } from "../shared/cors.ts";
+import { errorResponse, jsonResponse } from "../shared/http.ts";
+import { fetchWithTimeout } from "../shared/provider.ts";
 
-const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-const SYSTEM_PROMPT = `You extract one likely participant name or handle from a short chat transcript snippet.
-
-Rules:
-- Return only the name/handle, no extra text.
-- If you are not confident, return "UNKNOWN".
-- Prefer the other participant (not "You", "Me", "Today", "Yesterday", etc.).
-- If you see both a full name and a handle, choose the handle if it looks clear (@ryan.couronne), otherwise the name.
-- Ignore timestamps, status labels (Active, Online, Typing), and chat UI labels.`;
-
+const OPENAI_TIMEOUT_MS = 20_000;
 const MAX_LINES = 15;
-const MAX_CHARS = 1200;
+const MAX_CHARS = 1_200;
+const SYSTEM_PROMPT = `Extract one likely participant name or handle from a short chat transcript.
+Return only the name or handle. Return UNKNOWN when uncertain.
+Prefer the other participant. Ignore timestamps, status labels, and chat UI labels.`;
 
-const stripControlChars = (value: string): string =>
-  Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0);
-      return !(code >= 0 && code <= 31);
-    })
+function trimTranscript(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const withoutControls = Array.from(value)
+    .filter((character) => character.charCodeAt(0) >= 32)
     .join("");
+  return withoutControls
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LINES)
+    .join("\n")
+    .slice(0, MAX_CHARS);
+}
 
-const sanitizeText = (text: unknown): string => {
-  if (!text || typeof text !== "string") return "";
-  return stripControlChars(text).trim();
-};
-
-const trimText = (text: string): string => {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const limited = lines.slice(0, MAX_LINES).join("\n");
-  return limited.length > MAX_CHARS
-    ? limited.slice(0, MAX_CHARS) + "..."
-    : limited;
-};
-
-const isLikelyName = (value: string): boolean => {
-  if (!value) return false;
+function isLikelyName(value: string): boolean {
   const cleaned = value.trim();
   if (cleaned.length < 3 || cleaned.length > 60) return false;
-  const nameLike = /^([A-Z][a-zA-Z'’.-]+(?:\s+[A-Z][a-zA-Z'’.-]+){0,3})$/.test(
-    cleaned,
+  return (
+    /^([A-Z][a-zA-Z'’.-]+(?:\s+[A-Z][a-zA-Z'’.-]+){0,3})$/.test(cleaned) ||
+    /^@?[A-Za-z][\w.]{3,30}$/.test(cleaned)
   );
-  const handleLike = /^@?[A-Za-z][\w.]{3,30}$/.test(cleaned);
-  return nameLike || handleLike;
-};
+}
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  if (req.method !== "POST") {
+    return jsonResponse(req, { error: "Method not allowed" }, 405);
   }
 
   try {
-    if (!openAIApiKey) {
-      throw new Error("OpenAI API key not configured");
+    await requireAuthenticatedUser(req);
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) throw new Error("OpenAI configuration is missing");
+
+    const body = await req.json().catch(() => ({}));
+    const transcript = trimTranscript(body?.text);
+    if (!transcript) {
+      return jsonResponse(req, { candidate: "UNKNOWN", confidence: 0 });
     }
 
-    const { text } = await req.json().catch(() => ({}));
-    const sanitized = sanitizeText(text);
-
-    if (!sanitized) {
-      return new Response(
-        JSON.stringify({ candidate: "UNKNOWN", confidence: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const trimmed = trimText(sanitized);
-
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
       {
-        role: "user",
-        content: `Transcript snippet:\n"""${trimmed}"""\n\nReturn the participant name or handle, or "UNKNOWN".`,
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `Transcript snippet:\n"""${transcript}"""`,
+            },
+          ],
+          temperature: 0,
+        }),
       },
-    ];
-
-    const body = {
-      model: "gpt-4o-mini",
-      messages,
-      max_tokens: 32,
-      temperature: 0,
-    };
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
+      OPENAI_TIMEOUT_MS,
+    );
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `OpenAI API Error: ${response.status} - ${
-          errorData.error?.message || "Unknown error"
-        }`,
-      );
+      console.error("Name extraction provider request failed", {
+        status: response.status,
+      });
+      throw new Error("Name extraction provider request failed");
     }
 
     const data = await response.json();
-    const raw = (data.choices?.[0]?.message?.content || "").trim();
+    const raw = String(data?.choices?.[0]?.message?.content || "").trim();
     const candidate = isLikelyName(raw) ? raw : "UNKNOWN";
-    const confidence = candidate === "UNKNOWN" ? 0.15 : 0.72;
-
-    return new Response(
-      JSON.stringify({ candidate, confidence }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return jsonResponse(req, {
+      candidate,
+      confidence: candidate === "UNKNOWN" ? 0.15 : 0.72,
+    });
   } catch (error) {
-    console.error("Error in extract-name function:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return errorResponse(req, error);
   }
 });

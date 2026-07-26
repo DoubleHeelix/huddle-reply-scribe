@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Settings, LogOut, Sun, Moon } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Settings, LogOut, Sun, Moon, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DocumentProcessor } from "./DocumentProcessor";
-import { documentService } from "@/services/documentService";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -19,6 +18,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 
+const DocumentProcessor = lazy(() =>
+  import("./DocumentProcessor").then((module) => ({
+    default: module.DocumentProcessor,
+  })),
+);
 
 interface SettingsSidebarProps {
   googleCloudApiKey: string;
@@ -48,9 +52,9 @@ export const SettingsSidebar = ({
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return 'light';
     const stored = localStorage.getItem('theme_preference');
-    return stored === 'light' ? 'light' : 'dark';
+    return stored === 'dark' ? 'dark' : 'light';
   });
 
   // Sync theme to document and localStorage.
@@ -69,6 +73,7 @@ export const SettingsSidebar = ({
   const handleDeleteAll = async () => {
     setIsDeleting(true);
     try {
+      const { documentService } = await import("@/services/documentService");
       await documentService.deleteAllDocuments();
       toast({
         title: "Success",
@@ -92,26 +97,32 @@ export const SettingsSidebar = ({
         <Button
           variant="outline"
           size="icon"
-          className="fixed top-4 right-4 z-50 bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+          aria-label="Open settings"
+          className="fixed top-4 right-4 z-50 border border-[#1b2f4a] bg-[#071326] text-[#f4efe7] hover:bg-[#1b2f4a] dark:border-[#c49b5d]/40 dark:bg-[#c49b5d] dark:text-[#0d0c0b] dark:hover:bg-[#d5aa67]"
         >
           <Settings className="w-4 h-4" />
         </Button>
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="w-[400px] sm:w-[540px] bg-gray-800 border-gray-700 text-white overflow-y-auto flex flex-col"
+        className="w-[400px] sm:w-[540px] border-l border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] overflow-y-auto flex flex-col dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]"
       >
         <div>
           <SheetHeader>
-            <SheetTitle className="text-white">Settings</SheetTitle>
+            <SheetTitle className="text-[#29231c] dark:text-[#f4efe7]">Settings</SheetTitle>
+            <SheetDescription className="text-[#776b5d] dark:text-[#b4a89a]">
+              Appearance, huddle mode, and account tools.
+            </SheetDescription>
           </SheetHeader>
 
-          <div className="border-b border-gray-700 pb-4 mb-4">
-            <h3 className="text-sm text-gray-300 mb-2">Appearance</h3>
+          <div className="border-b border-[#826f56]/15 pb-4 mb-4 dark:border-white/10">
+            <h3 className="text-sm text-[#776b5d] mb-2 dark:text-[#b4a89a]">Appearance</h3>
             <div className="flex gap-2">
               <Button
                 variant={theme === 'dark' ? 'default' : 'outline'}
-                className="flex items-center gap-2 bg-slate-900/80 border-white/10 text-white hover:bg-slate-800"
+                className={theme === 'dark'
+                  ? "flex items-center gap-2 border-[#071326] bg-[#071326] text-[#f4efe7] hover:bg-[#1b2f4a]"
+                  : "flex items-center gap-2 border-[#826f56]/15 bg-white/70 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"}
                 onClick={() => setTheme('dark')}
               >
                 <Moon className="w-4 h-4" />
@@ -119,7 +130,9 @@ export const SettingsSidebar = ({
               </Button>
               <Button
                 variant={theme === 'light' ? 'default' : 'outline'}
-                className="flex items-center gap-2 bg-white text-slate-900 border-white/40 hover:bg-slate-100"
+                className={theme === 'light'
+                  ? "flex items-center gap-2 border-[#c49b5d] bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
+                  : "flex items-center gap-2 border-[#826f56]/15 bg-white/70 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"}
                 onClick={() => setTheme('light')}
               >
                 <Sun className="w-4 h-4" />
@@ -128,14 +141,14 @@ export const SettingsSidebar = ({
             </div>
           </div>
 
-          <div className="border-b border-gray-700 pb-4 mb-4">
-            <h3 className="text-sm text-gray-300 mb-2">Huddle mode</h3>
-            <div className="flex items-center justify-between bg-slate-900/60 border border-white/10 rounded-xl px-3 py-3">
+          <div className="border-b border-[#826f56]/15 pb-4 mb-4 dark:border-white/10">
+            <h3 className="text-sm text-[#776b5d] mb-2 dark:text-[#b4a89a]">Huddle mode</h3>
+            <div className="flex flex-col gap-3 bg-white/70 border border-[#826f56]/15 rounded-xl px-3 py-3 dark:border-white/10 dark:bg-black/20">
               <div>
-                <p className="text-white text-sm font-medium">Single vs Batch</p>
-                <p className="text-xs text-gray-400">Batch lets you queue up to 5 screenshots for sequential replies.</p>
+                <p className="text-[#29231c] text-sm font-medium dark:text-[#f4efe7]">Single vs Batch</p>
+                <p className="text-xs text-[#776b5d] dark:text-[#b4a89a]">Batch lets you queue up to 5 screenshots for sequential replies.</p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-white">
+              <div className="flex items-center justify-end gap-2 border-t border-[#826f56]/10 pt-3 text-sm text-[#29231c] dark:border-white/10 dark:text-[#f4efe7]">
                 Single
                 <Switch
                   checked={huddleMode === 'batch'}
@@ -147,8 +160,30 @@ export const SettingsSidebar = ({
           </div>
           
           {isAdmin && (
-            <div className="border-t border-gray-700 pt-4 mt-4">
-              <DocumentProcessor />
+            <div className="border-t border-[#826f56]/15 pt-4 mt-4 dark:border-white/10">
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-[#a97d45] dark:text-[#d5aa67]" />
+                  <h3 className="text-lg font-semibold text-[#29231c] dark:text-[#f4efe7]">
+                    Admin Tools
+                  </h3>
+                  <Badge className="border border-[#c49b5d]/30 bg-[#c49b5d]/12 text-[#8f5b18] dark:text-[#d5aa67]">
+                    Administrator
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm text-[#776b5d] dark:text-[#b4a89a]">
+                  Manage the shared knowledge base and protected document data.
+                </p>
+              </div>
+              <Suspense
+                fallback={
+                  <p className="text-sm text-[#776b5d] dark:text-[#b4a89a]">
+                    Loading document tools…
+                  </p>
+                }
+              >
+                <DocumentProcessor />
+              </Suspense>
                <div className="mt-4">
                 <h3 className="text-lg font-semibold mb-2">Danger Zone</h3>
                  <AlertDialog>
@@ -172,7 +207,7 @@ export const SettingsSidebar = ({
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-[#776b5d] mt-2 dark:text-[#b4a89a]">
                   This will delete all processed documents and their embeddings. Use this before re-uploading documents after a chunking strategy change.
                 </p>
               </div>
@@ -180,18 +215,18 @@ export const SettingsSidebar = ({
           )}
         </div>
 
-        <div className="mt-auto border-t border-gray-700 pt-4">
+        <div className="mt-auto border-t border-[#826f56]/15 pt-4 dark:border-white/10">
           {user && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-white text-sm font-sans">{user.email}</span>
+                <div className="w-2 h-2 bg-[#348f6a] rounded-full"></div>
+                <span className="text-[#29231c] text-sm font-sans dark:text-[#f4efe7]">{user.email}</span>
               </div>
               <Button
                 onClick={onSignOut}
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-white font-sans h-8 px-2"
+                className="text-[#776b5d] hover:text-[#29231c] font-sans h-8 px-2 dark:text-[#b4a89a] dark:hover:text-[#f4efe7]"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out

@@ -32,13 +32,13 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
   const getStatusBadge = (status: Story['status']) => {
     switch (status) {
       case 'uploading':
-        return <Badge variant="secondary" className="bg-gray-500 animate-pulse">Uploading...</Badge>;
+        return <Badge variant="secondary" className="bg-[#776b5d] text-white animate-pulse">Uploading...</Badge>;
       case 'ocr':
-        return <Badge variant="secondary" className="bg-blue-600 animate-pulse">Reading text...</Badge>;
+        return <Badge variant="secondary" className="border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] animate-pulse">Reading text...</Badge>;
       case 'generating':
-        return <Badge variant="secondary" className="bg-yellow-500 animate-pulse">Generating...</Badge>;
+        return <Badge variant="secondary" className="border border-[#c49b5d]/30 bg-[#c49b5d]/20 text-[#8f5b18] animate-pulse">Generating...</Badge>;
       case 'completed':
-        return <Badge variant="secondary" className="bg-green-600">Completed</Badge>;
+        return <Badge variant="secondary" className="border border-[#348f6a]/30 bg-[#bcefd8] text-[#23684c]">Completed</Badge>;
       case 'error':
         return <Badge variant="destructive">Error</Badge>;
       default:
@@ -48,11 +48,11 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
 
   return (
     <Carousel className="w-full max-w-lg mx-auto" effect="fade" transitionSpeed={10}>
-      <CarouselContent className="bg-gray-800 rounded-lg">
+      <CarouselContent className="bg-white/70 rounded-lg dark:bg-[#171513]">
         {stories.map((story) => (
           <CarouselItem key={story.id}>
             <div className="p-1">
-              <Card className="bg-gray-800 border-gray-700 text-white">
+              <Card className="border-[#826f56]/15 bg-white/90 text-[#29231c] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]">
                 <CardContent className="flex flex-col items-center justify-center p-6 space-y-4">
                   <div className="w-full relative">
                     <img
@@ -78,8 +78,8 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
                         },
                       }}
                     >
-                      <h4 className="text-lg font-semibold text-center text-white flex items-center justify-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
+                      <h4 className="text-lg font-semibold text-center text-[#29231c] flex items-center justify-center gap-2 dark:text-[#f4efe7]">
+                        <Sparkles className="w-5 h-5 text-[#a97d45] dark:text-[#d5aa67]" />
                         AI Suggestions
                       </h4>
                       {story.interruptions.map((interruption, i) => (
@@ -99,14 +99,14 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
                           }}
                           className="relative p-px overflow-hidden rounded-lg bg-transparent transition-all duration-300 hover:scale-[1.02]"
                         >
-                          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-500" />
-                          <div className="relative flex items-center gap-3 p-3 rounded-[7px] bg-gray-800">
-                            <p className="flex-grow text-sm font-medium text-white">{interruption}</p>
+                          <div className="absolute inset-0 bg-[#c49b5d]" />
+                          <div className="relative flex items-center gap-3 p-3 rounded-[7px] bg-[#fffcf7] dark:bg-[#171513]">
+                            <p className="flex-grow text-sm font-medium text-[#29231c] dark:text-[#f4efe7]">{interruption}</p>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleCopy(interruption)}
-                              className="text-gray-400 hover:text-white hover:bg-gray-700/50 flex-shrink-0"
+                              className="text-[#776b5d] hover:text-[#29231c] hover:bg-[#efe7dc] flex-shrink-0 dark:text-[#b4a89a] dark:hover:text-[#f4efe7] dark:hover:bg-white/[0.08]"
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
@@ -117,7 +117,7 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
                   )}
 
                   {(story.status === 'ocr' || story.status === 'generating') && (
-                    <div className="flex items-center gap-2 text-gray-400">
+                    <div className="flex items-center gap-2 text-[#776b5d] dark:text-[#b4a89a]">
                       <Loader2 className="h-5 w-5 animate-spin" />
                       <span>Processing...</span>
                     </div>
@@ -135,8 +135,8 @@ export function InterruptionsCarousel({ stories }: InterruptionsCarouselProps) {
           </CarouselItem>
         ))}
       </CarouselContent>
-      <CarouselPrevious className="text-white bg-gray-800 hover:bg-gray-700" />
-      <CarouselNext className="text-white bg-gray-800 hover:bg-gray-700" />
+      <CarouselPrevious className="border-[#826f56]/15 bg-white text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]" />
+      <CarouselNext className="border-[#826f56]/15 bg-white text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]" />
     </Carousel>
   );
 }

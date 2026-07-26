@@ -74,37 +74,37 @@ const columnSets: Record<Mode, ColumnConfig[]> = {
       id: "Unassigned",
       label: "Unassigned",
       description: "Auto-filled from your saved conversations",
-      badgeClass: "bg-slate-700/40 text-slate-100",
+      badgeClass: "border border-[#826f56]/15 bg-[#efe7dc] text-[#554b3f] dark:border-white/10 dark:bg-white/[0.06] dark:text-[#d8cfc2]",
     },
     {
       id: "OLB",
       label: "OLB",
       description: "One-Line-Bridge",
-      badgeClass: "bg-amber-500/20 text-amber-200",
+      badgeClass: "border border-[#c49b5d]/30 bg-[#c49b5d]/15 text-[#8f5b18] dark:text-[#d5aa67]",
     },
     {
       id: "MPA",
       label: "MPA",
       description: "Made Aware",
-      badgeClass: "bg-indigo-500/20 text-indigo-200",
+      badgeClass: "border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] dark:border-[#355981] dark:bg-[#102033] dark:text-[#7ea4d6]",
     },
     {
       id: "DTM",
       label: "DTM",
       description: "Door Opened",
-      badgeClass: "bg-emerald-500/20 text-emerald-200",
+      badgeClass: "border border-[#348f6a]/30 bg-[#bcefd8]/70 text-[#23684c] dark:bg-[#348f6a]/10 dark:text-[#6ee7b7]",
     },
     {
       id: "STP",
       label: "STP",
       description: "Process Started",
-      badgeClass: "bg-cyan-500/20 text-cyan-200",
+      badgeClass: "border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] dark:border-[#355981] dark:bg-[#102033] dark:text-[#7ea4d6]",
     },
     {
       id: "Removed",
       label: "Removed",
       description: "Removed",
-      badgeClass: "bg-rose-500/20 text-rose-200",
+      badgeClass: "border border-[#fda29b] bg-[#fee4e2] text-[#b42318] dark:border-[#7a271a] dark:bg-[#3a1210] dark:text-[#f97066]",
     },
   ],
   process: [
@@ -112,37 +112,37 @@ const columnSets: Record<Mode, ColumnConfig[]> = {
       id: "MeetGreet1",
       label: "Meet and Greet 1",
       description: "First meeting touchpoint",
-      badgeClass: "bg-indigo-500/20 text-indigo-200",
+      badgeClass: "border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] dark:border-[#355981] dark:bg-[#102033] dark:text-[#7ea4d6]",
     },
     {
       id: "MeetGreet2",
       label: "Meet and Greet 2",
       description: "Second meeting touchpoint",
-      badgeClass: "bg-indigo-400/25 text-indigo-100",
+      badgeClass: "border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] dark:border-[#355981] dark:bg-[#102033] dark:text-[#7ea4d6]",
     },
     {
       id: "FU1",
       label: "FU1",
       description: "Follow-up 1",
-      badgeClass: "bg-amber-500/20 text-amber-200",
+      badgeClass: "border border-[#c49b5d]/30 bg-[#c49b5d]/15 text-[#8f5b18] dark:text-[#d5aa67]",
     },
     {
       id: "FU2",
       label: "FU2",
       description: "Follow-up 2",
-      badgeClass: "bg-amber-400/25 text-amber-100",
+      badgeClass: "border border-[#c49b5d]/30 bg-[#c49b5d]/15 text-[#8f5b18] dark:text-[#d5aa67]",
     },
     {
       id: "FU3",
       label: "FU3",
       description: "Follow-up 3",
-      badgeClass: "bg-amber-300/25 text-amber-50",
+      badgeClass: "border border-[#c49b5d]/30 bg-[#c49b5d]/15 text-[#8f5b18] dark:text-[#d5aa67]",
     },
     {
       id: "PRC",
       label: "PRC",
       description: "Process control",
-      badgeClass: "bg-emerald-500/20 text-emerald-200",
+      badgeClass: "border border-[#348f6a]/30 bg-[#bcefd8]/70 text-[#23684c] dark:bg-[#348f6a]/10 dark:text-[#6ee7b7]",
     },
   ],
 };
@@ -1042,22 +1042,22 @@ export const TrelloTab = () => {
   return (
     <div className="space-y-4">
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-        <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
+        <AlertDialogContent className="border border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-lg">
               Reset board?
             </AlertDialogTitle>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-[#776b5d] dark:text-[#b4a89a]">
               This clears all names from every column. You can’t undo this
               action.
             </p>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-900 border border-slate-700 text-slate-200 hover:bg-slate-800">
+            <AlertDialogCancel className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-[#b42318] hover:bg-[#8b3d3d] text-white"
               onClick={() => {
                 clearBoard();
                 setShowResetConfirm(false);
@@ -1073,23 +1073,23 @@ export const TrelloTab = () => {
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => !open && setPendingDelete(null)}
       >
-        <AlertDialogContent className="bg-slate-950 border border-slate-800 text-white">
+        <AlertDialogContent className="border border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-lg">
               Remove this name?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-slate-400">
+            <AlertDialogDescription className="text-sm text-[#776b5d] dark:text-[#b4a89a]">
               {pendingDelete?.name
                 ? `Remove "${pendingDelete.name}" from the board.`
                 : "This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-900 border border-slate-700 text-slate-200 hover:bg-slate-800">
+            <AlertDialogCancel className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700 text-white"
+              className="bg-[#b42318] hover:bg-[#8b3d3d] text-white"
               onClick={handleConfirmDelete}
             >
               Remove
@@ -1104,8 +1104,8 @@ export const TrelloTab = () => {
           onClick={() => handleModeChange("convo")}
           className={
             mode === "convo"
-              ? "bg-cyan-600 text-white"
-              : "border-slate-700 bg-slate-900 text-slate-200"
+              ? "bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
+              : "border-[#826f56]/15 bg-white/70 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7]"
           }
         >
           Convo
@@ -1115,8 +1115,8 @@ export const TrelloTab = () => {
           onClick={() => handleModeChange("process")}
           className={
             mode === "process"
-              ? "bg-cyan-600 text-white"
-              : "border-slate-700 bg-slate-900 text-slate-200"
+              ? "bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
+              : "border-[#826f56]/15 bg-white/70 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7]"
           }
         >
           Process
@@ -1128,7 +1128,7 @@ export const TrelloTab = () => {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search names across columns"
-          className="bg-slate-900 border border-slate-800 text-white placeholder:text-slate-500 h-11 lg:h-12 lg:text-base"
+          className="border border-[#826f56]/15 bg-white/80 text-[#29231c] placeholder:text-[#776b5d] h-11 lg:h-12 lg:text-base focus-visible:ring-[#c49b5d]/50 dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7] dark:placeholder:text-[#b4a89a]"
         />
       </div>
 
@@ -1142,9 +1142,9 @@ export const TrelloTab = () => {
           return (
             <Card
               key={column.id}
-              className={`border-slate-800/70 bg-slate-900/70 backdrop-blur lg:min-h-[380px] lg:rounded-2xl lg:border-slate-800 lg:hover:border-slate-700 transition-colors ${
+              className={`border-[#826f56]/15 bg-white/80 backdrop-blur lg:min-h-[380px] lg:rounded-2xl lg:hover:border-[#c49b5d]/45 transition-colors dark:border-white/10 dark:bg-[#171513]/90 ${
                 activeDrop === column.id
-                  ? "border-cyan-500/60 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]"
+                  ? "border-[#c49b5d]/70 shadow-[0_0_0_1px_rgba(196,155,93,0.32)]"
                   : ""
               }`}
               onDragOver={(e) => {
@@ -1174,13 +1174,13 @@ export const TrelloTab = () => {
             >
               <CardHeader className="space-y-2 pb-3 lg:pb-4">
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-lg text-white flex items-center gap-2">
+                  <CardTitle className="text-lg text-[#29231c] flex items-center gap-2 dark:text-[#f4efe7]">
                     {column.label}
                     <button
                       onClick={() =>
                         setColumnCollapsed(column.id, !isCollapsed)
                       }
-                      className="text-slate-300 hover:text-white transition-colors"
+                      className="text-[#776b5d] hover:text-[#29231c] transition-colors dark:text-[#b4a89a] dark:hover:text-[#f4efe7]"
                       aria-label={
                         isCollapsed ? "Expand column" : "Collapse column"
                       }
@@ -1197,7 +1197,7 @@ export const TrelloTab = () => {
                     {(filteredBoard[column.id] || []).length === 1 ? "" : "s"}
                   </Badge>
                 </div>
-                <p className="text-sm text-slate-400 lg:text-[15px] lg:text-slate-300">
+                <p className="text-sm text-[#776b5d] lg:text-[15px] dark:text-[#b4a89a]">
                   {column.description}
                 </p>
               </CardHeader>
@@ -1221,7 +1221,7 @@ export const TrelloTab = () => {
                           }))
                         }
                         placeholder="Add a name"
-                        className="bg-slate-950/80 text-white placeholder:text-slate-500 lg:h-11 lg:text-base"
+                        className="border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] placeholder:text-[#776b5d] lg:h-11 lg:text-base focus-visible:ring-[#c49b5d]/50 dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7] dark:placeholder:text-[#b4a89a]"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -1241,7 +1241,7 @@ export const TrelloTab = () => {
 
                     <div className="space-y-2">
                       {(filteredBoard[column.id] || []).length === 0 && (
-                        <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/70 px-3 py-4 text-center text-sm text-slate-500">
+                        <div className="rounded-lg border border-dashed border-[#826f56]/20 bg-[#fffcf7]/70 px-3 py-4 text-center text-sm text-[#776b5d] dark:border-white/10 dark:bg-[#0d0c0b]/50 dark:text-[#b4a89a]">
                           Nothing here yet. Add the first name.
                         </div>
                       )}
@@ -1250,7 +1250,7 @@ export const TrelloTab = () => {
                         (name, idx) => (
                           <div
                             key={`${column.id}-${idx}-${name}`}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-white shadow-sm"
+                            className="flex items-center justify-between gap-2 rounded-lg border border-[#826f56]/15 bg-[#fffcf7] px-3 py-2 text-sm text-[#29231c] shadow-sm dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7]"
                             draggable
                             onDragStart={() => {
                               setDragging({ name, from: column.id });
@@ -1263,13 +1263,13 @@ export const TrelloTab = () => {
                           >
                             <div className="flex-1 min-w-0">
                               <button
-                                className="truncate text-left hover:text-cyan-200 w-full"
+                                className="truncate text-left hover:text-[#8f5b18] w-full dark:hover:text-[#d5aa67]"
                                 onClick={() => setSelectedName(name)}
                               >
                                 {name}
                               </button>
                               {lastTimestampLabelByName.get(name) && (
-                                <div className="text-[11px] text-slate-400 truncate">
+                                <div className="text-[11px] text-[#776b5d] truncate dark:text-[#b4a89a]">
                                   Last chatted{" "}
                                   {lastTimestampLabelByName.get(name)}
                                 </div>
@@ -1281,14 +1281,14 @@ export const TrelloTab = () => {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-slate-200 hover:bg-slate-800"
+                                    className="h-8 w-8 text-[#776b5d] hover:bg-[#efe7dc] dark:text-[#b4a89a] dark:hover:bg-white/[0.08]"
                                   >
                                     <ArrowLeftRight className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                   align="end"
-                                  className="bg-slate-950 text-slate-100 border border-slate-800 shadow-lg shadow-black/40 min-w-[260px] max-h-[320px] overflow-y-auto"
+                                  className="bg-[#fffcf7] text-[#29231c] border border-[#826f56]/15 shadow-lg shadow-[#4d3c2a]/15 min-w-[260px] max-h-[320px] overflow-y-auto dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7] dark:shadow-black/40"
                                 >
                                   <div className="px-3 py-2 text-[11px] uppercase tracking-[0.15em] text-slate-500">
                                     Convo columns
@@ -1368,7 +1368,7 @@ export const TrelloTab = () => {
         <Button
           variant="outline"
           onClick={() => setShowResetConfirm(true)}
-          className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+          className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"
         >
           Reset board
         </Button>
@@ -1378,13 +1378,13 @@ export const TrelloTab = () => {
         open={Boolean(selectedName)}
         onOpenChange={(open) => !open && setSelectedName(null)}
       >
-        <DialogContent className="max-w-3xl bg-slate-950 text-white border border-slate-800 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl bg-[#fffcf7] text-[#29231c] border border-[#826f56]/15 max-h-[90vh] overflow-y-auto dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]">
           {selectedGroup ? (
             <div className="space-y-4 text-center">
-              <h2 className="text-xl font-semibold text-white">
+              <h2 className="text-xl font-semibold text-[#29231c] dark:text-[#f4efe7]">
                 {selectedGroup.appliedName}
               </h2>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-[#776b5d] dark:text-[#b4a89a]">
                 Showing most recent conversation
                 {selectedGroup.huddles.length > 1
                   ? ` of ${selectedGroup.huddles.length}`

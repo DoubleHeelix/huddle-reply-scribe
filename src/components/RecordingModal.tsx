@@ -23,7 +23,7 @@ const MicrophoneIcon = () => (
     strokeWidth="1.5"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className="text-blue-400"
+    className="text-[#2f5d8c] dark:text-[#7ea4d6]"
     style={{
       filter: "drop-shadow(0 0 5px #3b82f6) drop-shadow(0 0 15px #3b82f6)",
     }}
@@ -61,7 +61,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
     // Render a more compact version for mobile screens
     return (
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-gray-900 bg-opacity-80 backdrop-blur-lg border-gray-700 text-white flex flex-col items-center p-2 rounded-lg shadow-2xl w-[90vw] max-w-md">
+        <DialogContent className="border-[#826f56]/15 bg-[#fffcf7]/95 backdrop-blur-lg text-[#29231c] flex flex-col items-center p-2 rounded-lg shadow-2xl w-[90vw] max-w-md dark:border-white/10 dark:bg-[#171513]/95 dark:text-[#f4efe7]">
           <DialogHeader>
             <DialogTitle className="sr-only">Recording in progress</DialogTitle>
             <DialogDescription className="sr-only">A modal to show the status of the recording and the transcribed text.</DialogDescription>
@@ -69,19 +69,19 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
           <div className="my-2 flex items-center justify-center space-x-4 h-12">
               <AudioVisualizer />
               <div className="relative">
-                  <div className="absolute h-10 w-10 bg-blue-500 rounded-full animate-ping opacity-50"></div>
+                  <div className="absolute h-10 w-10 bg-[#c49b5d] rounded-full animate-ping opacity-50"></div>
                   <MicrophoneIcon />
               </div>
               <AudioVisualizer />
           </div>
           <Button
             onClick={onComplete}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg text-md"
+            className="bg-[#b42318] hover:bg-[#8b3d3d] text-white font-bold py-2 px-4 rounded-lg text-md"
           >
             Stop Recording
           </Button>
           <div className="w-full mt-2 p-2 bg-black bg-opacity-20 rounded-md min-h-[80px] text-md">
-              {transcript || <span className="text-gray-400">Starting to listen<AnimatedEllipsis /></span>}
+              {transcript || <span className="text-[#776b5d] dark:text-[#b4a89a]">Starting to listen<AnimatedEllipsis /></span>}
           </div>
         </DialogContent>
       </Dialog>
@@ -91,7 +91,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   // Render the full version for desktop screens
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-gray-900 bg-opacity-70 backdrop-blur-md border-gray-700 text-white flex flex-col items-center justify-center p-4 rounded-lg shadow-2xl">
+      <DialogContent className="border-[#826f56]/15 bg-[#fffcf7]/95 backdrop-blur-md text-[#29231c] flex flex-col items-center justify-center p-4 rounded-lg shadow-2xl dark:border-white/10 dark:bg-[#171513]/95 dark:text-[#f4efe7]">
         <DialogHeader>
           <DialogTitle className="sr-only">Recording...</DialogTitle>
           <DialogDescription className="sr-only">A modal to show the status of the recording and the transcribed text.</DialogDescription>
@@ -99,18 +99,18 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         <div className="my-2 flex items-center justify-center space-x-6 h-16">
             <AudioVisualizer />
             <div className="relative">
-                <div className="absolute h-12 w-12 bg-blue-500 rounded-full animate-ping opacity-50"></div>
+                <div className="absolute h-12 w-12 bg-[#c49b5d] rounded-full animate-ping opacity-50"></div>
                 <MicrophoneIcon />
             </div>
             <AudioVisualizer />
         </div>
         <div className="w-full p-4 bg-black bg-opacity-20 rounded-md min-h-[100px] text-lg">
-            {transcript || <span className="text-gray-400">Starting to listen<AnimatedEllipsis /></span>}
+            {transcript || <span className="text-[#776b5d] dark:text-[#b4a89a]">Starting to listen<AnimatedEllipsis /></span>}
         </div>
         <DialogFooter className="mt-2">
           <Button
             onClick={onComplete}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg"
+            className="bg-[#b42318] hover:bg-[#8b3d3d] text-white font-bold py-3 px-6 rounded-lg text-lg"
           >
             Stop Recording
           </Button>

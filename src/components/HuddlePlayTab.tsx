@@ -9,14 +9,31 @@ import { AIKnowledgeSources } from './AIKnowledgeSources';
 import { BatchHuddlesSection } from './BatchHuddlesSection';
 import { useHuddleState } from '@/hooks/useHuddleState';
 import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
+import {
+  getStyleProfileStrength,
+  type StyleProfile,
+} from '@/types/styleProfile';
 
 type HuddleState = ReturnType<typeof useHuddleState>;
 
 interface HuddlePlayTabProps {
   huddleState: HuddleState;
+  styleProfile: StyleProfile | null;
 }
 
-export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => {
+const scrollToReplySection = () => {
+  requestAnimationFrame(() => {
+    const replySection = document.querySelector(
+      '[data-section="generated-reply"]',
+    );
+    replySection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+};
+
+export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({
+  huddleState,
+  styleProfile,
+}) => {
   const {
     uploadedImage,
     setUploadedImage,
@@ -34,11 +51,13 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     setExtractedText,
     currentHuddleId,
     setCurrentHuddleId,
+    currentGenerationId,
+    setCurrentGenerationId,
     generateReply,
     adjustTone,
     isGenerating,
     isAdjustingTone,
-    updateFinalReply,
+    recordAcceptance,
     extractText,
     isOCRProcessing,
     ocrResult,
@@ -53,6 +72,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
   } = huddleState;
   const [copiedFeedback, setCopiedFeedback] = useState(false);
   const [forceShowReplySection, setForceShowReplySection] = useState(false);
+  const [hasUserEditedReply, setHasUserEditedReply] = useState(false);
+  const styleStrength = getStyleProfileStrength(styleProfile);
 
   // Restore draft from localStorage on mount
   useEffect(() => {
@@ -132,7 +153,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
   };
 
   const getScreenshotText = useCallback((): string => {
-    return extractedText || "Please describe what you see in the screenshot or the conversation context that's relevant to your draft message.";
+    return extractedText || "Please describe what you see in the screenshot or the conversation context that's relevant to the user's draft or direction.";
   }, [extractedText]);
 
   const handleGenerateReply = useCallback(async () => {
@@ -140,8 +161,18 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
     if (!userDraft.trim()) {
       toast({
-        title: "Draft required",
-        description: "Please write your draft message first.",
+        title: "Draft or direction required",
+        description:
+          "Write a message, or briefly tell Huddle what you want to say.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (userDraft.trim().toLowerCase() === "test") {
+      toast({
+        title: "Add a real draft or direction",
+        description:
+          "Write the message, or briefly describe what the reply should say.",
         variant: "destructive",
       });
       return;
@@ -158,18 +189,15 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
     // Ensure Step 3 is shown as soon as generation starts.
     setForceShowReplySection(true);
+    setHasUserEditedReply(false);
     scrollToReplySection();
     
     const screenshotText = getScreenshotText();
-    const draftForAI =
-      userDraft.trim().toLowerCase() === "test"
-        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
-        : userDraft;
     
     let latestSlangTerms: string[] | undefined;
     const result = await generateReply(
       screenshotText,
-      draftForAI,
+      userDraft,
       false,
       [],
       [],
@@ -184,6 +212,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     );
     
     if (result) {
+      if (result.huddleId) setCurrentHuddleId(result.huddleId);
+      if (result.generationId) setCurrentGenerationId(result.generationId);
       const slangTerms = result.slangAddressTerms || latestSlangTerms;
       setGeneratedReply(
         sanitizeHumanReply(result.reply, { slangAddressTerms: slangTerms })
@@ -204,8 +234,12 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
       const documentCount = result.documentKnowledge?.length || 0;
       
       toast({
-        title: "Perfect reply generated!",
-        description: `Your optimized response is ready. Used ${huddleCount} past huddles and ${documentCount} documents.`,
+        title: styleProfile
+          ? "Reply matched to your voice"
+          : "Perfect reply generated!",
+        description: styleProfile
+          ? `Your ${styleStrength.label.toLowerCase()} profile shaped this reply, with ${huddleCount} past replies and ${documentCount} documents for context.`
+          : `Your optimized response is ready. Used ${huddleCount} past huddles and ${documentCount} documents.`,
       });
 
     }
@@ -218,23 +252,33 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     setLastUsedHuddles,
     setLastUsedDocuments,
     setShowKnowledgeSources,
+    setCurrentHuddleId,
+    setCurrentGenerationId,
     getScreenshotText,
+    styleProfile,
+    styleStrength.label,
   ]);
 
   const handleRegenerate = async () => {
     if (!userDraft.trim() || !uploadedImage) return;
+    if (userDraft.trim().toLowerCase() === "test") {
+      toast({
+        title: "Add a real draft or direction",
+        description:
+          "Write the message, or briefly describe what the reply should say.",
+        variant: "destructive",
+      });
+      return;
+    }
     setForceShowReplySection(true);
+    setHasUserEditedReply(false);
     scrollToReplySection();
     
     const screenshotText = getScreenshotText();
-    const draftForAI =
-      userDraft.trim().toLowerCase() === "test"
-        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
-        : userDraft;
     let latestSlangTerms: string[] | undefined;
     const result = await generateReply(
       screenshotText,
-      draftForAI,
+      userDraft,
       true,
       lastUsedDocuments,
       lastUsedHuddles,
@@ -245,10 +289,14 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         setGeneratedReply(
           sanitizeHumanReply(partial, { slangAddressTerms: latestSlangTerms })
         );
-      }
+      },
+      currentHuddleId,
+      currentGenerationId,
     );
     
     if (result) {
+      if (result.huddleId) setCurrentHuddleId(result.huddleId);
+      if (result.generationId) setCurrentGenerationId(result.generationId);
       const slangTerms = result.slangAddressTerms || latestSlangTerms;
       setGeneratedReply(
         sanitizeHumanReply(result.reply, { slangAddressTerms: slangTerms })
@@ -261,11 +309,6 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         (result.pastHuddles && result.pastHuddles.length > 0) ||
         (result.documentKnowledge && result.documentKnowledge.length > 0)
       );
-      
-      if (currentHuddleId) {
-        await updateFinalReply(currentHuddleId, result.reply);
-      }
-      
       toast({
         title: "New reply generated!",
         description: "Here's an alternative version for you.",
@@ -281,9 +324,16 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     if (!cleanAdjusted || cleanAdjusted === generatedReply) return;
 
     setGeneratedReply(cleanAdjusted);
+    setHasUserEditedReply(false);
 
     if (currentHuddleId) {
-      await updateFinalReply(currentHuddleId, cleanAdjusted);
+      await recordAcceptance(
+        currentHuddleId,
+        currentGenerationId,
+        'tone_applied',
+        cleanAdjusted,
+        { tone: selectedTone },
+      );
     }
 
     toast({
@@ -297,6 +347,23 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
     
     try {
       await navigator.clipboard.writeText(generatedReply);
+      if (currentHuddleId) {
+        if (hasUserEditedReply) {
+          await recordAcceptance(
+            currentHuddleId,
+            currentGenerationId,
+            'edited',
+            generatedReply,
+          );
+        }
+        await recordAcceptance(
+          currentHuddleId,
+          currentGenerationId,
+          'copied',
+          generatedReply,
+        );
+      }
+      setHasUserEditedReply(false);
       toast({
         title: "Copied!",
         description: "Reply copied to clipboard.",
@@ -310,7 +377,14 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
         variant: "destructive",
       });
     }
-  }, [generatedReply, toast]);
+  }, [
+    currentGenerationId,
+    currentHuddleId,
+    generatedReply,
+    hasUserEditedReply,
+    recordAcceptance,
+    toast,
+  ]);
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to generate, Cmd/Ctrl+C to copy reply
   const handleShortcut = useCallback(
@@ -338,16 +412,8 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
 
   const handleResetHuddle = () => {
     setForceShowReplySection(false);
+    setHasUserEditedReply(false);
     resetHuddle();
-  };
-
-  const scrollToReplySection = () => {
-    requestAnimationFrame(() => {
-      const replySection = document.querySelector('[data-section="generated-reply"]');
-      if (replySection) {
-        replySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
   };
 
   // Keep inline loaders visible during generation/tone adjustment; no overlay needed.
@@ -366,6 +432,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
           isAdjustingTone={isAdjustingTone}
           batchItems={batchItems}
           setBatchItems={setBatchItems}
+          recordAcceptance={recordAcceptance}
         />
       ) : (
         <>
@@ -376,7 +443,7 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
           />
 
           {!hasScreenshot && (
-            <div className="rounded-xl border border-dashed border-slate-700/70 bg-slate-900/40 p-4 text-center text-sm text-slate-400">
+            <div className="rounded-xl border border-dashed border-[#826f56]/30 bg-white/45 p-4 text-center text-sm text-[#776b5d] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#b4a89a]">
               Step 2 (draft + generate) unlocks after you drop a screenshot above.
             </div>
           )}
@@ -400,10 +467,10 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
               <Button 
                 onClick={handleGenerateReply}
                 disabled={isGenerating || !userDraft.trim() || !uploadedImage}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12"
+                className="w-full bg-[#c49b5d] hover:bg-[#b58a52] text-[#071326] py-4 text-lg font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed font-sans h-12 shadow-[0_16px_38px_rgba(181,138,82,0.2)]"
               >
                 <Zap className="w-5 h-5 mr-2" />
-                {isGenerating ? "Generating AI Reply..." : "🪄 Generate AI Reply"}
+                {isGenerating ? "Generating..." : "Generate"}
               </Button>
 
               <GeneratedReplySection
@@ -416,9 +483,14 @@ export const HuddlePlayTab: React.FC<HuddlePlayTabProps> = ({ huddleState }) => 
                 onToneChange={setSelectedTone}
                 onApplyTone={handleApplyTone}
                 onCopyReply={handleCopyReply}
+                onReplyChange={(reply) => {
+                  setGeneratedReply(reply);
+                  setHasUserEditedReply(true);
+                }}
                 onRegenerate={handleRegenerate}
                 onReset={handleResetHuddle}
                 copiedFeedback={copiedFeedback}
+                styleProfile={styleProfile}
               />
 
               {/* AI Knowledge Sources Section - Show if we have any knowledge data */}

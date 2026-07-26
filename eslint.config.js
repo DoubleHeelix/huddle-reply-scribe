@@ -19,11 +19,22 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // These React Compiler-oriented rules require a broader legacy state
+      // migration. Keep the runtime hooks rules enabled and handle that
+      // migration separately from the security/toolchain upgrade.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
     },
-  }
+  },
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
 );

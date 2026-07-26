@@ -9,4 +9,8 @@ describe("shouldGenerateHuddleEmbedding", () => {
   it("skips the unused embedding for a regeneration", () => {
     expect(shouldGenerateHuddleEmbedding(true)).toBe(false);
   });
+
+  it("reuses the stored embedding when an idempotent request is retried", () => {
+    expect(shouldGenerateHuddleEmbedding(false, true)).toBe(false);
+  });
 });

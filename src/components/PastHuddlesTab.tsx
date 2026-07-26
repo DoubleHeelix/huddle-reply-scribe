@@ -545,7 +545,7 @@ export const PastHuddlesTab = () => {
       if (!session) throw new Error("Not authenticated");
 
       const { data, error } = await supabase.functions.invoke('search-past-huddles', {
-        body: { query: searchTerm, userId: session.user.id },
+        body: { query: searchTerm },
       });
 
       if (error) throw error;
@@ -568,9 +568,11 @@ export const PastHuddlesTab = () => {
       prev.includes(id) ? prev.filter(hId => hId !== id) : [...prev, id]
     );
     // Hydrate full text on first open if we only have a preview
-    const target = (searchResults !== null ? searchResults : initialHuddlePlays).find(
-      (h) => h.id === id
-    );
+    const target = (
+      searchResults !== null ? searchResults : initialHuddlePlays
+    ).find((h) => h.id === id) as
+      | (HuddlePlay & { __preview?: boolean })
+      | undefined;
     if (target?.__preview) {
       await ensureHuddleDetail(id);
     }

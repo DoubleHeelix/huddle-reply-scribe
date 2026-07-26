@@ -2,7 +2,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import FlowPage from "./pages/FlowPage";
@@ -10,20 +9,20 @@ import { AuthWrapper } from "./components/AuthWrapper";
 
 const queryClient = new QueryClient();
 
+const AppRoute = () => {
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (pathname === "/") return <Index />;
+  if (pathname === "/flow") return <FlowPage />;
+  return <NotFound />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthWrapper>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/flow" element={<FlowPage />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AppRoute />
       </AuthWrapper>
     </TooltipProvider>
   </QueryClientProvider>

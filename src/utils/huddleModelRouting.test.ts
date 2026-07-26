@@ -1,54 +1,51 @@
 import { describe, expect, it } from "vitest";
 import {
-  HUDDLE_MODELS,
+  applyEvaluatedRoutingPolicy,
   selectHuddleReplyModel,
 } from "../../supabase/functions/shared/huddleModelRouting";
 
-describe("selectHuddleReplyModel", () => {
-  it("uses the intended provider model IDs", () => {
-    expect(HUDDLE_MODELS).toEqual({
-      primaryReply: "gpt-5.4-nano",
-      fallbackReply: "gpt-5-mini",
-      toneAdjustment: "gpt-4o-mini",
+describe("evaluation-gated Huddle model routing", () => {
+  const baseline = selectHuddleReplyModel({
+    isRegeneration: false,
+    contextIsHeavy: false,
+  });
+
+  it("keeps the proven baseline until the sample threshold is met", () => {
+    expect(
+      applyEvaluatedRoutingPolicy(baseline, {
+        primary_model: "candidate-cheap-model",
+        cheap_route_enabled: true,
+        evaluated_sample_count: 24,
+      }),
+    ).toMatchObject({
+      model: baseline.model,
+      policyApplied: false,
     });
   });
 
-  it("uses the cost-efficient model without reasoning for a simple first pass", () => {
+  it("applies a cheaper candidate only after it is explicitly enabled and evaluated", () => {
     expect(
-      selectHuddleReplyModel({
-        isRegeneration: false,
-        contextIsHeavy: false,
-      })
-    ).toEqual({
-      model: HUDDLE_MODELS.primaryReply,
-      reasoningEffort: "none",
-      route: "primary",
+      applyEvaluatedRoutingPolicy(baseline, {
+        primary_model: "candidate-cheap-model",
+        cheap_route_enabled: true,
+        evaluated_sample_count: 25,
+      }),
+    ).toMatchObject({
+      model: "candidate-cheap-model",
+      policyApplied: true,
     });
   });
 
-  it("uses low reasoning when the first pass has substantial context", () => {
+  it("never applies a candidate just because it exists in the database", () => {
     expect(
-      selectHuddleReplyModel({
-        isRegeneration: false,
-        contextIsHeavy: true,
-      })
-    ).toEqual({
-      model: HUDDLE_MODELS.primaryReply,
-      reasoningEffort: "low",
-      route: "primary",
-    });
-  });
-
-  it("uses GPT-5 mini as the quality fallback for regenerations", () => {
-    expect(
-      selectHuddleReplyModel({
-        isRegeneration: true,
-        contextIsHeavy: false,
-      })
-    ).toEqual({
-      model: HUDDLE_MODELS.fallbackReply,
-      reasoningEffort: "medium",
-      route: "fallback",
+      applyEvaluatedRoutingPolicy(baseline, {
+        primary_model: "candidate-cheap-model",
+        cheap_route_enabled: false,
+        evaluated_sample_count: 100,
+      }),
+    ).toMatchObject({
+      model: baseline.model,
+      policyApplied: false,
     });
   });
 });

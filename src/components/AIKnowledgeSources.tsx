@@ -15,7 +15,7 @@ interface PastHuddle {
   generated_reply?: string;
   final_reply?: string;
   created_at: string;
-  similarity: number;
+  similarity?: number;
   __preview?: boolean;
 }
 
@@ -24,6 +24,10 @@ interface AIKnowledgeSourcesProps {
   documentKnowledge?: DocumentKnowledge[];
   isVisible: boolean;
 }
+
+type DocumentKnowledgePreview = DocumentKnowledge & {
+  __preview?: boolean;
+};
 
 const getMetadataValue = (
   metadata: Record<string, unknown> | undefined,
@@ -54,7 +58,7 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
   const [localHuddles, setLocalHuddles] = useState<PastHuddle[]>(pastHuddles);
-  const [localDocs, setLocalDocs] = useState<DocumentKnowledge[]>(documentKnowledge);
+  const [localDocs, setLocalDocs] = useState<DocumentKnowledgePreview[]>(documentKnowledge);
   const [hydratingHuddles, setHydratingHuddles] = useState<Set<string>>(new Set());
   const [hydratingDocs, setHydratingDocs] = useState<Set<string>>(new Set());
 
@@ -105,17 +109,26 @@ export const AIKnowledgeSources = ({ pastHuddles, documentKnowledge = [], isVisi
   const hydrateDocument = async (id: string) => {
     if (!id || hydratingDocs.has(id)) return;
     const target = localDocs.find((d) => d.id === id);
-    // @ts-expect-error __preview may exist on sanitized meta
-    if (target && !(target as any).__preview && target.content_chunk) return;
+    if (target && !target.__preview && target.content_chunk) return;
     setHydratingDocs((prev) => new Set(prev).add(id));
     try {
       const { data, error } = await supabase
         .from('document_knowledge')
-        .select('id, document_name, content_chunk, metadata, similarity')
+        .select('id, document_name, content_chunk, metadata')
         .eq('id', id)
         .single();
       if (!error && data) {
-        setLocalDocs((prev) => prev.map((d) => (d.id === id ? { ...d, ...data } : d)));
+        const metadata =
+          data.metadata &&
+          typeof data.metadata === 'object' &&
+          !Array.isArray(data.metadata)
+            ? (data.metadata as Record<string, unknown>)
+            : undefined;
+        setLocalDocs((prev) =>
+          prev.map((d) =>
+            d.id === id ? { ...d, ...data, metadata, __preview: false } : d
+          )
+        );
       }
     } finally {
       setHydratingDocs((prev) => {

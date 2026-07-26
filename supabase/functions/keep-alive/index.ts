@@ -1,55 +1,55 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { handleCorsPreflight } from "../shared/cors.ts";
+import { jsonResponse } from "../shared/http.ts";
+import { fetchWithTimeout } from "../shared/provider.ts";
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  if (req.method !== "POST") {
+    return jsonResponse(req, { error: "Method not allowed" }, 405);
+  }
+
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const keepAliveSecret =
+    Deno.env.get("KEEP_ALIVE_SECRET") || serviceRoleKey;
+  const suppliedSecret = req.headers
+    .get("Authorization")
+    ?.replace(/^Bearer\s+/i, "")
+    .trim();
+  if (!keepAliveSecret || suppliedSecret !== keepAliveSecret) {
+    return jsonResponse(
+      req,
+      { error: "Authentication required", code: "unauthorized" },
+      401,
+    );
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse(req, { ok: false }, 500);
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("Supabase env vars are not configured.");
-    }
-
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${supabaseUrl}/functions/v1/enhanced-ai-suggestions`,
       {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
           "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
         },
         body: JSON.stringify({ action: "health" }),
-      }
+      },
+      10_000,
     );
-
-    const text = await response.text();
-    return new Response(
-      JSON.stringify({
-        ok: response.ok,
-        status: response.status,
-        body: text,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: response.ok ? 200 : 502,
-      }
+    return jsonResponse(
+      req,
+      { ok: response.ok, status: response.status },
+      response.ok ? 200 : 502,
     );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+  } catch {
+    return jsonResponse(req, { ok: false }, 502);
   }
 });

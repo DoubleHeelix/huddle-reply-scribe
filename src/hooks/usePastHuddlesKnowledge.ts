@@ -28,7 +28,7 @@ export const usePastHuddlesKnowledge = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('search-past-huddles', {
-        body: { query, userId: user.id },
+        body: { query },
       });
 
       if (error) {

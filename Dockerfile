@@ -1,11 +1,10 @@
 # Stage 1: Build the application
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY package.json ./
-COPY package-lock.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
@@ -17,8 +16,8 @@ ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 
-# Build the application
-RUN npm run build
+# Refuse to ship a bundle that fails tests, lint, or TypeScript.
+RUN npm run test && npm run lint && npm run typecheck && npm run build
 
 # Stage 2: Serve the application
 FROM nginx:stable-alpine
@@ -27,5 +26,5 @@ COPY default.conf.template /etc/nginx/templates/default.conf.template
 
 # Expose port 80 and start nginx
 EXPOSE 80
-HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD curl --fail http://localhost:80 || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1:80/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]

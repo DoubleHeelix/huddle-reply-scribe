@@ -37,7 +37,10 @@ export const pdfProcessor = {
         };
 
         items.forEach((item) => {
-          const y = (item as any)?.transform?.[5] as number | undefined;
+          const y =
+            typeof item.transform?.[5] === 'number'
+              ? item.transform[5]
+              : undefined;
           const str = (item.str || '').trim();
           if (!str) return;
 
@@ -46,7 +49,7 @@ export const pdfProcessor = {
           }
 
           // Prefer pdf.js line hint.
-          if ((item as any).hasEOL) {
+          if (item.hasEOL) {
             buffer.push(str);
             flushLine();
             currentY = typeof y === 'number' ? y : currentY;
@@ -80,8 +83,9 @@ export const pdfProcessor = {
       };
     } catch (error) {
       console.error('❌ PDF text extraction failed:', error);
-      const message = error instanceof Error ? error.message : 'Unknown PDF extraction error';
-      throw new Error(`Failed to extract text from PDF: ${message}`);
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to extract text from PDF');
     }
   },
 
@@ -110,8 +114,9 @@ export const pdfProcessor = {
       };
     } catch (error) {
       console.error('❌ PDF extraction failed:', error);
-      const message = error instanceof Error ? error.message : 'Unknown PDF extraction error';
-      throw new Error(`Failed to extract text from PDF: ${message}`);
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to extract text from PDF');
     }
   }
 };

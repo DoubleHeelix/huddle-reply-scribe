@@ -114,7 +114,9 @@ export class OCRService {
   }
 
   private async uint8ArrayToDataUrl(uint8Array: Uint8Array): Promise<string> {
-    const blob = new Blob([uint8Array]);
+    const buffer = new ArrayBuffer(uint8Array.byteLength);
+    new Uint8Array(buffer).set(uint8Array);
+    const blob = new Blob([buffer]);
     return this.fileToDataUrl(new File([blob], 'image.jpg', { type: 'image/jpeg' }));
   }
 

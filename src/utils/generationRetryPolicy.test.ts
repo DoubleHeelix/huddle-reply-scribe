@@ -32,6 +32,22 @@ describe("runWithGenerationRetry", () => {
     expect(sleep).toHaveBeenCalledWith(BASE_RETRY_DELAY_MS);
   });
 
+  it("waits and retries when the same generation request is still in progress", async () => {
+    const operation = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("Generation is already in progress (409)"),
+      )
+      .mockResolvedValue("reply");
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      runWithGenerationRetry(operation, { sleep }),
+    ).resolves.toBe("reply");
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(BASE_RETRY_DELAY_MS);
+  });
+
   it("stops after two attempts when a 503 persists", async () => {
     const operation = vi
       .fn()

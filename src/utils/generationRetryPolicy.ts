@@ -22,7 +22,7 @@ export const isRetryableGenerationError = (error: unknown): boolean => {
 
   const status = extractGenerationHttpStatus(error);
   if (status !== null) {
-    return [408, 500, 502, 503, 504].includes(status);
+    return [408, 409, 500, 502, 503, 504].includes(status);
   }
 
   const message = error instanceof Error ? error.message : String(error);

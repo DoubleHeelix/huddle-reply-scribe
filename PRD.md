@@ -1,8 +1,10 @@
 # Huddle Play Revamp PRD
 
-Status: Draft for product validation
+Status: Core revamp implemented; product validation continues
 Date: 2026-07-26
 Architecture reference: `ARCHITECTURE.md`
+
+Implemented in the 2026-07-26 revamp pass: durable Huddles and generations, accepted-reply signals, source and token ledgers, authenticated server-side retrieval, idempotent bounded retries, evaluation-gated low-cost routing, no reply output-token cap, private Story inputs, and the mobile-first Reply/History shell. Contact consolidation and fully scoped/versioned knowledge administration remain follow-up product work.
 
 ## 1. Product decision
 
@@ -114,6 +116,7 @@ Jobs:
 5. Privacy by default: private storage, short retention, server-derived identity, and no raw-content logs.
 6. One workflow, multiple inputs: screenshot, pasted text, and Story should share the same underlying Huddle lifecycle.
 7. Clear recovery: failures explain what happened and offer a bounded retry.
+8. Affordable by default: use the lowest-cost model route that meets the quality bar, prevent duplicate or abusive calls, and never shorten a valid reply or escalate to a premium model silently.
 
 ## 9. Proposed information architecture
 
@@ -221,6 +224,7 @@ Priority definitions:
 | FR-21 | P2 | Story reply mode | Users can submit a Story screenshot and receive distinct, visually grounded starters through the same Huddle record. |
 | FR-22 | P0 | Data controls | Users can delete individual Huddles and request deletion/export of their account data. |
 | FR-23 | P0 | Usage feedback | Generation, OCR, and provider failures use stable error codes and actionable user-facing messages. |
+| FR-24 | P0 | Cost governance | Every billable operation passes idempotency and budget admission, records non-content usage metadata, and stops before the provider call when a hard limit is reached. |
 
 ## 12. AI and retrieval requirements
 
@@ -263,7 +267,17 @@ No retrieved source may override the user's intent or system policy.
 - User-requested regeneration is a new operation with its own idempotency key.
 - Every provider call has an explicit timeout and cancellation path.
 - Per-user rate and spend limits are enforced.
-- Token budgets are based on a bounded context assembly policy.
+- Token budgets are based on a bounded context assembly policy, with conversation context and user intent taking priority.
+- The first reply uses the lowest-cost model tier that passes the quality gate.
+- A premium or flagship model is never selected automatically; any such route must be explicit, feature-flagged, and justified by evaluation results.
+- The application imposes no reply output-token target or product-level truncation. Output length follows the user's intent and the quality requirements of the reply.
+- Provider safety ceilings may prevent runaway responses, but they must be high enough not to constrain normal Huddle replies and are not used as a cost-saving mechanism.
+- Retrieval starts with a ceiling of three accepted past replies, three document chunks, and 6,000 rendered input tokens.
+- One embedding is reused for retrieval and persistence within a Huddle.
+- Deterministic validation, routing, name extraction, trimming, and deduplication run before model calls.
+- Unchanged media is identified by checksum so successful OCR is not billed twice.
+- Provider pricing is versioned configuration, not hard-coded business logic.
+- Prompt caching is adopted only when measured cache behavior lowers total cost.
 - Failed or cancelled generations are stored with status, not as successful replies.
 
 ### 12.5 Evaluation set
@@ -280,6 +294,8 @@ Before launch, create a de-identified evaluation set covering:
 - contact continuity;
 - refusal to invent unsupported claims;
 - Story images with ambiguous content.
+
+Each evaluated model route must report quality pass rate, first-token and total latency, retries, input/output/reasoning/cache units, estimated cost per successful generation, and estimated cost per accepted Huddle. A cheaper route replaces the current route only when it meets the agreed quality floor.
 
 ## 13. Privacy and security requirements
 
@@ -339,6 +355,7 @@ Proposed launch gates:
 | Data isolation | Automated cross-user access tests pass for every table, RPC, storage bucket, and Edge Function |
 | Tests | Unit tests for domain rules; integration tests for auth/retrieval/persistence; browser tests for the happy path |
 | Observability | Request ID, stage timing, provider status, token/cost estimate, and redacted error code for every generation |
+| Cost governance | 100% of billable operations pass budget admission and record usage; zero duplicate charges for the same idempotency key; zero automatic flagship escalation |
 | Browser support | Current and previous major Safari, Chrome, Edge, and mobile equivalents |
 
 ## 16. Success metrics
@@ -369,6 +386,9 @@ An accepted Huddle is one where the user explicitly accepts or copies a reply af
 - P50/P95 latency by stage.
 - Duplicate generation rate.
 - Cost per accepted Huddle.
+- Input, output, reasoning, cached, and cache-write units by route.
+- Budget warning and hard-limit rates by plan.
+- Share of requests served by the lowest-cost passing route.
 - Automatic retry rate.
 
 ### 16.5 Retention
@@ -416,12 +436,14 @@ Each event should include only IDs, timestamps, stage durations, source type, mo
 - Lock down storage, RLS, RPCs, and Edge Functions.
 - Define retention and provider policies.
 - Instrument the current happy path to establish baselines.
+- Establish current cost per generated and accepted Huddle, then configure soft and hard budget limits.
 
 Exit criteria:
 
 - No known cross-user access path.
 - No public conversation media.
 - No credential or raw-message logging.
+- All provider calls use idempotency, usage recording, and budget admission.
 - Agreed primary persona and first-release scope.
 
 ### Phase 1: Core revamp
@@ -433,11 +455,13 @@ Exit criteria:
 - Accept/edit/copy behavior.
 - Lightweight History.
 - CI, type check, integration tests, and observability.
+- Evaluation-gated low-cost model routing, bounded retrieval, and duplicate-call protection without output truncation.
 
 Exit criteria:
 
 - Core launch gates in Sections 13 and 15 pass.
 - Evaluation set meets the agreed quality threshold.
+- The default route meets the agreed cost-per-accepted-Huddle ceiling without automatic flagship escalation.
 - Persistence is deterministic across generation, regeneration, and acceptance.
 
 ### Phase 2: Personalization and knowledge
@@ -471,7 +495,7 @@ Exit criteria:
 | Personalization amplifies poor outputs | Replies may become less safe or authentic | Learn only from accepted/edited replies; expose style controls; evaluate changes |
 | OCR errors distort context | Bad replies or wrong contact inference | OCR review step, manual correction, pasted-text fallback |
 | Retrieval surfaces irrelevant scripts | Replies feel manipulative or inaccurate | Higher-quality chunking, scoped retrieval, thresholds, source visibility, evaluations |
-| AI costs rise with history and documents | Unsustainable unit economics | Context budgets, result caching, rate limits, cost per accepted Huddle metric |
+| AI costs rise with history and documents | Unsustainable unit economics | Lowest-cost passing route, bounded context, one reusable embedding, idempotency, hard spend limits, measured caching, and cost per accepted Huddle |
 | Pipeline scope distracts from core value | Revamp becomes another CRM project | Ship after core acceptance and retention are validated |
 | Users expect automatic sending | Trust or compliance concerns | Explicitly position as a human-approved drafting tool |
 
