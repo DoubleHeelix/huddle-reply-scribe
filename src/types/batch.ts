@@ -9,8 +9,10 @@ export type BatchItem = {
   tone: string;
   extractedText: string;
   reply: string;
+  huddleId?: string;
+  generationId?: string;
   status: BatchStatus;
-  pastHuddles: (import("@/utils/huddlePlayService").HuddlePlay & { similarity?: number })[];
+  pastHuddles: import("@/utils/huddlePlayService").PastHuddleReference[];
   documents: import("@/types/document").DocumentKnowledge[];
   error?: string;
 };

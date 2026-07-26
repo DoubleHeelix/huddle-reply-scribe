@@ -1,8 +1,28 @@
 # Huddle Play Architecture
 
-Status: Current-state review and target-state revamp blueprint
+Status: Baseline review plus implemented revamp
 Reviewed: 2026-07-26
 Repository baseline: `main` at `5a6b78b`
+
+## 0. Implemented revamp (2026-07-26)
+
+The repository now implements the first complete revamp pass:
+
+- one authenticated streaming reply client and one core generation Edge Function;
+- server-derived identity and origin allowlisting across Edge Functions;
+- bounded two-attempt retry with generation-level idempotency and completed-result replay;
+- server-side Huddle and document retrieval using one shared embedding;
+- durable Huddle, generation, source, acceptance, token-usage, and model-policy records;
+- accepted/copy/tone actions as stronger personalization signals;
+- an evaluation gate that cannot apply a candidate model until it is explicitly enabled with at least 25 reviewed samples;
+- no application-level output-token field on reply or tone requests;
+- a configurable daily generation admission limit and configurable pricing ledger;
+- private Story media handling without public Storage URLs;
+- a mobile-first Reply/History navigation and a lightweight, lazy-loaded History surface;
+- lazy-loaded Story, Board, History, and document-administration bundles;
+- Node 22, reproducible installs, CI, and container build health gates.
+
+The detailed sections below preserve the original baseline review for traceability. Where they conflict with this implementation summary, this section and the source code are authoritative.
 
 ## 1. Executive summary
 
@@ -408,7 +428,8 @@ The Vite build transpiles TypeScript but does not enforce a full type check, so 
 5. Separate provider adapters from product policy.
 6. Treat "accepted/copied by the user" as the learning signal, not every generated draft.
 7. Make all generation operations idempotent, cancellable, observable, and cost-bounded.
-8. Split the UI by product domain, with server state managed consistently through TanStack Query.
+8. Make the lowest-cost route that passes the quality evaluation the default; premium-model escalation is never automatic.
+9. Split the UI by product domain, with server state managed consistently through TanStack Query.
 
 ### 12.2 Proposed system
 
@@ -421,12 +442,14 @@ flowchart LR
     API --> DB["Postgres + pgvector"]
     API --> PRIVATE["Private Storage"]
     API --> JOBS["Ingestion / cleanup jobs"]
-    API --> AI["AI orchestration"]
+    API --> BUDGET["Budget policy + idempotency"]
+    BUDGET --> AI["AI orchestration"]
 
     AI --> CHAT["Chat model adapter"]
     AI --> EMBED["Embedding adapter"]
     AI --> OCR["OCR adapter"]
     AI --> SPEECH["Speech adapter"]
+    AI --> USAGE["Usage ledger"]
 
     JOBS --> PRIVATE
     JOBS --> DB
@@ -455,6 +478,7 @@ src/
     ui/
     validation/
     telemetry/
+    cost-policy/
 
 supabase/
   functions/
@@ -504,6 +528,8 @@ Recommended additions and changes:
 - `knowledge_chunks`: document FK, content, embedding, page/line metadata.
 - `style_profiles`: versioned profile derived from accepted replies, plus user-edited settings.
 - `user_roles`: server-owned role assignments, or equivalent `app_metadata`.
+- `usage_ledger`: one redacted row per provider operation with user, Huddle, generation, route, model, token units, estimated cost, attempt, and status.
+- `usage_budgets`: configurable per-user, plan, and global soft/hard limits without embedding provider prices in application code.
 
 Existing data can be migrated incrementally. `huddle_plays` can remain readable while new writes target the new schema.
 
@@ -515,11 +541,42 @@ Existing data can be migrated incrementally. `huddle_plays` can remain readable 
 - Zod or an equivalent schema validates all requests and responses.
 - Rate limits are applied per user and per operation.
 - Provider timeouts and retries are centralized and capped.
+- Idempotency is checked before any billable provider call.
+- A budget check runs before every provider operation and records usage after it.
+- Pricing metadata is versioned configuration; provider prices are not hard-coded into prompts or business logic.
 - Raw content is redacted from logs by default.
 - Storage is private and uses signed URLs only when necessary.
 - CORS is restricted to configured origins.
 - Prompt templates and safety rules are versioned and testable.
 - Search returns IDs and short previews first; full content is hydrated only when opened.
+
+### 12.7 Cost-control architecture
+
+Cost is a launch constraint and part of request admission, not a dashboard-only concern.
+
+Provisional defaults, to be tightened or relaxed only with evaluation evidence:
+
+| Operation | Default route | Hard guardrail |
+| --- | --- | --- |
+| First reply | Lowest-cost model tier that passes the reply-quality gate, with `none` or `low` reasoning | No automatic flagship-model escalation and no application-level output-token cap |
+| Automatic retry | Same route, retryable provider failures only | At most one retry; the same idempotency key cannot create duplicate billing |
+| User regeneration | New explicit operation; balanced tier only when evaluation shows a gain | Never silently retry or escalate to a flagship tier |
+| Tone and name operations | Deterministic code first, otherwise the lowest-cost passing model | One provider call; tone changes preserve the reply's necessary length |
+| Retrieval | One embedding reused for search and persistence | At most three past replies and three document chunks; rendered model context starts with a 6,000-token ceiling |
+| OCR | Reuse a successful result for the same media checksum | No duplicate OCR call for an unchanged image; manual paste remains free |
+| Story mode | One resized, intentionally detailed image request returning all variants | One multimodal call per submitted Story unless the user explicitly retries |
+| Batch | Same Huddle API with sequential or low-concurrency execution | Budget admission per item and a configurable queue cap |
+
+Additional policy:
+
+- Conversation context and user intent receive the token budget before style, history, or documents.
+- Output length follows the user's intent and the reply-quality prompt. The application does not shorten, truncate, or reject an otherwise valid reply to save tokens.
+- Long inputs are reduced deterministically at message or chunk boundaries; an extra model summarization call is not the default.
+- The stable prompt prefix is kept compact. Prompt caching is enabled only after measurements show that cache writes and hit rates reduce total cost.
+- Every provider response records input, output, reasoning, cached, and cache-write units when available.
+- Operations are measured by cost per accepted Huddle, not merely cost per API call.
+- Soft budget warnings are emitted before the hard limit. Hard limits return a stable `usage_limit_reached` error before a provider call.
+- Model routes, reasoning effort, retrieval limits, and spend limits are server-owned configuration with an emergency kill switch. None of these controls imposes a product-level reply-length target.
 
 ## 13. Migration plan
 
@@ -531,6 +588,7 @@ Existing data can be migrated incrementally. `huddle_plays` can remain readable 
 - Bind every service-role operation to the authenticated user.
 - Block arbitrary Story image URLs.
 - Add rate limits and bounded retries.
+- Add idempotency, a usage ledger, configurable budget admission, and a global provider kill switch.
 
 ### Phase 1: Stabilize the core loop
 
@@ -538,6 +596,7 @@ Existing data can be migrated incrementally. `huddle_plays` can remain readable 
 - Consolidate to one generation API and one retrieval path.
 - Persist every generation and acceptance deterministically.
 - Add type checking, CI, integration tests, and provider mocks.
+- Establish cost and quality baselines for each model route before changing production defaults.
 - Split and lazy-load the initial bundle.
 
 ### Phase 2: Rebuild personalization

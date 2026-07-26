@@ -58,8 +58,6 @@ export const documentService = {
     const sourceType = this.getSourceType(fileName);
 
     try {
-      console.log("📄 Starting processing for:", fileName);
-
       // 1) Extract raw text
       const {
         text,
@@ -71,33 +69,17 @@ export const documentService = {
         throw new Error("Could not extract sufficient text from document.");
       }
 
-      // Debug: confirm markers exist in extracted text
-      const markerCount = (text.match(/---\s*CHUNK\s*\d+\s*---/gi) || [])
-        .length;
-      console.log("MARKER_MATCH_COUNT", markerCount);
-      console.log("MARKER_PROBE", JSON.stringify(text.slice(0, 500)));
-
       // 2) STRICT: one row per marker
       const markerChunks = markerChunksToUploadStrict(text);
-
-      console.log(`🧩 Marker chunks to upload: ${markerChunks.length}`);
 
       // 3) Upload each marker chunk as its own DB row
       for (let i = 0; i < markerChunks.length; i++) {
         const item = markerChunks[i];
 
-        const preview = item.content.slice(0, 200);
-        console.log(
-          `➡️ Uploading CHUNK ${item.markerIndex}. tokenCount=${tokenCount(
-            item.content
-          )} preview=${JSON.stringify(preview)}`
-        );
-
         const { error } = await supabase.functions.invoke("create-embedding", {
           body: {
             document_name: fileName,
             extracted_text: item.content, // EXACTLY one marker chunk
-            user_id: user.id,
             is_chunked: true,
 
             // Store the source marker number here:
@@ -126,7 +108,6 @@ export const documentService = {
         }
       }
 
-      console.log("✅ All marker chunks processed successfully");
       return { success: true, chunks_processed: markerChunks.length };
     } catch (error) {
       console.error("❌ Document processing error:", error);
@@ -173,18 +154,14 @@ export const documentService = {
   },
 
   async deleteDocument(documentName: string): Promise<void> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    const { error } = await supabase.functions.invoke("delete-all-documents", {
+      method: "POST",
+      body: { documentName },
+    });
 
-    const { error } = await supabase
-      .from("document_knowledge")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("document_name", documentName);
-
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Failed to delete document: ${error.message}`);
+    }
   },
 
   async deleteAllDocuments(): Promise<void> {

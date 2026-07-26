@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Huddle Play
 
-## Project info
+Huddle Play turns a conversation screenshot and a rough draft into a concise, human reply. It combines OCR, the signed-in user's accepted replies, approved document knowledge, and a style profile without exposing provider credentials to the browser.
 
-**URL**: https://lovable.dev/projects/1772111d-7fd4-49c4-bade-653193d28071
+## Local development
 
-## How can I edit this code?
+Requirements:
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/1772111d-7fd4-49c4-bade-653193d28071) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+- Node.js 22.13 or newer
+- npm
+- a Supabase project with the migrations in `supabase/migrations`
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Run the complete local quality gate with:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+npm run check
+```
 
-**Use GitHub Codespaces**
+## Generation architecture
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `enhanced-ai-suggestions` is the single reply-generation endpoint.
+- User identity always comes from the bearer token.
+- One embedding is reused for Huddle retrieval, document retrieval, and persistence.
+- The client receives typed NDJSON metadata, token, and completion events.
+- A request ID replays completed work and prevents duplicate paid generations or Huddles when the one bounded retry runs.
+- Every generation, source, acceptance action, and provider usage record is durable.
+- The default route stays on the proven cost-efficient model. A cheaper candidate is applied only after at least 25 evaluated samples and an explicit database flag.
+- Huddle reply requests do not set an output-token ceiling.
 
-## What technologies are used for this project?
+## Cost controls
 
-This project is built with:
+Generation cost is controlled by model routing and duplicate-call prevention, not by truncating replies:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- at most two attempts for retryable failures;
+- completed idempotent requests are replayed without another provider call;
+- no duplicate document-search embedding;
+- no embedding on retry or regeneration when the stored embedding is available;
+- a configurable daily generation admission limit;
+- token and optional estimated-cost ledger rows;
+- no automatic premium/flagship escalation;
+- an offline candidate-model evaluation command:
 
-## How can I deploy this project?
+```sh
+OPENAI_API_KEY=... CANDIDATE_MODEL=... npm run eval:huddle
+```
 
-Simply open [Lovable](https://lovable.dev/projects/1772111d-7fd4-49c4-bade-653193d28071) and click on Share -> Publish.
+The command never enables a model automatically. Review at least 25 representative outputs before changing `model_routing_policies`.
 
-## Can I connect a custom domain to my Lovable project?
+## Supabase Edge Function secrets
 
-Yes, you can!
+See `supabase/functions/.env.example`. Store real values as Supabase secrets; never commit them. `OPENAI_PRICING_USD_PER_MILLION` is configuration so pricing can be updated without changing application code.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Deployment
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+The included multi-stage Docker image runs tests, lint, TypeScript, and the production build before creating the Nginx image. GitHub Actions runs the same checks on pull requests and `main`.

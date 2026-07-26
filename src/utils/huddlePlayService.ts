@@ -3,7 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type HuddlePlay = Tables<'huddle_plays'>;
-export type HuddlePlayInsert = TablesInsert<'huddle_plays'>;
+export type PastHuddleReference = Pick<
+  HuddlePlay,
+  'id' | 'created_at'
+> &
+  Partial<
+    Pick<
+      HuddlePlay,
+      'screenshot_text' | 'user_draft' | 'generated_reply' | 'final_reply'
+    >
+  > & {
+    similarity?: number;
+    __preview?: boolean;
+  };
 type PeopleOverrideInsert = TablesInsert<'people_overrides'>;
 type HuddlePersonOverrideInsert = TablesInsert<'huddle_person_overrides'>;
 type TrelloBoardPositionInsert = TablesInsert<'trello_board_positions'>;
@@ -16,35 +28,6 @@ export type HuddlePlayPreview = Pick<
   screenshot_text?: string | null;
   user_draft?: string | null;
   generated_reply?: string | null;
-};
-
-export const saveHuddlePlay = async (huddlePlay: Omit<HuddlePlayInsert, 'user_id'>): Promise<HuddlePlay | null> => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('huddle_plays')
-      .insert({
-        ...huddlePlay,
-        user_id: user.id
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error saving huddle play:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in saveHuddlePlay:', error);
-    return null;
-  }
 };
 
 export const getHuddlePlayDetail = async (id: string): Promise<HuddlePlay | null> => {
@@ -88,7 +71,7 @@ export const getHuddlePlayPreviews = async (
 
     const { data, error } = await supabase
       .from('huddle_plays')
-      .select('id, created_at, user_id, final_reply, selected_tone, screenshot_text, user_draft, generated_reply')
+      .select('id, created_at, user_id, final_reply, selected_tone, user_draft, generated_reply')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(start, end);
@@ -143,24 +126,39 @@ export const getUserHuddlePlays = async (
   }
 };
 
-export const updateHuddlePlayFinalReply = async (id: string, finalReply: string): Promise<boolean> => {
+export type HuddleAcceptanceEvent =
+  | 'copied'
+  | 'edited'
+  | 'tone_applied'
+  | 'accepted';
+
+export const recordHuddleAcceptance = async (
+  huddlePlayId: string,
+  generationId: string | null,
+  eventType: HuddleAcceptanceEvent,
+  finalReply: string,
+  metadata: Record<string, string | number | boolean | null> = {},
+): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('huddle_plays')
-      .update({ 
-        final_reply: finalReply,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
+    const { error } = await supabase.rpc('record_huddle_acceptance', {
+      p_huddle_play_id: huddlePlayId,
+      p_generation_id: generationId,
+      p_event_type: eventType,
+      p_final_reply: finalReply,
+      p_metadata: metadata,
+    });
 
     if (error) {
-      console.error('Error updating huddle play:', error);
+      console.error('Unable to record Huddle acceptance', {
+        code: error.code,
+      });
       return false;
     }
-
     return true;
   } catch (error) {
-    console.error('Error in updateHuddlePlayFinalReply:', error);
+    console.error('Unable to record Huddle acceptance', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+    });
     return false;
   }
 };

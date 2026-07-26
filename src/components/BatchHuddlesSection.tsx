@@ -17,6 +17,10 @@ import type { DocumentKnowledge } from "@/types/document";
 import type { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { BatchItem, BatchStatus } from "@/types/batch";
+import type {
+  HuddleAcceptanceEvent,
+  PastHuddleReference,
+} from "@/utils/huddlePlayService";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
 
@@ -54,20 +58,24 @@ const BATCH_LIMIT = 3;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface BatchHuddlesSectionProps {
-  extractText: (file: File | Blob) => Promise<string>;
+  extractText: (file: File) => Promise<string>;
   generateReply: (
     screenshotText: string,
     userDraft: string,
     isRegeneration?: boolean,
     existingDocumentKnowledge?: DocumentKnowledge[],
-    existingPastHuddles?: (HuddlePlay & { similarity?: number })[],
+    existingPastHuddles?: PastHuddleReference[],
     onToken?: (
       partial: string,
       options?: { slangAddressTerms?: string[] }
-    ) => void
+    ) => void,
+    huddleId?: string | null,
+    parentGenerationId?: string | null,
   ) => Promise<{
     reply: string;
-    pastHuddles?: (HuddlePlay & { similarity?: number })[];
+    huddleId?: string;
+    generationId?: string;
+    pastHuddles?: PastHuddleReference[];
     documentKnowledge?: DocumentKnowledge[];
     slangAddressTerms?: string[];
   } | null>;
@@ -76,6 +84,13 @@ interface BatchHuddlesSectionProps {
   isAdjustingTone: boolean;
   batchItems: BatchItem[];
   setBatchItems: React.Dispatch<React.SetStateAction<BatchItem[]>>;
+  recordAcceptance: (
+    huddlePlayId: string,
+    generationId: string | null,
+    eventType: HuddleAcceptanceEvent,
+    finalReply: string,
+    metadata?: Record<string, string | number | boolean | null>,
+  ) => Promise<boolean>;
 }
 
 export const BatchHuddlesSection = ({
@@ -86,6 +101,7 @@ export const BatchHuddlesSection = ({
   isAdjustingTone,
   batchItems,
   setBatchItems,
+  recordAcceptance,
 }: BatchHuddlesSectionProps) => {
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -202,12 +218,17 @@ export const BatchHuddlesSection = ({
       updateItem(id, (item) => ({ ...item, status: "needs-draft" }));
       return;
     }
+    if (target.draft.trim().toLowerCase() === "test") {
+      toast({
+        title: "Add a real draft",
+        description: "Write a short version of what you want to say.",
+        variant: "destructive",
+      });
+      updateItem(id, (item) => ({ ...item, status: "needs-draft" }));
+      return;
+    }
 
     const screenshotText = target.extractedText || fallbackScreenshotText;
-    const draftForAI =
-      target.draft.trim().toLowerCase() === "test"
-        ? "No explicit draft provided. Generate the best possible reply using the screenshot context plus any available document knowledge or past huddles. Match the user's usual style."
-        : target.draft;
 
     updateItem(id, (item) => ({
       ...item,
@@ -219,7 +240,7 @@ export const BatchHuddlesSection = ({
     let latestSlangTerms: string[] | undefined;
     const result = await generateReply(
       screenshotText,
-      draftForAI,
+      target.draft,
       isRegeneration,
       target.documents,
       target.pastHuddles,
@@ -233,7 +254,9 @@ export const BatchHuddlesSection = ({
             slangAddressTerms: latestSlangTerms,
           }),
         }));
-      }
+      },
+      target.huddleId,
+      target.generationId,
     );
 
     if (!result) {
@@ -258,6 +281,8 @@ export const BatchHuddlesSection = ({
     updateItem(id, (item) => ({
       ...item,
       reply: cleanReply,
+      huddleId: result.huddleId || item.huddleId,
+      generationId: result.generationId || item.generationId,
       status: "done",
       pastHuddles: result.pastHuddles || [],
       documents: result.documentKnowledge || [],
@@ -287,20 +312,38 @@ export const BatchHuddlesSection = ({
 
     updateItem(id, (item) => ({ ...item, status: "generating" }));
     const adjusted = await adjustTone(target.reply, target.tone);
+    const cleanAdjusted = sanitizeHumanReply(adjusted || target.reply);
     updateItem(id, (item) => ({
       ...item,
-      reply: sanitizeHumanReply(adjusted || target.reply),
+      reply: cleanAdjusted,
       status: "done",
     }));
+    if (target.huddleId) {
+      await recordAcceptance(
+        target.huddleId,
+        target.generationId || null,
+        "tone_applied",
+        cleanAdjusted,
+        { tone: target.tone },
+      );
+    }
     toast({
       title: "Tone applied",
       description: `Updated with ${target.tone} tone.`,
     });
   };
 
-  const handleCopy = async (reply: string) => {
+  const handleCopy = async (item: BatchItem) => {
     try {
-      await navigator.clipboard.writeText(reply);
+      await navigator.clipboard.writeText(item.reply);
+      if (item.huddleId) {
+        await recordAcceptance(
+          item.huddleId,
+          item.generationId || null,
+          "copied",
+          item.reply,
+        );
+      }
       toast({ title: "Copied!", description: "Reply copied to clipboard." });
     } catch (error) {
       toast({
@@ -334,44 +377,44 @@ export const BatchHuddlesSection = ({
 
   return (
     <div className="space-y-4">
-      <Card className="bg-slate-900/70 border-white/5 glass-surface">
+      <Card className="border-[#826f56]/15 bg-white/90 dark:border-white/10 dark:bg-[#151513] glass-surface">
         <CardContent className="p-5 sm:p-6 space-y-4">
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-colors ${
               isDragActive
-                ? "border-cyan-400 bg-cyan-500/10"
-                : "border-white/15"
+                ? "border-[#c49b5d] bg-[#c49b5d]/10"
+                : "border-[#826f56]/25 dark:border-white/15"
             } ${
               !canAddMore
                 ? "cursor-not-allowed opacity-60"
-                : "hover:border-cyan-300 hover:bg-white/5"
+                : "hover:border-[#c49b5d] hover:bg-[#c49b5d]/10"
             }`}
           >
             <input {...getInputProps()} />
-            <div className="flex flex-col items-center gap-3 text-white">
-              <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
-                <Upload className="w-6 h-6 text-cyan-300" />
+            <div className="flex flex-col items-center gap-3 text-[#29231c] dark:text-[#f4efe7]">
+              <div className="h-12 w-12 rounded-full bg-[#c49b5d]/15 flex items-center justify-center">
+                <Upload className="w-6 h-6 text-[#a97d45] dark:text-[#d5aa67]" />
               </div>
               <div>
                 <p className="text-lg font-display">
                   Drop up to {BATCH_LIMIT} huddle screenshots
                 </p>
               </div>
-              <div className="px-4 py-2 rounded-full bg-white/10 text-sm text-white/90">
+              <div className="px-4 py-2 rounded-full bg-[#c49b5d] text-sm text-[#071326]">
                 {canAddMore ? "Select images" : "Batch full"}
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
-            <Badge className="bg-cyan-500/20 text-cyan-200">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
+            <Badge className="border border-[#b9cbe5] bg-[#eaf1fa] text-[#2f5d8c] dark:border-[#355981] dark:bg-[#102033] dark:text-[#7ea4d6]">
               Queue {batchItems.length}/{BATCH_LIMIT}
             </Badge>
-            <Badge className="bg-emerald-500/20 text-emerald-100">
+            <Badge className="border border-[#348f6a]/30 bg-[#bcefd8]/70 text-[#23684c] dark:bg-[#348f6a]/10 dark:text-[#6ee7b7]">
               Done {completed}
             </Badge>
-            <Badge className="bg-indigo-500/20 text-indigo-100">
+            <Badge className="border border-[#c49b5d]/30 bg-[#c49b5d]/15 text-[#8f5b18] dark:text-[#d5aa67]">
               Ready {totalReady}
             </Badge>
           </div>
@@ -380,7 +423,7 @@ export const BatchHuddlesSection = ({
             <Button
               onClick={handleGenerateAll}
               disabled={!batchItems.length || isRunningAll}
-              className="bg-gradient-to-r from-purple-600 to-blue-500 text-white"
+              className="bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
             >
               {isRunningAll ? (
                 <>
@@ -397,7 +440,7 @@ export const BatchHuddlesSection = ({
             <Button
               variant="outline"
               onClick={handleReset}
-              className="border-white/20 text-white"
+              className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"
             >
               Reset batch
             </Button>
@@ -409,32 +452,32 @@ export const BatchHuddlesSection = ({
         {batchItems.map((item, index) => (
           <Card
             key={item.id}
-            className={`bg-slate-900/80 border ${
+            className={`bg-white/90 dark:bg-[#151513] border ${
               activeItem?.id === item.id
-                ? "border-cyan-400/40"
-                : "border-white/10"
+                ? "border-[#c49b5d]/50"
+                : "border-[#826f56]/15 dark:border-white/10"
             } glass-surface`}
             onClick={() => setActiveId(item.id)}
           >
             <CardContent className="p-4 sm:p-5 space-y-3">
               <div className="grid gap-4 lg:grid-cols-[minmax(360px,520px)_1fr] items-start">
                 <div className="space-y-2">
-                  <div className="relative w-full bg-slate-950/80 border border-white/10 rounded-2xl overflow-hidden shadow-inner">
+                  <div className="relative w-full bg-[#fffcf7] border border-[#826f56]/15 rounded-2xl overflow-hidden shadow-inner dark:border-white/10 dark:bg-[#0d0c0b]">
                     <div className="absolute top-2 left-2">
-                      <Badge className="bg-black/60 text-white border-white/10">
+                      <Badge className="border-[#c49b5d]/30 bg-[#071326] text-[#f4efe7]">
                         {index + 1}
                       </Badge>
                     </div>
                     <img
                       src={item.imageUrl}
                       alt={item.fileName}
-                      className="w-full h-full object-contain max-h-[520px] sm:max-h-[560px] bg-slate-950"
+                      className="w-full h-full object-contain max-h-[520px] sm:max-h-[560px] bg-[#fffcf7] dark:bg-[#0d0c0b]"
                     />
                     <div className="absolute bottom-3 right-3 flex gap-2">
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="bg-white/15 text-white border border-white/10"
+                        className="border border-[#826f56]/15 bg-white/90 text-[#29231c] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPreviewImage(item.imageUrl);
@@ -452,7 +495,7 @@ export const BatchHuddlesSection = ({
                     onChange={(e) => handleDraftChange(item.id, e.target.value)}
                     placeholder="Draft your intent for this huddle..."
                     rows={3}
-                    className="bg-slate-950/70 border-white/10 text-white placeholder:text-slate-500"
+                    className="border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] placeholder:text-[#776b5d] focus-visible:ring-[#c49b5d]/50 dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7] dark:placeholder:text-[#b4a89a]"
                   />
 
                   <div className="grid grid-cols-2 gap-3">
@@ -461,7 +504,7 @@ export const BatchHuddlesSection = ({
                       disabled={
                         item.status === "ocr" || item.status === "generating"
                       }
-                      className="bg-gradient-to-r from-purple-600 to-blue-500 text-white"
+                      className="bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
                     >
                       {item.status === "generating" ? (
                         <>
@@ -483,7 +526,7 @@ export const BatchHuddlesSection = ({
                         item.status === "generating" ||
                         !item.reply
                       }
-                      className="border-white/20 text-white"
+                      className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7]"
                     >
                       <RefreshCcw className="w-4 h-4 mr-2" />
                       Regenerate
@@ -502,15 +545,15 @@ export const BatchHuddlesSection = ({
                         }
                         disabled={!item.reply || isAdjustingTone}
                       >
-                        <SelectTrigger className="w-full bg-slate-950 border-white/15 text-white">
+                        <SelectTrigger className="w-full border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7]">
                           <SelectValue placeholder="Tone" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                        <SelectContent className="border-[#826f56]/15 bg-[#fffcf7] text-[#29231c] dark:border-white/10 dark:bg-[#171513] dark:text-[#f4efe7]">
                           {toneOptions.map((option) => (
                             <SelectItem
                               key={option.value}
                               value={option.value}
-                              className="text-white"
+                              className="text-[#29231c] dark:text-[#f4efe7]"
                             >
                               {option.label}
                             </SelectItem>
@@ -525,7 +568,7 @@ export const BatchHuddlesSection = ({
                         disabled={
                           !item.reply || item.tone === "none" || isAdjustingTone
                         }
-                        className="border-white/20 text-white w-full"
+                        className="border-[#c49b5d] bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52] w-full"
                       >
                         {isAdjustingTone ? "Adjusting..." : "Apply tone"}
                       </Button>
@@ -533,9 +576,9 @@ export const BatchHuddlesSection = ({
                     <div className="flex justify-center col-span-2">
                       <Button
                         variant="ghost"
-                        onClick={() => handleCopy(item.reply)}
+                        onClick={() => handleCopy(item)}
                         disabled={!item.reply}
-                        className="text-white w-full"
+                        className="text-[#29231c] hover:bg-[#efe7dc] w-full dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
@@ -544,8 +587,8 @@ export const BatchHuddlesSection = ({
                   </div>
 
                   {item.reply && (
-                    <div className="bg-slate-950/60 border border-white/10 rounded-xl p-3 text-sm text-slate-100 leading-relaxed">
-                      <div className="flex items-center gap-2 text-xs text-emerald-200 mb-2">
+                    <div className="bg-[#fffcf7] border border-[#826f56]/15 rounded-xl p-3 text-sm text-[#29231c] leading-relaxed dark:border-white/10 dark:bg-[#0d0c0b]/70 dark:text-[#f4efe7]">
+                      <div className="flex items-center gap-2 text-xs text-[#23684c] mb-2 dark:text-[#6ee7b7]">
                         <Check className="w-4 h-4" />
                         Reply ready
                       </div>
@@ -554,7 +597,7 @@ export const BatchHuddlesSection = ({
                       </pre>
                       {(item.pastHuddles.length > 0 ||
                         item.documents.length > 0) && (
-                        <p className="mt-2 text-xs text-slate-400">
+                        <p className="mt-2 text-xs text-[#776b5d] dark:text-[#b4a89a]">
                           Sources: {item.pastHuddles.length} huddles •{" "}
                           {item.documents.length} docs
                         </p>
@@ -571,7 +614,7 @@ export const BatchHuddlesSection = ({
           open={!!previewImage}
           onOpenChange={(open) => !open && setPreviewImage(null)}
         >
-          <DialogContent className="max-w-5xl bg-slate-900/95 border-white/10">
+          <DialogContent className="max-w-5xl border-[#826f56]/15 bg-[#fffcf7] dark:border-white/10 dark:bg-[#171513]">
             {previewImage && (
               <img
                 src={previewImage}
@@ -583,8 +626,8 @@ export const BatchHuddlesSection = ({
         </Dialog>
 
         {!batchItems.length && (
-          <Card className="bg-slate-900/60 border-white/5 glass-surface">
-            <CardContent className="p-6 text-center text-slate-300">
+          <Card className="border-[#826f56]/15 bg-white/80 dark:border-white/10 dark:bg-[#151513] glass-surface">
+            <CardContent className="p-6 text-center text-[#776b5d] dark:text-[#b4a89a]">
               Drop multiple screenshots to queue huddles and generate replies in
               one pass.
             </CardContent>
@@ -596,7 +639,7 @@ export const BatchHuddlesSection = ({
             <Button
               onClick={handleGenerateAll}
               disabled={!batchItems.length || isRunningAll}
-              className="bg-gradient-to-r from-purple-600 to-blue-500 text-white"
+              className="bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
             >
               {isRunningAll ? (
                 <>

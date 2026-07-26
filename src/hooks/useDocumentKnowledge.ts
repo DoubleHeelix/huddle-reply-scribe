@@ -15,7 +15,6 @@ export const useDocumentKnowledge = () => {
     isProcessing, 
     error, 
     processStorageDocument: baseProcessStorageDocument, 
-    uploadDocument: baseUploadDocument, 
     clearError 
   } = useDocumentProcessing();
 
@@ -32,11 +31,6 @@ export const useDocumentKnowledge = () => {
     await baseProcessStorageDocument(fileName);
     await fetchDocuments();
   }, [baseProcessStorageDocument, fetchDocuments]);
-
-  const uploadDocument = useCallback(async (file: File) => {
-    await baseUploadDocument(file);
-    await fetchDocuments();
-  }, [baseUploadDocument, fetchDocuments]);
 
   const deleteDocument = useCallback(async (documentName: string) => {
     try {
@@ -62,7 +56,6 @@ export const useDocumentKnowledge = () => {
     isProcessing,
     error,
     processStorageDocument,
-    uploadDocument,
     deleteDocument,
     searchDocuments,
     clearError,

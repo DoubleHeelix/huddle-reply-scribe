@@ -40,8 +40,6 @@ export const useOCR = (options: UseOCROptions = {}) => {
         return '';
       }
 
-      console.log('OCR: Extracted text:', result.text);
-      
       return result.text;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown OCR error';

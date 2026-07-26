@@ -11,7 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
 supabase/.env
+supabase/.temp/linked-project.json
+
+# Local visual QA artifacts may contain signed-in or conversation data.
+design-audit/
+design-qa.md
 
 # Editor directories and files
 .vscode/*

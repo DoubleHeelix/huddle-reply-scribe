@@ -1,69 +1,79 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import supabaseJs from 'https://esm.sh/@supabase/supabase-js@2.50.0/dist/umd/supabase.js?target=deno&deno-std=0.168.0';
-
-const { createClient } = supabaseJs;
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  hasAdminRole,
+  requireAuthenticatedUser,
+} from "../shared/auth.ts";
+import { handleCorsPreflight } from "../shared/cors.ts";
+import { errorResponse, jsonResponse } from "../shared/http.ts";
 
 serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  if (req.method !== "POST") {
+    return jsonResponse(req, { error: "Method not allowed" }, 405);
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    // Get user from Authorization header
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabase.auth.getUser(token);
-
-    if (!user) {
-      throw new Error('User not authenticated');
+    const { user, serviceClient } = await requireAuthenticatedUser(req);
+    if (!hasAdminRole(user)) {
+      return jsonResponse(
+        req,
+        { error: "Administrator access required", code: "forbidden" },
+        403,
+      );
+    }
+    const body = await req.json().catch(() => ({}));
+    const documentName =
+      typeof body?.documentName === "string"
+        ? body.documentName.trim()
+        : "";
+    if (documentName.length > 500) {
+      return jsonResponse(req, { error: "Invalid document name" }, 400);
     }
 
-    console.log(`🗑️ Deleting all documents for user: ${user.id}`);
-
-    // Delete all rows from document_knowledge for the user
-    const { error: deleteError } = await supabase
-      .from('document_knowledge')
-      .delete()
-      .eq('user_id', user.id);
-
+    let deleteQuery = serviceClient
+      .from("document_knowledge")
+      .delete();
+    deleteQuery = documentName
+      ? deleteQuery.eq("document_name", documentName)
+      : deleteQuery.not("id", "is", null);
+    const { error: deleteError } = await deleteQuery;
     if (deleteError) {
-      throw deleteError;
+      console.error("Unable to delete document knowledge", {
+        code: deleteError.code,
+      });
+      throw new Error("Unable to delete documents");
+    }
+    if (documentName) {
+      return jsonResponse(req, { success: true });
     }
 
-    // Also delete from storage (optional, but good practice)
-    const { data: files, error: listError } = await supabase.storage
-      .from('documents')
-      .list(user.id);
-
+    const { data: files, error: listError } = await serviceClient.storage
+      .from("documents")
+      .list("", { limit: 1_000 });
     if (listError) {
-      console.warn(`Could not list files for deletion: ${listError.message}`);
-    } else if (files && files.length > 0) {
-      const fileNames = files.map((file: { name: string }) => `${user.id}/${file.name}`);
-      await supabase.storage.from('documents').remove(fileNames);
-      console.log(`🗑️ Deleted ${fileNames.length} files from storage.`);
+      console.warn("Unable to list stored documents during cleanup", {
+        code: listError.name,
+      });
+    } else if (files?.length) {
+      const paths = files
+        .filter((file: { id?: string | null }) => Boolean(file.id))
+        .map((file: { name: string }) => file.name);
+      if (!paths.length) {
+        return jsonResponse(req, { success: true });
+      }
+      const { error: storageError } = await serviceClient.storage
+        .from("documents")
+        .remove(paths);
+      if (storageError) {
+        console.warn("Unable to remove all stored document files", {
+          code: storageError.name,
+        });
+      }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, message: 'All documents and knowledge chunks deleted.' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-
-  } catch (e) {
-    const error = e instanceof Error ? e : new Error(String(e));
-    console.error('❌ Delete all documents error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    return jsonResponse(req, { success: true });
+  } catch (error) {
+    return errorResponse(req, error);
   }
 });

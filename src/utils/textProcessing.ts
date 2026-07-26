@@ -15,7 +15,7 @@ const applyInlineMarkdown = (value: string): string => {
   html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
 
   // Italic (single * or _)
-  html = html.replace(/(^|[^\*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+  html = html.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
   html = html.replace(/(^|[^_])_([^_]+)_(?!_)/g, '$1<em>$2</em>');
 
   return html;

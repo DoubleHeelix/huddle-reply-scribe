@@ -1,25 +1,31 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useDocumentKnowledge } from '@/hooks/useDocumentKnowledge';
 import { sanitizeHumanReply } from '@/utils/sanitizeHumanReply';
 import {
   RetryableGenerationError,
   runWithGenerationRetry,
 } from '@/utils/generationRetryPolicy';
+import {
+  HuddleGenerationHttpError,
+  streamHuddleReply,
+} from '@/services/huddleGenerationService';
 import type { DocumentKnowledge } from '@/types/document';
-import type { HuddlePlay } from '@/utils/huddlePlayService';
+import type { PastHuddleReference } from '@/utils/huddlePlayService';
+import type { AppliedStyleProfile } from '@/types/styleProfile';
+import { inferDraftInputMode } from '@/utils/draftInput';
 
-type PastHuddleWithSimilarity = HuddlePlay & { similarity?: number; __preview?: boolean };
+type PastHuddleWithSimilarity = PastHuddleReference;
 
 interface GenerateReplyResult {
   reply: string;
+  huddleId?: string;
+  generationId?: string;
   pastHuddles?: PastHuddleWithSimilarity[];
   documentKnowledge?: DocumentKnowledge[];
   slangAddressTerms?: string[];
+  styleProfile?: AppliedStyleProfile;
 }
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const sanitizeHuddleMeta = (items: unknown[]): PastHuddleWithSimilarity[] => {
   return (items || []).map((item) => {
@@ -58,19 +64,21 @@ export const useEnhancedAISuggestions = () => {
   const [isAdjustingTone, setIsAdjustingTone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { searchDocuments } = useDocumentKnowledge();
-
   const generateReply = async (
     screenshotText: string,
     userDraft: string,
     isRegeneration: boolean = false,
     existingDocumentKnowledge: DocumentKnowledge[] = [],
     existingPastHuddles: PastHuddleWithSimilarity[] = [],
-    onToken?: (partial: string, options?: { slangAddressTerms?: string[] }) => void
+    onToken?: (partial: string, options?: { slangAddressTerms?: string[] }) => void,
+    huddleId?: string | null,
+    parentGenerationId?: string | null,
   ): Promise<GenerateReplyResult | null> => {
     const errorMessage = "Generation failed. Please click re-generate";
-    let lastDocumentKnowledge = existingDocumentKnowledge;
-    let lastPastHuddles = existingPastHuddles;
+    const requestId = crypto.randomUUID();
+    const draftInputMode = inferDraftInputMode(userDraft);
+    let activeHuddleId = huddleId || undefined;
+    let activeGenerationId = parentGenerationId || undefined;
 
     setIsGenerating(true);
     setError(null);
@@ -79,141 +87,64 @@ export const useEnhancedAISuggestions = () => {
       try {
         return await runWithGenerationRetry(
           async (attempt, maxAttempts) => {
-            console.log(`🤖 DEBUG: Enhanced AI - Starting reply generation (attempt ${attempt}/${maxAttempts})...`);
-            console.log('📸 DEBUG: Screenshot text length:', screenshotText.length);
-            console.log('✏️ DEBUG: User draft length:', userDraft.length);
+            console.log('Huddle generation started', {
+              attempt,
+              maxAttempts,
+              isRegeneration: isRegeneration || attempt > 1,
+            });
 
-          // Search for relevant documents based on screenshot + draft content
-          let documentKnowledge: DocumentKnowledge[] = [];
-          if (isRegeneration) {
-            documentKnowledge = existingDocumentKnowledge;
-            console.log(`📚 DEBUG: Re-using ${documentKnowledge.length} document chunks for regeneration`);
-          } else {
-            if (attempt === 1) {
-              console.log('📚 DEBUG: Searching for relevant documents...');
-              const searchQuery = `${screenshotText} ${userDraft}`;
-              documentKnowledge = await searchDocuments(searchQuery, 3);
-              console.log(`📚 DEBUG: Found ${documentKnowledge.length} relevant document chunks`);
-            } else {
-              documentKnowledge = lastDocumentKnowledge;
-              console.log(`📚 DEBUG: Re-using document knowledge on retry: ${documentKnowledge.length}`);
-            }
-          }
-          lastDocumentKnowledge = documentKnowledge;
+            let slangAddressTerms: string[] | undefined;
+            let pastHuddles: PastHuddleWithSimilarity[] =
+              isRegeneration ? existingPastHuddles : [];
+            let documentKnowledgeUsed: DocumentKnowledge[] =
+              isRegeneration ? existingDocumentKnowledge : [];
+            let appliedStyleProfile: AppliedStyleProfile | undefined;
 
-          console.log('🚀 DEBUG: Calling enhanced-ai-suggestions function...');
-
-          if (!SUPABASE_URL) {
-            throw new Error('SUPABASE_URL is not configured.');
-          }
-
-          const { data: sessionData } = await supabase.auth.getSession();
-          const accessToken = sessionData.session?.access_token;
-
-          const response = await fetch(`${SUPABASE_URL}/functions/v1/enhanced-ai-suggestions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-            },
-            body: JSON.stringify({
-              action: 'generateReply',
-              screenshotText,
-              userDraft,
-              isRegeneration,
-              documentKnowledge,
-              returnLightweight: true, // ask backend to keep meta small; we still send full text for quality
-            }),
-          });
-
-          if (!response.ok || !response.body) {
-            const errorText = await response.text();
-            throw new Error(`Function Error: ${response.status} ${response.statusText}: ${errorText}`);
-          }
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-          let reply = '';
-          let slangAddressTerms: string[] | undefined;
-          let pastHuddles: PastHuddleWithSimilarity[] = isRegeneration ? existingPastHuddles : [];
-          let documentKnowledgeUsed: DocumentKnowledge[] = documentKnowledge;
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (!line.trim()) continue;
-              try {
-                const payload = JSON.parse(line);
-                if (payload.type === 'meta') {
-                  pastHuddles = isRegeneration ? existingPastHuddles : sanitizeHuddleMeta(payload.pastHuddles || []);
-                  documentKnowledgeUsed = sanitizeDocumentMeta(payload.documentKnowledge || documentKnowledge);
-                  slangAddressTerms = Array.isArray(payload.slangAddressTerms)
-                    ? payload.slangAddressTerms
-                    : slangAddressTerms;
-                  lastPastHuddles = pastHuddles;
-                  lastDocumentKnowledge = documentKnowledgeUsed;
-                } else if (payload.type === 'token') {
-                  reply += payload.text || '';
-                  if (onToken) onToken(reply, { slangAddressTerms });
-                }
-              } catch (err) {
-                console.error('❌ DEBUG: Error parsing stream payload:', err, line);
-              }
-            }
-          }
-
-          // Process any trailing buffer content that wasn't newline-terminated.
-          if (buffer.trim()) {
-            try {
-              const payload = JSON.parse(buffer);
-              if (payload.type === 'meta') {
-                pastHuddles = isRegeneration ? existingPastHuddles : sanitizeHuddleMeta(payload.pastHuddles || []);
-                documentKnowledgeUsed = sanitizeDocumentMeta(payload.documentKnowledge || documentKnowledge);
-                slangAddressTerms = Array.isArray(payload.slangAddressTerms)
-                  ? payload.slangAddressTerms
-                  : slangAddressTerms;
-                lastPastHuddles = pastHuddles;
-                lastDocumentKnowledge = documentKnowledgeUsed;
-              } else if (payload.type === 'token') {
-                reply += payload.text || '';
-                if (onToken) onToken(reply, { slangAddressTerms });
-              }
-            } catch (err) {
-              console.error('❌ DEBUG: Error parsing trailing stream payload:', err, buffer);
-            }
-          }
-
-          console.log('✅ DEBUG: AI Function stream complete:', {
-            replyLength: reply.length,
-            pastHuddlesCount: pastHuddles.length,
-            documentKnowledgeCount: documentKnowledgeUsed.length
-          });
-
-          const trimmedReply = reply.trim();
-          if (!trimmedReply) {
-            throw new RetryableGenerationError('Empty reply from AI function');
-          }
-
-          if (trimmedReply === errorMessage) {
-            throw new RetryableGenerationError(
-              'AI function returned the fallback reply'
+            const streamed = await streamHuddleReply(
+              {
+                screenshotText,
+                userDraft,
+                draftInputMode,
+                isRegeneration: isRegeneration || attempt > 1,
+                requestId,
+                huddleId: activeHuddleId,
+                parentGenerationId: activeGenerationId,
+              },
+              {
+                onMeta: (meta) => {
+                  activeHuddleId = meta.huddleId || activeHuddleId;
+                  activeGenerationId =
+                    meta.generationId || activeGenerationId;
+                  pastHuddles = sanitizeHuddleMeta(meta.pastHuddles);
+                  documentKnowledgeUsed = sanitizeDocumentMeta(
+                    meta.documentKnowledge,
+                  );
+                  slangAddressTerms = meta.slangAddressTerms;
+                  appliedStyleProfile = meta.styleProfile;
+                },
+                onToken: (partial, meta) => {
+                  slangAddressTerms =
+                    meta.slangAddressTerms || slangAddressTerms;
+                  onToken?.(partial, { slangAddressTerms });
+                },
+              },
             );
-          }
 
-          // Ensure UI sees the final reply even if no tokens were streamed.
-          if (reply && onToken) onToken(reply, { slangAddressTerms });
-
+            const trimmedReply = streamed.reply.trim();
+            if (!trimmedReply || trimmedReply === errorMessage) {
+              throw new RetryableGenerationError(
+                "Generation returned no usable reply",
+              );
+            }
+            onToken?.(streamed.reply, { slangAddressTerms });
             return {
-              reply,
+              reply: streamed.reply,
+              huddleId: activeHuddleId,
+              generationId: activeGenerationId,
               pastHuddles,
               documentKnowledge: documentKnowledgeUsed,
               slangAddressTerms,
+              styleProfile: appliedStyleProfile,
             };
           },
           {
@@ -251,13 +182,13 @@ export const useEnhancedAISuggestions = () => {
           draftLength: userDraft.length,
         });
 
-        if (onToken) onToken(errorMessage);
-        setError(errorMessage);
-        return {
-          reply: errorMessage,
-          pastHuddles: lastPastHuddles,
-          documentKnowledge: lastDocumentKnowledge,
-        };
+        onToken?.("");
+        const userFacingError =
+          generationError instanceof HuddleGenerationHttpError
+            ? generationError.message.replace(/\s*\(\d{3}\)\s*$/, "")
+            : errorMessage;
+        setError(userFacingError);
+        return null;
       }
     } finally {
       setIsGenerating(false);

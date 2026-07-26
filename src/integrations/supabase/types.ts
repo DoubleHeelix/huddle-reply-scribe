@@ -80,43 +80,274 @@ export type Database = {
       }
       huddle_plays: {
         Row: {
+          accepted_at: string | null
+          client_request_id: string | null
           created_at: string
           embedding: string | null
           final_reply: string | null
+          generation_count: number
           generated_reply: string
           id: string
           principles: string | null
           screenshot_text: string
           selected_tone: string | null
+          status: string
           updated_at: string
           user_draft: string
           user_id: string
         }
         Insert: {
+          accepted_at?: string | null
+          client_request_id?: string | null
           created_at?: string
           embedding?: string | null
           final_reply?: string | null
+          generation_count?: number
           generated_reply: string
           id?: string
           principles?: string | null
           screenshot_text: string
           selected_tone?: string | null
+          status?: string
           updated_at?: string
           user_draft: string
           user_id: string
         }
         Update: {
+          accepted_at?: string | null
+          client_request_id?: string | null
           created_at?: string
           embedding?: string | null
           final_reply?: string | null
+          generation_count?: number
           generated_reply?: string
           id?: string
           principles?: string | null
           screenshot_text?: string
           selected_tone?: string | null
+          status?: string
           updated_at?: string
           user_draft?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      huddle_generations: {
+        Row: {
+          attempt_number: number
+          client_request_id: string | null
+          completed_at: string | null
+          completion_tokens: number | null
+          error_code: string | null
+          generated_reply: string | null
+          huddle_play_id: string
+          id: string
+          model: string
+          model_route: string
+          parent_generation_id: string | null
+          prompt_tokens: number | null
+          provider_request_id: string | null
+          reasoning_effort: string | null
+          reasoning_tokens: number | null
+          started_at: string
+          status: string
+          total_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          client_request_id?: string | null
+          completed_at?: string | null
+          completion_tokens?: number | null
+          error_code?: string | null
+          generated_reply?: string | null
+          huddle_play_id: string
+          id?: string
+          model: string
+          model_route: string
+          parent_generation_id?: string | null
+          prompt_tokens?: number | null
+          provider_request_id?: string | null
+          reasoning_effort?: string | null
+          reasoning_tokens?: number | null
+          started_at?: string
+          status?: string
+          total_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          client_request_id?: string | null
+          completed_at?: string | null
+          completion_tokens?: number | null
+          error_code?: string | null
+          generated_reply?: string | null
+          huddle_play_id?: string
+          id?: string
+          model?: string
+          model_route?: string
+          parent_generation_id?: string | null
+          prompt_tokens?: number | null
+          provider_request_id?: string | null
+          reasoning_effort?: string | null
+          reasoning_tokens?: number | null
+          started_at?: string
+          status?: string
+          total_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      huddle_generation_sources: {
+        Row: {
+          created_at: string
+          generation_id: string
+          id: string
+          metadata: Json
+          rank: number | null
+          similarity: number | null
+          source_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          generation_id: string
+          id?: string
+          metadata?: Json
+          rank?: number | null
+          similarity?: number | null
+          source_id?: string | null
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          generation_id?: string
+          id?: string
+          metadata?: Json
+          rank?: number | null
+          similarity?: number | null
+          source_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      huddle_acceptance_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          final_reply: string | null
+          generation_id: string | null
+          huddle_play_id: string
+          id: string
+          metadata: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          final_reply?: string | null
+          generation_id?: string | null
+          huddle_play_id: string
+          id?: string
+          metadata?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          final_reply?: string | null
+          generation_id?: string | null
+          huddle_play_id?: string
+          id?: string
+          metadata?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      api_usage_ledger: {
+        Row: {
+          completion_tokens: number
+          created_at: string
+          estimated_cost_micros: number | null
+          generation_id: string | null
+          id: string
+          model: string
+          model_route: string | null
+          operation: string
+          prompt_tokens: number
+          provider: string
+          reasoning_tokens: number
+          total_tokens: number
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost_micros?: number | null
+          generation_id?: string | null
+          id?: string
+          model: string
+          model_route?: string | null
+          operation: string
+          prompt_tokens?: number
+          provider?: string
+          reasoning_tokens?: number
+          total_tokens?: number
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string
+          estimated_cost_micros?: number | null
+          generation_id?: string | null
+          id?: string
+          model?: string
+          model_route?: string | null
+          operation?: string
+          prompt_tokens?: number
+          provider?: string
+          reasoning_tokens?: number
+          total_tokens?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      model_routing_policies: {
+        Row: {
+          cheap_route_enabled: boolean
+          evaluated_sample_count: number
+          evaluation_version: string
+          fallback_model: string
+          minimum_quality_score: number
+          primary_model: string
+          tone_model: string
+          updated_at: string
+          workflow: string
+        }
+        Insert: {
+          cheap_route_enabled?: boolean
+          evaluated_sample_count?: number
+          evaluation_version?: string
+          fallback_model: string
+          minimum_quality_score?: number
+          primary_model: string
+          tone_model: string
+          updated_at?: string
+          workflow: string
+        }
+        Update: {
+          cheap_route_enabled?: boolean
+          evaluated_sample_count?: number
+          evaluation_version?: string
+          fallback_model?: string
+          minimum_quality_score?: number
+          primary_model?: string
+          tone_model?: string
+          updated_at?: string
+          workflow?: string
         }
         Relationships: []
       }
@@ -299,6 +530,16 @@ export type Database = {
           created_at: string
           similarity: number
         }[]
+      }
+      record_huddle_acceptance: {
+        Args: {
+          p_huddle_play_id: string
+          p_generation_id: string | null
+          p_event_type: string
+          p_final_reply?: string | null
+          p_metadata?: Json
+        }
+        Returns: undefined
       }
       search_document_knowledge: {
         Args: {

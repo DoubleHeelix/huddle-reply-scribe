@@ -4,7 +4,7 @@ import { useEnhancedAISuggestions } from '@/hooks/useEnhancedAISuggestions';
 import { useHuddlePlays } from '@/hooks/useHuddlePlays';
 import { useOCR } from '@/hooks/useOCR';
 import type { DocumentKnowledge } from '@/types/document';
-import type { HuddlePlay } from '@/utils/huddlePlayService';
+import type { PastHuddleReference } from '@/utils/huddlePlayService';
 import type { BatchItem } from '@/types/batch';
 
 export const useHuddleState = () => {
@@ -12,7 +12,7 @@ export const useHuddleState = () => {
   const [userDraft, setUserDraft] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
   const [selectedTone, setSelectedTone] = useState("none");
-  const [lastUsedHuddles, setLastUsedHuddles] = useState<(HuddlePlay & { similarity?: number })[]>([]);
+  const [lastUsedHuddles, setLastUsedHuddles] = useState<PastHuddleReference[]>([]);
   const [showKnowledgeSources, setShowKnowledgeSources] = useState(false);
   const [googleCloudApiKey, setGoogleCloudApiKey] = useState("");
   const [enableAutoCropping, setEnableAutoCropping] = useState(true);
@@ -20,6 +20,7 @@ export const useHuddleState = () => {
   const [extractedText, setExtractedText] = useState("");
   const [showExtractedText, setShowExtractedText] = useState(false);
   const [currentHuddleId, setCurrentHuddleId] = useState<string | null>(null);
+  const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
   const [lastUsedDocuments, setLastUsedDocuments] = useState<DocumentKnowledge[]>([]);
   const [interruptionImage, setInterruptionImage] = useState<string | null>(null);
   const [interruptionText, setInterruptionText] = useState("");
@@ -34,7 +35,7 @@ export const useHuddleState = () => {
   const { toast } = useToast();
 
   const { generateReply, adjustTone, isGenerating, isAdjustingTone, error, clearError } = useEnhancedAISuggestions();
-  const { saveCurrentHuddle, updateFinalReply } = useHuddlePlays();
+  const { recordAcceptance } = useHuddlePlays();
   
   const { 
     extractText, 
@@ -97,6 +98,7 @@ export const useHuddleState = () => {
     setExtractedText("");
     setShowExtractedText(false);
     setCurrentHuddleId(null);
+    setCurrentGenerationId(null);
     setShowKnowledgeSources(false);
     setLastUsedHuddles([]);
     setLastUsedDocuments([]);
@@ -132,6 +134,8 @@ export const useHuddleState = () => {
     setShowExtractedText,
     currentHuddleId,
     setCurrentHuddleId,
+    currentGenerationId,
+    setCurrentGenerationId,
     interruptionImage,
     setInterruptionImage,
     interruptionText,
@@ -152,8 +156,7 @@ export const useHuddleState = () => {
     isAdjustingTone,
     error,
     clearError,
-    saveCurrentHuddle,
-    updateFinalReply,
+    recordAcceptance,
     extractText,
     isOCRProcessing,
     ocrResult,

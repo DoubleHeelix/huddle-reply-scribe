@@ -32,12 +32,13 @@ export const DocumentProcessor: React.FC = () => {
 
       if (error) throw error;
 
-      const pdfFiles = data?.filter(file =>
-        file.name.toLowerCase().endsWith('.pdf') &&
+      const supportedFiles = data?.filter(file =>
+        (file.name.toLowerCase().endsWith('.pdf') ||
+          file.name.toLowerCase().endsWith('.docx')) &&
         file.name !== '.emptyFolderPlaceholder'
       ) || [];
       
-      setStorageFiles(pdfFiles);
+      setStorageFiles(supportedFiles);
     } catch (err) {
       console.error('Error fetching storage files:', err);
       setStorageError('Failed to load files from storage. Is the bucket public?');
@@ -48,14 +49,6 @@ export const DocumentProcessor: React.FC = () => {
 
   useEffect(() => {
     fetchStorageFiles();
-    const checkData = async () => {
-      const { data, error } = await supabase.from('document_knowledge').select('*').limit(5);
-      console.log('DATABASE CHECK: document_knowledge table sample:', data);
-      if (error) {
-        console.error('DATABASE CHECK ERROR:', error);
-      }
-    };
-    checkData();
   }, []);
 
   const handleProcessDocument = async (fileName: string) => {
@@ -110,13 +103,13 @@ export const DocumentProcessor: React.FC = () => {
   };
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="border-[#826f56]/15 bg-white/70 dark:border-white/10 dark:bg-[#151513]">
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-white text-lg font-medium mb-2 font-sans">Document Knowledge Base</h3>
-            <p className="text-gray-400 text-sm font-sans">
-              Process PDF documents from Supabase storage to enhance AI responses.
+            <h3 className="text-[#29231c] text-lg font-medium mb-2 font-sans dark:text-[#f4efe7]">Document Knowledge Base</h3>
+            <p className="text-[#776b5d] text-sm font-sans dark:text-[#b4a89a]">
+              Process PDF and DOCX documents from Supabase storage to enhance AI responses.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -124,8 +117,9 @@ export const DocumentProcessor: React.FC = () => {
               onClick={fetchStorageFiles}
               variant="outline"
               size="sm"
+              aria-label="Refresh documents"
               disabled={isLoadingStorage}
-              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+              className="border-[#826f56]/15 bg-white/80 text-[#29231c] hover:bg-[#efe7dc] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f4efe7] dark:hover:bg-white/[0.08]"
             >
               <RefreshCw className={`w-4 h-4 ${isLoadingStorage ? 'animate-spin' : ''}`} />
             </Button>
@@ -134,7 +128,7 @@ export const DocumentProcessor: React.FC = () => {
               variant="outline"
               size="sm"
               disabled={isProcessing || storageFiles.every(file => isDocumentProcessed(file.name))}
-              className="bg-blue-600 border-blue-500 text-white hover:bg-blue-500"
+              className="border-[#c49b5d] bg-[#c49b5d] text-[#071326] hover:bg-[#b58a52]"
             >
               Process All
             </Button>
@@ -164,10 +158,10 @@ export const DocumentProcessor: React.FC = () => {
 
         {/* Processing Status */}
         {isProcessing && (
-          <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-3">
+          <div className="bg-[#eaf1fa] border border-[#b9cbe5] rounded-lg p-3 dark:border-[#355981] dark:bg-[#102033]">
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
-              <span className="text-blue-400 text-sm font-sans">Processing document...</span>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#2f5d8c] dark:border-[#7ea4d6]"></div>
+              <span className="text-[#2f5d8c] text-sm font-sans dark:text-[#7ea4d6]">Processing document...</span>
             </div>
           </div>
         )}
@@ -175,20 +169,20 @@ export const DocumentProcessor: React.FC = () => {
         {/* Storage Files List */}
         {storageFiles.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-white text-sm font-medium font-sans">Available Documents in Storage</h4>
+            <h4 className="text-[#29231c] text-sm font-medium font-sans dark:text-[#f4efe7]">Available Documents in Storage</h4>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {storageFiles.map((file) => {
                 const isProcessed = isDocumentProcessed(file.name);
                 return (
-                  <div key={file.name} className="bg-gray-900 p-3 rounded-lg border border-gray-600">
+                  <div key={file.name} className="bg-[#fffcf7] p-3 rounded-lg border border-[#826f56]/15 dark:border-white/10 dark:bg-[#0d0c0b]/70">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                        <span className="text-white text-sm font-sans truncate">
+                        <FileText className="w-4 h-4 text-[#2f5d8c] flex-shrink-0 dark:text-[#7ea4d6]" />
+                        <span className="text-[#29231c] text-sm font-sans truncate dark:text-[#f4efe7]">
                           {file.name}
                         </span>
                         {isProcessed && (
-                          <Badge variant="secondary" className="text-xs bg-green-900 text-green-300">
+                          <Badge variant="secondary" className="text-xs border border-[#348f6a]/30 bg-[#bcefd8]/70 text-[#23684c] dark:bg-[#348f6a]/10 dark:text-[#6ee7b7]">
                             Processed
                           </Badge>
                         )}
@@ -198,7 +192,8 @@ export const DocumentProcessor: React.FC = () => {
                           onClick={() => downloadFile(file.name)}
                           variant="ghost"
                           size="sm"
-                          className="text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+                          aria-label={`Download ${file.name}`}
+                          className="text-[#776b5d] hover:text-[#29231c] hover:bg-[#efe7dc] dark:text-[#b4a89a] dark:hover:text-[#f4efe7] dark:hover:bg-white/[0.08]"
                         >
                           <Download className="w-4 h-4" />
                         </Button>
@@ -217,7 +212,7 @@ export const DocumentProcessor: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             disabled={isProcessing}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                            className="text-[#2f5d8c] hover:text-[#1b2f4a] hover:bg-[#eaf1fa] dark:text-[#7ea4d6] dark:hover:text-[#eaf1fa] dark:hover:bg-[#102033]"
                           >
                             Process
                           </Button>
@@ -226,8 +221,8 @@ export const DocumentProcessor: React.FC = () => {
                     </div>
                     {isProcessed && (
                       <div className="flex items-center gap-1 mt-1">
-                        <CheckCircle className="w-3 h-3 text-green-400" />
-                        <span className="text-green-400 text-xs font-sans">Ready for AI</span>
+                        <CheckCircle className="w-3 h-3 text-[#23684c] dark:text-[#6ee7b7]" />
+                        <span className="text-[#23684c] text-xs font-sans dark:text-[#6ee7b7]">Ready for AI</span>
                       </div>
                     )}
                   </div>
@@ -239,9 +234,9 @@ export const DocumentProcessor: React.FC = () => {
 
         {/* Processed Documents Summary */}
         {documents.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-600">
-            <h4 className="text-white text-sm font-medium font-sans mb-2">Knowledge Base Summary</h4>
-            <div className="text-gray-400 text-sm font-sans">
+          <div className="mt-4 pt-4 border-t border-[#826f56]/15 dark:border-white/10">
+            <h4 className="text-[#29231c] text-sm font-medium font-sans mb-2 dark:text-[#f4efe7]">Knowledge Base Summary</h4>
+            <div className="text-[#776b5d] text-sm font-sans dark:text-[#b4a89a]">
               {documents.length} document(s) processed with {documents.reduce((sum, doc) => sum + doc.chunks, 0)} total chunks
             </div>
           </div>
@@ -249,12 +244,12 @@ export const DocumentProcessor: React.FC = () => {
 
         {storageFiles.length === 0 && !isLoadingStorage && (
           <div className="text-center py-4">
-            <FileText className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm font-sans">
-              No PDF files found in Supabase storage
+            <FileText className="w-8 h-8 text-[#776b5d] mx-auto mb-2 dark:text-[#b4a89a]" />
+            <p className="text-[#776b5d] text-sm font-sans dark:text-[#b4a89a]">
+              No PDF or DOCX files found in Supabase storage
             </p>
-            <p className="text-gray-600 text-xs font-sans mt-1">
-              Upload PDFs to the 'documents' bucket in Supabase storage
+            <p className="text-[#776b5d] text-xs font-sans mt-1 dark:text-[#b4a89a]">
+              Upload PDF or DOCX files to the 'documents' bucket in Supabase storage
             </p>
           </div>
         )}

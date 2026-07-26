@@ -1,23 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { saveHuddlePlay, getUserHuddlePlays, getHuddlePlayPreviews, getHuddlePlayDetail, updateHuddlePlayFinalReply, type HuddlePlay, type HuddlePlayPreview } from '@/utils/huddlePlayService';
+import {
+  getUserHuddlePlays,
+  getHuddlePlayPreviews,
+  getHuddlePlayDetail,
+  recordHuddleAcceptance,
+  type HuddleAcceptanceEvent,
+  type HuddlePlay,
+  type HuddlePlayPreview,
+} from '@/utils/huddlePlayService';
 import { useAuth } from './useAuth';
 
-const PAGE_SIZE = 25;
-const MAX_PAGES = 4; // Cap at 100 rows total.
-const MAX_ROWS = PAGE_SIZE * MAX_PAGES;
-
-const HUDDLE_SAVED_EVENT = 'huddle-play-saved';
+const DEFAULT_PAGE_SIZE = 25;
+const DEFAULT_MAX_ROWS = 100;
 
 type UseHuddlePlaysOptions = {
   paginated?: boolean;
   light?: boolean; // fetch lightweight list (metadata/previews) and hydrate on demand
   maxRows?: number; // cap rows per request to trim egress
+  pageSize?: number; // number of rows fetched per paginated request
   autoFetch?: boolean; // when false, skip initial fetch; caller can invoke refetch manually
 };
 
 export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
-  const { paginated = false, light = false, maxRows = MAX_ROWS, autoFetch = true } = options;
+  const {
+    paginated = false,
+    light = false,
+    maxRows = DEFAULT_MAX_ROWS,
+    pageSize: requestedPageSize = DEFAULT_PAGE_SIZE,
+    autoFetch = true,
+  } = options;
+  const pageSize = Math.max(1, Math.min(requestedPageSize, maxRows));
+  const maxPages = Math.max(1, Math.ceil(maxRows / pageSize));
   const { user } = useAuth();
   const [huddlePlays, setHuddlePlays] = useState<(HuddlePlay & { __preview?: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(autoFetch);
@@ -34,12 +48,12 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
       const plays = light
         ? await getHuddlePlayPreviews(
             0,
-            paginated ? PAGE_SIZE : maxRows,
+            paginated ? pageSize : maxRows,
             maxRows
           )
         : await getUserHuddlePlays(
             0,
-            paginated ? PAGE_SIZE : maxRows,
+            paginated ? pageSize : maxRows,
             maxRows
           );
       const normalized = (plays as Array<HuddlePlay | HuddlePlayPreview>).map((p) => ({
@@ -48,7 +62,7 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
       }));
       setHuddlePlays(normalized);
       setPage(0);
-      setHasMore(paginated && plays.length === PAGE_SIZE && MAX_PAGES > 1);
+      setHasMore(paginated && plays.length === pageSize && maxPages > 1);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch huddle plays';
       setError(errorMessage);
@@ -61,13 +75,13 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoading(false);
     }
-  }, [light, maxRows, paginated, toast]);
+  }, [light, maxPages, maxRows, pageSize, paginated, toast]);
 
   const loadMore = useCallback(async () => {
     if (!paginated) return;
     if (isLoadingMore || isLoading || !hasMore) return;
     const nextPage = page + 1;
-    if (nextPage >= MAX_PAGES) {
+    if (nextPage >= maxPages) {
       setHasMore(false);
       return;
     }
@@ -75,8 +89,8 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     try {
       setIsLoadingMore(true);
       const more = light
-        ? await getHuddlePlayPreviews(nextPage, PAGE_SIZE, maxRows)
-        : await getUserHuddlePlays(nextPage, PAGE_SIZE, maxRows);
+        ? await getHuddlePlayPreviews(nextPage, pageSize, maxRows)
+        : await getUserHuddlePlays(nextPage, pageSize, maxRows);
       setHuddlePlays((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
         const newItems = more
@@ -85,8 +99,8 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
         return [...prev, ...newItems];
       });
       setPage(nextPage);
-      const reachedMaxPages = nextPage >= MAX_PAGES - 1;
-      setHasMore(!reachedMaxPages && more.length === PAGE_SIZE);
+      const reachedMaxPages = nextPage >= maxPages - 1;
+      setHasMore(!reachedMaxPages && more.length === pageSize);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch more huddle plays';
       setError(errorMessage);
@@ -99,7 +113,18 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMore, isLoading, isLoadingMore, light, maxRows, page, paginated, toast]);
+  }, [
+    hasMore,
+    isLoading,
+    isLoadingMore,
+    light,
+    maxPages,
+    maxRows,
+    page,
+    pageSize,
+    paginated,
+    toast,
+  ]);
 
   const ensureHuddleDetail = useCallback(
     async (id: string) => {
@@ -121,44 +146,20 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     [huddlePlays]
   );
 
-  const saveCurrentHuddle = async (huddlePlay: Omit<HuddlePlay, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    try {
-      const newPlay = await saveHuddlePlay(huddlePlay);
-      if (newPlay) {
-        setHuddlePlays(prev => [newPlay, ...prev]);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(HUDDLE_SAVED_EVENT, { detail: newPlay.id }));
-        }
-      }
-      return newPlay;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save huddle play';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      return null;
-    }
-  };
-
-  const updateFinalReply = async (id: string, finalReply: string) => {
-    try {
-      const success = await updateHuddlePlayFinalReply(id, finalReply);
-      if (success) {
-        setHuddlePlays(prev => 
-          prev.map(play => 
-            play.id === id 
-              ? { ...play, final_reply: finalReply, updated_at: new Date().toISOString() }
-              : play
-          )
-        );
-      }
-    } catch (err) {
-      console.error('Error updating final reply:', err);
-    }
-  };
+  const recordAcceptance = async (
+    huddlePlayId: string,
+    generationId: string | null,
+    eventType: HuddleAcceptanceEvent,
+    finalReply: string,
+    metadata?: Record<string, string | number | boolean | null>,
+  ) =>
+    recordHuddleAcceptance(
+      huddlePlayId,
+      generationId,
+      eventType,
+      finalReply,
+      metadata,
+    );
 
   useEffect(() => {
     if (!user) {
@@ -173,18 +174,6 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     fetchHuddlePlays();
   }, [autoFetch, fetchHuddlePlays, user]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!autoFetch) return;
-    const handler = () => {
-      fetchHuddlePlays();
-    };
-    window.addEventListener(HUDDLE_SAVED_EVENT, handler);
-    return () => {
-      window.removeEventListener(HUDDLE_SAVED_EVENT, handler);
-    };
-  }, [autoFetch, fetchHuddlePlays]);
-
   return {
     huddlePlays,
     isLoading,
@@ -195,7 +184,6 @@ export const useHuddlePlays = (options: UseHuddlePlaysOptions = {}) => {
     isLoadingMore,
     page,
     ensureHuddleDetail,
-    saveCurrentHuddle,
-    updateFinalReply,
+    recordAcceptance,
   };
 };

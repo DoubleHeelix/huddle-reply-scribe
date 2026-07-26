@@ -1,22 +1,29 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, History, Camera, Kanban } from "lucide-react";
+import { MessageSquare, History, UserRound } from "lucide-react";
 import { SettingsSidebar } from "@/components/SettingsSidebar";
-import { InterruptionsTab } from "@/components/InterruptionsTab";
-import { PastHuddlesTab } from "@/components/PastHuddlesTab";
 import { HuddlePlayTab } from "@/components/HuddlePlayTab";
-import { TrelloTab } from "@/components/TrelloTab";
 import { useHuddleState } from "@/hooks/useHuddleState";
-import { useInterruptions } from "@/hooks/useInterruptions";
+import { useStyleProfile } from "@/hooks/useStyleProfile";
 import { useAuth } from '@/hooks/useAuth';
 
+const HistoryTab = lazy(() =>
+  import("@/components/HistoryTab").then((module) => ({
+    default: module.HistoryTab,
+  })),
+);
+const ProfileStyleTab = lazy(() =>
+  import("@/components/ProfileStyleTab").then((module) => ({
+    default: module.ProfileStyleTab,
+  })),
+);
 export const MainApp = () => {
   const { user, onSignOut, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("huddle-play");
   const [direction, setDirection] = useState(0);
   const huddleState = useHuddleState();
-  const interruptionsState = useInterruptions();
+  const styleProfileState = useStyleProfile(user?.id);
   const {
     googleCloudApiKey,
     setGoogleCloudApiKey,
@@ -71,10 +78,9 @@ export const MainApp = () => {
   };
 
   const navTabs = [
-    { value: "huddle-play", label: "Huddle", icon: MessageSquare },
-    { value: "trello", label: "Trello", icon: Kanban },
-    { value: "interruptions", label: "Interruption", icon: Camera },
+    { value: "huddle-play", label: "Reply", icon: MessageSquare },
     { value: "past-huddles", label: "History", icon: History },
+    { value: "style-profile", label: "Profile", icon: UserRound },
   ];
 
   const tabContentVariants = {
@@ -140,40 +146,39 @@ export const MainApp = () => {
         />
 
         {/* Header + Tabs */}
-        <div className={`sticky top-0 z-40 backdrop-blur-xl ${scrolled ? 'bg-white/95 dark:bg-slate-950/95 shadow-lg shadow-black/10 dark:shadow-black/20' : 'bg-white/90 dark:bg-slate-950/90'} border-b border-gray-200 dark:border-white/5`}>
+        <div className={`sticky top-0 z-40 backdrop-blur-xl ${scrolled ? 'bg-[#f4efe7]/95 dark:bg-[#0d0c0b]/95 shadow-lg shadow-[#4d3c2a]/10 dark:shadow-black/20' : 'bg-[#f4efe7]/90 dark:bg-[#0d0c0b]/90'} border-b border-[#826f56]/15 dark:border-white/10`}>
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4 relative items-center text-center">
             <div className="flex flex-col items-center gap-2">
-              <div className={`h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-purple-500/20 mx-auto ${scrolled ? 'scale-95' : ''}`}>
-                <MessageSquare className="w-5 h-5 text-white" />
+              <div className={`h-11 w-11 rounded-xl bg-[#c49b5d] flex items-center justify-center shadow-lg shadow-[#c49b5d]/20 mx-auto transition-transform ${scrolled ? 'scale-95' : ''}`}>
+                <MessageSquare className="w-5 h-5 text-[#071326]" />
               </div>
               <div className="space-y-1 text-center">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Huddle Assistant</p>
-                <h1 className="text-base sm:text-lg md:text-xl font-display leading-tight text-slate-900 dark:text-white">Replies that stay human</h1>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#8f5b18] dark:text-[#d5aa67]">Huddle Assistant</p>
+                <h1 className="text-base sm:text-lg md:text-xl font-display leading-tight text-[#29231c] dark:text-[#f4efe7]">Replies that stay human</h1>
               </div>
             </div>
-            <div className="absolute right-3 top-3 flex items-center gap-3">
+            <div className="absolute right-16 top-3 flex items-center gap-3">
               {user?.email && (
                 <div className="user-chip hidden sm:flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10 text-xs text-slate-200">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+                  <div className="h-2 w-2 rounded-full bg-[#c49b5d]"></div>
                   {user.email}
                 </div>
               )}
             </div>
 
             <div className="relative w-full max-w-5xl mx-auto">
-              <div className="absolute inset-0 -z-10 rounded-[26px] bg-gradient-to-r from-cyan-400/25 via-indigo-500/20 to-purple-500/25 blur-xl" aria-hidden />
-              <TabsList className="group relative grid w-full grid-cols-4 overflow-hidden rounded-[22px] bg-slate-950/80 border border-white/10 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_15px_50px_-28px_rgba(0,0,0,0.8)]">
-                <div className="pointer-events-none absolute inset-0 rounded-[22px] bg-gradient-to-r from-white/10 via-white/0 to-white/10" aria-hidden />
+              <div className="absolute inset-0 -z-10 rounded-[26px] bg-[#c49b5d]/14 blur-xl" aria-hidden />
+              <TabsList className="group relative grid w-full grid-cols-3 overflow-hidden rounded-[22px] bg-white/80 dark:bg-[#171513]/90 border border-[#826f56]/15 dark:border-white/10 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_15px_50px_-28px_rgba(77,60,42,0.4)]">
                 {navTabs.map(({ value, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
                     value={value}
-                    className="group relative overflow-hidden rounded-full px-3 sm:px-4 py-2 text-[13px] sm:text-sm font-medium tracking-tight text-slate-200/80 hover:text-white transition-all duration-300 focus-visible:ring-0 focus-visible:outline-none data-[state=active]:text-white"
+                    className="group relative overflow-hidden rounded-full px-3 sm:px-4 py-2 text-[13px] sm:text-sm font-medium tracking-tight text-[#776b5d] dark:text-[#b4a89a] hover:text-[#29231c] dark:hover:text-[#f4efe7] transition-all duration-300 focus-visible:ring-2 focus-visible:ring-[#c49b5d]/50 focus-visible:outline-none data-[state=active]:text-[#071326] dark:data-[state=active]:text-[#071326]"
                   >
                     {activeTab === value && (
                       <motion.div
                         layoutId="tab-pill"
-                        className="absolute inset-0 rounded-full bg-gradient-to-r from-indigo-500/80 via-cyan-500/70 to-emerald-400/70 shadow-lg shadow-cyan-500/30"
+                        className="absolute inset-0 rounded-full bg-[#c49b5d] shadow-lg shadow-[#c49b5d]/25"
                         transition={{ type: 'spring', stiffness: 220, damping: 26 }}
                       />
                     )}
@@ -183,8 +188,6 @@ export const MainApp = () => {
                     </span>
                   </TabsTrigger>
                 ))}
-                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-slate-950 via-slate-950/80 to-transparent rounded-l-[22px]" aria-hidden />
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-slate-950 via-slate-950/80 to-transparent rounded-r-[22px]" aria-hidden />
               </TabsList>
             </div>
           </div>
@@ -201,22 +204,32 @@ export const MainApp = () => {
                 variants={tabContentVariants}
                 custom={direction}
               >
-                <TabsContent value="huddle-play" forceMount className={activeTab === 'huddle-play' ? 'block' : 'hidden'}>
-                  <HuddlePlayTab huddleState={huddleState} />
-                </TabsContent>
-                <TabsContent value="trello" forceMount className={activeTab === 'trello' ? 'block' : 'hidden'}>
-                  <TrelloTab />
-                </TabsContent>
-                <TabsContent value="interruptions" forceMount className={activeTab === 'interruptions' ? 'block' : 'hidden'}>
-                  <InterruptionsTab
-                    stories={interruptionsState.stories}
-                    processStories={interruptionsState.processStories}
-                    clearStories={interruptionsState.clearStories}
+                {activeTab === "huddle-play" && (
+                <TabsContent value="huddle-play">
+                  <HuddlePlayTab
+                    huddleState={huddleState}
+                    styleProfile={styleProfileState.profile}
                   />
                 </TabsContent>
-                <TabsContent value="past-huddles" forceMount className={activeTab === 'past-huddles' ? 'block' : 'hidden'}>
-                  <PastHuddlesTab />
-                </TabsContent>
+                )}
+                <Suspense
+                  fallback={
+                    <div className="flex min-h-48 items-center justify-center text-sm text-slate-500">
+                      Loading…
+                    </div>
+                  }
+                >
+                  {activeTab === "past-huddles" && (
+                    <TabsContent value="past-huddles">
+                      <HistoryTab />
+                    </TabsContent>
+                  )}
+                  {activeTab === "style-profile" && (
+                    <TabsContent value="style-profile">
+                      <ProfileStyleTab styleProfileState={styleProfileState} />
+                    </TabsContent>
+                  )}
+                </Suspense>
               </motion.div>
             </AnimatePresence>
           </div>
