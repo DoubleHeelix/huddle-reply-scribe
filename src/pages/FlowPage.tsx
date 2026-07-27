@@ -145,7 +145,15 @@ const personas = ["PMs", "Support", "Successful DTMs"];
 
 const FlowPage = () => {
   return (
-    <div className="min-h-screen bg-[#f4efe7] text-[#29231c] dark:bg-[#0d0c0b] dark:text-[#f4efe7] relative overflow-hidden">
+    <div
+      className="min-h-screen bg-[#f4efe7] text-[#29231c] dark:bg-[#0d0c0b] dark:text-[#f4efe7] relative overflow-hidden"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -left-24 top-12 w-72 h-72 rounded-full bg-[#c49b5d]/16 dark:bg-[#c49b5d]/12 blur-3xl" />
         <div className="absolute right-[-4rem] top-24 w-80 h-80 rounded-full bg-[#2f5d8c]/14 dark:bg-[#2f5d8c]/20 blur-3xl" />

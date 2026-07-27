@@ -5,6 +5,8 @@ import { User } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 import { AuthContext } from '@/hooks/useAuth';
 import { hasAdminRole } from '@/utils/adminRole';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -18,11 +20,16 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
 
   useEffect(() => {
     let isMounted = true;
+    let appUrlListener: PluginListenerHandle | null = null;
 
-    const handleAuthFromUrl = async () => {
-      const url = new URL(window.location.href);
+    const handleAuthFromUrl = async (rawUrl: string) => {
+      let url: URL;
+      try {
+        url = new URL(rawUrl);
+      } catch {
+        return;
+      }
       const code = url.searchParams.get('code');
-      const type = url.searchParams.get('type');
 
       if (!code) return;
 
@@ -52,12 +59,26 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
       });
 
       // Remove auth params from the URL so we don't re-run the exchange.
-      const cleanedParams = new URLSearchParams(window.location.search);
-      cleanedParams.delete('code');
-      cleanedParams.delete('type');
-      const cleanedUrl = `${window.location.pathname}${cleanedParams.toString() ? `?${cleanedParams}` : ''}${window.location.hash}`;
-      window.history.replaceState({}, document.title, cleanedUrl);
+      if (!Capacitor.isNativePlatform()) {
+        const cleanedParams = new URLSearchParams(window.location.search);
+        cleanedParams.delete('code');
+        cleanedParams.delete('type');
+        const cleanedUrl = `${window.location.pathname}${cleanedParams.toString() ? `?${cleanedParams}` : ''}${window.location.hash}`;
+        window.history.replaceState({}, document.title, cleanedUrl);
+      }
     };
+
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+        void handleAuthFromUrl(url);
+      }).then((listener) => {
+        if (isMounted) {
+          appUrlListener = listener;
+        } else {
+          void listener.remove();
+        }
+      });
+    }
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -71,7 +92,14 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
 
     // Check for existing session
     const initializeSession = async () => {
-      await handleAuthFromUrl();
+      if (Capacitor.isNativePlatform()) {
+        const launchUrl = await CapacitorApp.getLaunchUrl();
+        if (launchUrl?.url) {
+          await handleAuthFromUrl(launchUrl.url);
+        }
+      } else {
+        await handleAuthFromUrl(window.location.href);
+      }
 
       if (!isMounted) return;
 
@@ -104,6 +132,9 @@ export const AuthWrapper = ({ children }: AuthWrapperProps) => {
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      if (appUrlListener) {
+        void appUrlListener.remove();
+      }
     };
   }, [toast]);
 

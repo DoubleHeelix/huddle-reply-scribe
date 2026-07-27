@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Huddle Assistant</string>
+    <string name="title_activity_main">Huddle Assistant</string>
+    <string name="package_name">com.doubleheelix.huddleassistant</string>
+    <string name="custom_url_scheme">com.doubleheelix.huddleassistant</string>
+</resources>
