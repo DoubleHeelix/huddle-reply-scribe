@@ -40,6 +40,8 @@ const stripControlChars = (value: string) =>
   Array.from(value)
     .filter((char) => {
       const code = char.charCodeAt(0);
+      // Tabs and line endings are intentional formatting, not unsafe controls.
+      if (code === 9 || code === 10 || code === 13) return true;
       return !((code >= 0 && code <= 31) || (code >= 127 && code <= 159));
     })
     .join("");

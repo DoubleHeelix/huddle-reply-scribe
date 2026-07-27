@@ -426,7 +426,7 @@ export const PeopleTab = () => {
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm text-gray-200 font-sans line-clamp-2">
+                          <div className="whitespace-pre-wrap text-sm text-gray-200 font-sans line-clamp-2">
                             {huddle.user_draft}
                           </div>
                           <div className="flex items-start gap-2 text-xs text-gray-400 font-sans">
@@ -477,7 +477,7 @@ export const PeopleTab = () => {
                             </div>
                           </div>
 
-                          <div className="bg-gray-800/60 border border-gray-700/60 rounded-md p-2 text-xs text-white font-sans">
+                          <div className="whitespace-pre-wrap bg-gray-800/60 border border-gray-700/60 rounded-md p-2 text-xs text-white font-sans">
                             {huddle.final_reply || huddle.generated_reply}
                           </div>
                         </div>
