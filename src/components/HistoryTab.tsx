@@ -229,8 +229,8 @@ export const HistoryTab = () => {
                       Your draft
                     </p>
                     <p
-                      className={`text-sm leading-relaxed text-[#776b5d] dark:text-[#b4a89a] ${
-                        expanded ? "whitespace-pre-wrap" : "line-clamp-3"
+                      className={`whitespace-pre-wrap text-sm leading-relaxed text-[#776b5d] dark:text-[#b4a89a] ${
+                        expanded ? "" : "line-clamp-3"
                       }`}
                     >
                       {huddle.user_draft || "Draft unavailable"}
@@ -242,8 +242,8 @@ export const HistoryTab = () => {
                       Final reply
                     </p>
                     <p
-                      className={`text-[15px] leading-7 text-[#29231c] dark:text-[#f4efe7] ${
-                        expanded ? "whitespace-pre-wrap" : "line-clamp-3"
+                      className={`whitespace-pre-wrap text-[15px] leading-7 text-[#29231c] dark:text-[#f4efe7] ${
+                        expanded ? "" : "line-clamp-3"
                       }`}
                     >
                       {reply || "Reply unavailable"}

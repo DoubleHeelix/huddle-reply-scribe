@@ -314,7 +314,7 @@ const VirtualizedHuddleList = ({
                       Your Draft:
                     </p>
                     <p
-                      className={`text-gray-800 dark:text-gray-200 text-sm font-sans ${
+                      className={`whitespace-pre-wrap text-gray-800 dark:text-gray-200 text-sm font-sans ${
                         !isDraftExpanded(huddle.id) && 'line-clamp-2'
                       }`}
                     >
@@ -336,7 +336,7 @@ const VirtualizedHuddleList = ({
                       {huddle.final_reply ? 'Final Reply:' : 'Generated Reply:'}
                     </p>
                     <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <p className="text-gray-900 dark:text-white text-sm font-sans">
+                      <p className="whitespace-pre-wrap text-gray-900 dark:text-white text-sm font-sans">
                         {huddle.final_reply || huddle.generated_reply}
                       </p>
                     </div>

@@ -13,6 +13,7 @@ import {
 } from "../shared/huddleModelRouting.ts";
 import { shouldGenerateHuddleEmbedding } from "../shared/huddleCostPolicy.ts";
 import { stopWords } from "../shared/stopWords.ts";
+import { sanitizeReply } from "../shared/replyFormatting.ts";
 
 // Exclude obvious system/prompt words from phrase extraction.
 const PHRASE_BANLIST = new Set([
@@ -391,10 +392,6 @@ function median(nums: number[]): number {
   return sorted[mid];
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function buildSlangAddressTerms(terms: string[] = []): string[] {
   const merged = [...defaultSlangAddressTerms, ...terms];
   return Array.from(
@@ -406,62 +403,11 @@ function buildSlangAddressTerms(terms: string[] = []): string[] {
   );
 }
 
-function buildSlangAddressRegex(terms: string[]): RegExp | null {
-  if (!terms.length) return null;
-  const escaped = terms.map(escapeRegex).join("|");
-  return new RegExp(`,\\s+(${escaped})(?=$|\\s|[.!?])`, "gi");
-}
-
-function removeVocativeComma(text: string, terms: string[] = []): string {
-  if (!terms.length) return text;
-  const regex = buildSlangAddressRegex(terms);
-  if (!regex) return text;
-  return text.replace(regex, " $1");
-}
-
 function topItems(map: Map<string, number>, limit: number): string[] {
   return Array.from(map.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key]) => key);
-}
-
-function stripControlChars(value: string): string {
-  return Array.from(value)
-    .filter((char) => {
-      const code = char.charCodeAt(0);
-      return !((code >= 0 && code <= 31) || (code >= 127 && code <= 159));
-    })
-    .join("");
-}
-
-// Remove control characters and odd symbols that occasionally appear in model output.
-function sanitizeReply(
-  text: string,
-  options: { trim?: boolean; slangAddressTerms?: string[] } = {}
-): string {
-  if (!text) return "";
-  let cleaned = text;
-
-  cleaned = stripControlChars(cleaned)
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/[^\S\n]+/gu, " ")
-    // Keep letters, numbers, punctuation, spaces, line breaks, and emoji; drop other symbols
-    .replace(
-      /[^\p{L}\p{N}\p{P}\p{Zs}\n\r\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
-      " "
-    )
-    // Normalize runs of spaces/tabs
-    .replace(/[ \t]+/g, " ")
-    // Limit excessive blank lines
-    .replace(/\n{3,}/g, "\n\n");
-
-  if (options.slangAddressTerms?.length) {
-    cleaned = removeVocativeComma(cleaned, options.slangAddressTerms);
-  }
-
-  return options.trim ? cleaned.trim() : cleaned;
 }
 
 function computeStyleFingerprint(drafts: string[]): StyleFingerprint {
@@ -1450,6 +1396,7 @@ Input handling (critical):
 - The supplied input type is "${effectiveDraftInputMode}".
 - If it is "draft": treat the user's wording as the primary voice evidence. Preserve every concrete fact, commitment, question, boundary, emotional stance, and recognizable phrase unless it is genuinely unclear. Refine conservatively; do not replace the user's personality with generic polish.
 - If it is "direction": treat the input as instructions for the final message, not text to repeat. Build the complete reply from the stated goal, the conversation, accepted-reply examples, and the style profile. Never expose planning language such as "tell them", "ask him", or "keep it casual" in the final reply.
+- Preserve intentional line breaks and paragraph boundaries. For a draft, keep the same paragraph structure. For a direction, treat separate lines or paragraphs as separate ideas and return readable paragraph breaks.
 - If the classification appears uncertain, behave conservatively: preserve supplied wording and never invent missing personal details.
 
 Authenticity evidence priority:
@@ -1484,6 +1431,7 @@ Context Tools:
 
 Output Rules:
 - Aim for 2–4 sentences; exceed only if necessary for clarity (max 10).
+- Never collapse separate paragraphs into one block of text.
 - Only return the final message—no commentary, labels, analysis, or quotation marks.
 - The result should feel organic and human, not over-engineered.
 - Prioritize clarity, connection, and authenticity.`;
@@ -2581,7 +2529,7 @@ ${
         messages: [
           {
             role: "system",
-            content: `${instruction}. Keep the core message and meaning intact, just adjust the tone. Respond with only the adjusted message, no explanations.`,
+            content: `${instruction}. Keep the core message and meaning intact, just adjust the tone. Preserve every existing line break and paragraph boundary; do not merge paragraphs. Respond with only the adjusted message, no explanations.`,
           },
           {
             role: "user",

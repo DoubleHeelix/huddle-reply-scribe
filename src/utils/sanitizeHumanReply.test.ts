@@ -12,6 +12,23 @@ describe("sanitizeHumanReply", () => {
     expect(sanitizeHumanReply(input)).toBe("hello world!");
   });
 
+  it("preserves line breaks and paragraph boundaries", () => {
+    const input = "First line.\nSecond line.\n\nSecond paragraph.";
+    expect(sanitizeHumanReply(input)).toBe(input);
+  });
+
+  it("normalizes pasted line endings and excessive blank lines", () => {
+    const input = "First paragraph.\r\n\r\n\r\nSecond paragraph.";
+    expect(sanitizeHumanReply(input)).toBe(
+      "First paragraph.\n\nSecond paragraph."
+    );
+  });
+
+  it("normalizes tabs without removing line breaks", () => {
+    const input = "First\tline.\n\nSecond\tline.";
+    expect(sanitizeHumanReply(input)).toBe("First line.\n\nSecond line.");
+  });
+
   it("normalizes fancy quotes and ellipsis", () => {
     const input = "“wow…” they said ‘cool’";
     expect(sanitizeHumanReply(input)).toBe('"wow..." they said \'cool\'');
