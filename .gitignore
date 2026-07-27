@@ -14,6 +14,9 @@ dist-ssr
 *.tsbuildinfo
 supabase/.env
 supabase/.temp/linked-project.json
+android/*.jks
+android/*.keystore
+android/keystore.properties
 
 # Local visual QA artifacts may contain signed-in or conversation data.
 design-audit/

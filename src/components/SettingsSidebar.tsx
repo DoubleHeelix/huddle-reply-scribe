@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { syncNativeTheme } from "@/utils/nativeApp";
 
 const DocumentProcessor = lazy(() =>
   import("./DocumentProcessor").then((module) => ({
@@ -68,6 +69,7 @@ export const SettingsSidebar = ({
       root.classList.add('dark');
     }
     localStorage.setItem('theme_preference', theme);
+    void syncNativeTheme(theme);
   }, [theme]);
 
   const handleDeleteAll = async () => {

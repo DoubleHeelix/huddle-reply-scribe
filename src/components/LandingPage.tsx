@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Sparkles, Mail, Lock, UserPlus, LogIn, ShieldCheck, Bot } from "lucide-react";
+import { getAuthRedirectUrl } from "@/utils/nativeApp";
 
 const LandingPage = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -43,7 +44,7 @@ const LandingPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = getAuthRedirectUrl();
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -78,7 +79,15 @@ const LandingPage = () => {
   const isSignup = authMode === 'signup';
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#f4efe7] text-[#29231c] dark:bg-[#0d0c0b] dark:text-[#f4efe7]">
+    <div
+      className="min-h-screen relative overflow-hidden bg-[#f4efe7] text-[#29231c] dark:bg-[#0d0c0b] dark:text-[#f4efe7]"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <div className="absolute inset-0 pointer-events-none opacity-70 dark:opacity-60">
         <div className="pattern-grid absolute inset-0" />
         <div className="absolute -left-24 top-10 w-64 h-64 sm:w-80 sm:h-80 rounded-full blur-3xl bg-[#c49b5d]/20 dark:bg-[#c49b5d]/15" />
@@ -186,7 +195,6 @@ const LandingPage = () => {
                     className="bg-[#fffcf7] border-[#826f56]/20 text-[#29231c] placeholder:text-[#776b5d] dark:bg-[#0d0c0b]/70 dark:border-white/10 dark:text-[#f4efe7] dark:placeholder:text-[#8f8477] h-12 text-center"
                     required
                   />
-                  <p className="text-xs text-[#776b5d] dark:text-[#b4a89a] text-center">We’ll keep you signed in on this device.</p>
                 </div>
 
                 <Button

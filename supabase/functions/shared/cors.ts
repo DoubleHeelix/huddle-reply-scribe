@@ -3,6 +3,8 @@ const defaultAllowedOrigins = [
   "https://localhost:8080",
   "http://localhost:8081",
   "https://localhost:8081",
+  "https://localhost",
+  "capacitor://localhost",
   "https://huddle-reply-scribe-production.up.railway.app",
 ];
 

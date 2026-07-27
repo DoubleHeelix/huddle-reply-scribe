@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { syncNativeTheme } from "@/utils/nativeApp";
 
 type ThemeToggleProps = {
   className?: string;
@@ -17,6 +18,7 @@ const ThemeToggle = ({ className = "" }: ThemeToggleProps) => {
     root.classList.add(nextTheme);
     localStorage.setItem("theme_preference", nextTheme);
     setTheme(nextTheme);
+    void syncNativeTheme(nextTheme);
   };
 
   return (
